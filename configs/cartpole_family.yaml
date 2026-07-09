@@ -1,0 +1,53 @@
+# Tier 1: parametric CartPole family (README development tier). MLP policy,
+# Monte-Carlo estimator. First non-tabular test of the alternation.
+experiment:
+  name: cartpole_family
+  seed: 42
+  results_dir: results
+  log_every: 5
+
+env:
+  family: cartpole
+  params:
+    gamma: 0.99
+    max_steps: 200
+  tasks:              # physics shifts strong enough to induce interference
+    - {}                                  # default CartPole-v1
+    - { length: 1.2, masspole: 0.3 }      # long heavy pole
+    - { gravity: 14.7, force_mag: 6.0 }   # high gravity, weak cart
+
+policy:
+  kind: mlp
+  hidden_sizes: [64, 64]
+  task_conditioned: false   # flip on if small eps proves infeasible (README risk 2)
+
+estimator:
+  kind: monte_carlo
+  episodes_per_eval: 16
+  episodes_per_grad: 16
+  episodes_per_ref: 64
+  baseline: batch_mean
+  time_discount_weighting: true
+
+duals:
+  kind: projected_ascent
+  # Squared shortfall on returns of scale ~tens: gap of g gives F ~ g^2, so eta
+  # is small. Watch mu/lambda magnitudes on the first run and retune.
+  lr: 0.0005
+  init: 0.0
+  max_value: 50.0
+  warm_start: true
+
+trainer:
+  cycles_per_task: 2
+  local_steps: 100
+  global_steps: 100
+  task1_steps: 300
+  lr_local: 0.01
+  lr_global: 0.01
+  optimizer: adam     # REINFORCE on MLPs wants adaptive steps
+  eps: 4.0            # squared-return units: tolerated return gap ~ sqrt(4) = 2
+  past_task_sampling: all
+  entropy_coef: 0.01
+  eval_episodes: 32
+  eval_all_tasks: true

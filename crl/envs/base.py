@@ -1,0 +1,66 @@
+"""Task and task-family abstractions.
+
+A *task* is one MDP ``M_i = (S, A, P_i, r_i, rho_i, gamma)`` (eq 1); a
+*family* is the ordered sequence of tasks presented to the learner. State
+and action spaces are shared across the family; only dynamics, rewards and
+initial distributions vary.
+"""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import Any
+
+import gymnasium as gym
+import torch
+
+
+@dataclass
+class TaskSpec:
+    """Identity and parameters of one task in a family."""
+
+    task_id: int  # 0-based arrival index
+    name: str
+    params: dict[str, Any] = field(default_factory=dict)
+
+
+class Task(ABC):
+    """One MDP. Environments returned by :meth:`make_env` are fresh copies."""
+
+    def __init__(self, spec: TaskSpec, gamma: float) -> None:
+        self.spec = spec
+        self.gamma = gamma
+
+    @abstractmethod
+    def make_env(self) -> gym.Env:
+        """Instantiate a Gymnasium environment for this task."""
+
+
+class TabularTask(Task):
+    """A task that additionally exposes exact MDP tensors.
+
+    Attributes:
+        transition: ``[S, A, S]`` next-state distribution ``P_i``.
+        reward: ``[S, A]`` expected immediate reward ``r_i``.
+        initial_dist: ``[S]`` initial state distribution ``rho_i``.
+
+    Exact (dynamic-programming) estimators require these; sampled
+    estimators only need :meth:`make_env`.
+    """
+
+    transition: torch.Tensor
+    reward: torch.Tensor
+    initial_dist: torch.Tensor
+
+
+class TaskFamily(ABC):
+    """Ordered task sequence with shared observation/action spaces."""
+
+    tasks: list[Task]
+    obs_dim: int
+    num_actions: int
+    is_tabular: bool = False
+
+    def __len__(self) -> int:
+        return len(self.tasks)

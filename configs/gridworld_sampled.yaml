@@ -1,0 +1,55 @@
+# Tier 0b: same gridworld, Monte-Carlo estimator. Isolates estimator noise:
+# any qualitative difference from gridworld_exact.yaml is sampling error, not
+# the method. Cross-checks the REINFORCE machinery before CartPole.
+experiment:
+  name: gridworld_sampled
+  seed: 42
+  results_dir: results
+  log_every: 10
+
+env:
+  family: gridworld
+  params:
+    size: 5
+    slip: 0.1
+    gamma: 0.95
+    goal_reward: 1.0
+    step_penalty: 0.0
+    start: uniform
+    max_steps: 100
+  tasks:
+    - goal: [0, 4]
+    - goal: [4, 0]
+    - goal: [4, 4]
+
+policy:
+  kind: tabular
+
+estimator:
+  kind: monte_carlo
+  episodes_per_eval: 32
+  episodes_per_grad: 32
+  episodes_per_ref: 128
+  baseline: batch_mean
+  time_discount_weighting: true
+
+duals:
+  kind: projected_ascent
+  lr: 1.5            # smaller than exact tier: F-hat is noisy
+  init: 0.0
+  max_value: 100.0
+  warm_start: true
+
+trainer:
+  cycles_per_task: 3
+  local_steps: 150
+  global_steps: 150
+  task1_steps: 400
+  lr_local: 0.5
+  lr_global: 0.5
+  optimizer: sgd
+  eps: 0.0025        # squared-value units (tolerated value gap ~ 0.05)
+  past_task_sampling: all
+  entropy_coef: 0.0
+  eval_episodes: 64
+  eval_all_tasks: true
