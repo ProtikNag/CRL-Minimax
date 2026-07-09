@@ -144,11 +144,15 @@ diagnostics (dual dynamics, gap sequences, forgetting matrix).
 1. **Exact gridworld** (`gridworld_exact`, `gridworld_nn_three_task`).
    Zero-variance DP estimator; verifies the update rules and, with the
    multi-head network, the multi-task retention result. The canonical demos.
-2. **Sampled gridworld** (`gridworld_sampled`,
-   `gridworld_nn_three_task_sampled`). REINFORCE estimator; first test with
-   real rollouts and sampling noise. **The recommended next experiment.**
-3. **CartPole family** (`cartpole_family`). First continuous-control tier.
-4. **Paper tier.** MiniGrid goal families, then an Atari 3–6 game subset
+2. **Many-task exact** (`gridworld_manytask_exact`). Six tasks on a 7×7 grid;
+   validated scaling check (ours retains all six, fine-tuning collapses). Add
+   goals to reach 5–10 tasks.
+3. **Sampled / many-task** (`gridworld_manytask_sampled`,
+   `gridworld_nn_three_task_sampled`). REINFORCE estimator; real rollouts and
+   sampling noise. **The next experiment** (needs HPC at 6+ tasks; see
+   `HANDOFF.md` ►►START HERE and `scripts/hpc_baseline.sbatch`).
+4. **CartPole family** (`cartpole_family`). First continuous-control tier.
+5. **Paper tier.** MiniGrid goal families, then an Atari 3–6 game subset
    (Pong → Boxing → …), matching the scale of RePR. Requires actor-critic.
 
 ## 6. Open issues (ordered by severity)

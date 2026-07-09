@@ -3,6 +3,39 @@
 State of the project and what to do next. Written for a fresh session (on
 Hyperion or elsewhere) that needs to continue without the prior context.
 
+## ►► START HERE: the next experiment (HPC)
+
+Scale from the validated 6-task exact result to **6–10 tasks under real
+rollouts** on the cluster. The exact-estimator many-task result is already
+validated (`gridworld_manytask_exact`, committed under
+`reports/gridworld_manytask/` — ours retains all 6 tasks at 100% success,
+fine-tuning collapses). The next step swaps to the sampled estimator, which is
+what actually needs HPC (every step rolls out the current task plus each past
+task).
+
+```bash
+# On the cluster:
+sbatch scripts/hpc_baseline.sbatch          # runs configs/gridworld_manytask_sampled.yaml
+# or directly:
+python -m experiments.baseline_comparison \
+    --config configs/gridworld_manytask_sampled.yaml --name gridworld_manytask_sampled
+```
+
+What to do:
+1. Run it; the hyperparameters in `gridworld_manytask_sampled.yaml` are a
+   starting point. Inspect `reports/.../figures/constrained/` — the dual (`μ`,
+   `λ`) magnitudes and the gap figure. Lower `duals.lr` if the multipliers
+   oscillate; raise `estimator.episodes_per_grad` if learning is too noisy.
+2. Once it works at 6 tasks, add goals under `env.tasks` to reach 8–10 tasks,
+   and set `trainer.past_task_sampling: sample` to keep per-step cost at O(1).
+3. Commit `reports/gridworld_manytask_sampled/` from the node and push so it can
+   be pulled locally (only `reports/` is tracked; `results/` stays on the node).
+
+After that: a **larger environment** than gridworld. Cheapest step up is the
+CartPole family (`cartpole_family.yaml`, already implemented — switch its policy
+to `kind: multihead`); then MiniGrid (a new env family to add under
+`crl/envs/`), then a 3-game Atari subset (needs an actor-critic estimator).
+
 ## Where things stand
 
 The full method from `docs/Objective_for_Continual_Reinforcement_Learning.pdf`
@@ -118,36 +151,32 @@ The pair can cycle (each phase moves the other's reference). Always inspect the
 contribution. Mitigations to try if cycling appears: shorter phases, Polyak-
 averaged references, the PID dual controller (`duals.kind: pid`).
 
-## Recommended next experiment (lowest cost, highest signal)
+## Experiment roadmap (after the many-task sampled run above)
 
-The neural 3-task result is done (exact estimator). Do **not** jump to Atari.
-In order:
-
-1. **`gridworld_nn_three_task_sampled`** — the single most valuable next run.
-   Same multi-head network and tasks, but the Monte-Carlo estimator, so it is
-   the *first test with real environment rollouts and sampling noise* and it
-   exercises the past-task rollout machinery. The plumbing is verified; the
-   hyperparameters are a starting point (retune `duals.lr` and
-   `episodes_per_grad` from the `μ`/`λ` and gap figures). One command:
-   `python -m experiments.compare_constraint --config configs/gridworld_nn_three_task_sampled.yaml --name nn_three_task_sampled`
-2. **Sweep `ε` and `duals.lr`** with `experiments/sweep.py` on the exact neural
-   tier (`configs/sweeps/eps_grid.yaml`) across 3 seeds; produce the
-   constraint-strength ablation (paper Fig 4). Exact estimator = seconds per run.
-3. **`cartpole_family`** (multi-head MLP, sampled) — first continuous-control
-   tier; expect to retune `duals.lr` and `ε`.
-4. Only then MiniGrid (another shared-state family), then a 3-game Atari subset
+1. **6→10 task sampled gridworld** — the ►►START HERE job. Real rollouts, HPC.
+2. **Sweep `ε` and `duals.lr`** with `experiments/sweep.py` on the exact
+   many-task tier (`configs/sweeps/eps_grid.yaml`, `scripts/hpc_sweep.sbatch`)
+   across 3 seeds; produce the constraint-strength ablation (paper Fig 4).
+3. **CartPole family** (`cartpole_family`, switch policy to `kind: multihead`)
+   — first continuous-control tier; expect to retune `duals.lr` and `ε`.
+4. **MiniGrid** (a new env family under `crl/envs/`), then a 3-game Atari subset
    (Pong → Boxing → third), which needs an actor-critic estimator (new backend
    in `crl/estimators/`).
 
 ## Generating figures
 
-- Full bundle for an experiment (runs constrained + baseline, all figures +
-  tables into `reports/<name>/`):
+- Full four-method bundle (ours + fine-tune + ablation + joint) into
+  `reports/<name>/`:
+  `python -m experiments.baseline_comparison --config <cfg> --name <name>`
+- Two-method constrained-vs-ablation bundle only:
   `python -m experiments.compare_constraint --config <cfg> --name <name>`
 - Single-run diagnostics only:
   `python -m analysis.plots --run results/<run_dir>`
 - Conceptual figures only (design-space map, method schematic):
   `python -m analysis.schematics --out <figures_dir>`
+
+Raw runs go to `results/` (gitignored); curated bundles to `reports/` (tracked).
+See `reports/README.md` for the folder layout.
 
 Every figure is written in both PNG and SVG into split `png/` and `svg/`
 subfolders, with titles, axis labels, legends, and the academic palette
