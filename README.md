@@ -108,20 +108,30 @@ python -m experiments.compare_constraint \
 # -> reports/nn_three_task/figures/{png,svg}/  and  tables/retention_table.csv
 ```
 
-**Headline result** (3-task gridworld, multi-head MLP, exact estimator). Value
-is what the algorithm optimizes; task performance is what matters. Both are
-reported (`reports/<name>/tables/`):
+**Headline result** (3-task gridworld, multi-head MLP, exact estimator). Success
+rate (fraction of episodes that reach the goal) per task, deployed policy:
 
-| | Constrained (ours) | Unconstrained baseline |
-|---|---|---|
-| Value, per task | 0.83 / 0.83 / 0.83 | 0.83 / 0.83 / **0.20** |
-| Success rate (goal reached) | 100% / 100% / **100%** | 100% / 100% / **69%** |
-| Mean steps to goal | 4.8 / 4.5 / 4.4 | 4.9 / 4.5 / **59** |
+| Method | Task 1 | Task 2 | Task 3 | Fails on |
+|--------|--------|--------|--------|----------|
+| **Constrained min-max (ours)** | **100%** | **100%** | **100%** | nothing |
+| Naive fine-tuning (single net, sequential) | 49% | 100% | 100% | oldest task |
+| Unconstrained ablation (duals off) | 100% | 100% | 69% | newest task |
+| Joint multi-task (upper bound) | 100% | 100% | 100% | — |
 
-A value of 0.83 is optimal here (100% success, ~4.5-step paths). The baseline
-forgets the newest task: its deployed policy solves task 3 only 69% of the time
-and wanders (~59 steps). The tabular 2-task `gridworld_exact` is the smaller
-zero-neural-network sanity demo.
+The two standard baselines fail in *opposite* directions: naive sequential
+fine-tuning forgets the **oldest** task (classic catastrophic forgetting), while
+the constraint-off ablation forgets the **newest** (the global over-consolidates
+the past). Our method retains all three and matches the joint upper bound. Both
+value and performance tables are written to `reports/<name>/tables/`; a value of
+0.83 is optimal here (100% success, ~4.5-step paths). The tabular 2-task
+`gridworld_exact` is the smaller zero-neural-network sanity demo.
+
+Reproduce the full four-method comparison and figure bundle with:
+
+```bash
+python -m experiments.baseline_comparison \
+    --config configs/gridworld_nn_three_task.yaml --name nn_three_task
+```
 
 Figures are written to `reports/<name>/figures/png/` and `.../svg/`, with
 per-method diagnostics under `.../figures/<method>/`. The bundle includes the

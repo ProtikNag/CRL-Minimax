@@ -21,6 +21,13 @@ retains every task; the unconstrained baseline forgets the newest one.
   24% retained). Reproduce both + all figures with one command:
   `python -m experiments.compare_constraint --config configs/gridworld_nn_three_task.yaml --name nn_three_task`
 - The tabular 2-task `gridworld_exact` remains the smallest sanity demo.
+- **Baselines** (all same network/tasks/estimator, only the procedure differs;
+  `python -m experiments.baseline_comparison --config <cfg> --name <name>`):
+  naive sequential fine-tuning of one network forgets the OLDEST task
+  (49% / 100% / 100% success); the constraint-off ablation forgets the NEWEST
+  (100% / 100% / 69%); joint multi-task is the upper bound (all 100%). Ours
+  matches the upper bound. The two standard failures are in opposite directions,
+  which is the core narrative. Baseline trainers live in `crl/baselines.py`.
 - **Figures** land under `reports/<name>/` (tracked in git; raw runs stay in
   `results/`, gitignored). The committed bundle for the neural experiment is in
   `reports/nn_three_task/` (PNG + SVG, per-method diagnostics, retention CSV).

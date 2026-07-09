@@ -100,7 +100,7 @@ def plot_retention_curves(runs: dict[str, Path], out_dir: Path) -> None:
     ax.set_xlabel("Cumulative primal steps across all phases")
     ax.legend(loc="center right", fontsize=9)
 
-    fig.suptitle("Per-task retention: constrained min-max vs unconstrained baseline",
+    fig.suptitle("Per-task retention across methods (green = ours retains all)",
                  fontweight="600", y=0.995)
     fig.tight_layout()
     save_figure(fig, out_dir, "retention_curves")
