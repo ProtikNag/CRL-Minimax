@@ -1,0 +1,9 @@
+method,task,final_value,expert_value,retention_pct
+constrained,1,0.8347,0.8347,100.0
+constrained,2,0.8345,0.8347,100.0
+constrained,3,0.8337,0.8338,100.0
+constrained,mean,0.8343,0.8344,100.0
+unconstrained,1,0.8347,0.8347,100.0
+unconstrained,2,0.8347,0.8347,100.0
+unconstrained,3,0.2018,0.8338,24.2
+unconstrained,mean,0.6237,0.8344,74.7

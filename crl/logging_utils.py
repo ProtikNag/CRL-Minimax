@@ -24,7 +24,9 @@ class RunLogger:
         self.run_dir.mkdir(parents=True, exist_ok=True)
         with open(self.run_dir / "config.yaml", "w") as handle:
             yaml.safe_dump(config, handle, sort_keys=False)
-        self._log_file = open(self.run_dir / "logs.jsonl", "a")
+        # Truncate: re-running a config must overwrite its log, not append
+        # (appending concatenates runs and corrupts step-indexed plots).
+        self._log_file = open(self.run_dir / "logs.jsonl", "w")
         self._start_time = time.time()
 
     def log(self, record: dict[str, Any]) -> None:

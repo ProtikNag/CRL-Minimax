@@ -1,0 +1,7 @@
+method,task,success_rate_pct,mean_return,mean_steps
+constrained,1,100.0,1.0,4.8
+constrained,2,100.0,1.0,4.5
+constrained,3,100.0,1.0,4.4
+unconstrained,1,100.0,1.0,4.9
+unconstrained,2,100.0,1.0,4.5
+unconstrained,3,68.7,0.687,59.2

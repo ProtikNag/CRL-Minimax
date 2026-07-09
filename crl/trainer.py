@@ -98,6 +98,7 @@ class AlternationTrainer:
         self.mu_ctrl = make_dual(self.dual_cfg)
 
         self.eval_matrix: list[list[float]] = []  # row per finished task
+        self.cumulative_step = 0  # primal steps across all phases (probe x-axis)
 
     # ------------------------------------------------------------------ #
     # helpers
@@ -145,6 +146,31 @@ class AlternationTrainer:
             for i in range(last)
         ]
 
+    def _maybe_probe(self, current_task: int, phase_type: str) -> None:
+        """Record the global policy's value on every task vs cumulative step.
+
+        This is the learning-curve data (Fig 3). The global is frozen during
+        local phases, so its curve is flat there by construction; task-boundary
+        markers come from the recorded ``current_task``.
+        """
+        self.cumulative_step += 1
+        every = self.cfg.eval_probe_every
+        if not every or self.cumulative_step % every != 0:
+            return
+        values = [
+            self.estimator.evaluate(self.global_policy, self.family.tasks[i])
+            for i in range(len(self.family))
+        ]
+        self.logger.log(
+            {
+                "phase": "probe",
+                "cumulative_step": self.cumulative_step,
+                "current_task": current_task,
+                "phase_type": phase_type,
+                "values": values,
+            }
+        )
+
     # ------------------------------------------------------------------ #
     # phases
     # ------------------------------------------------------------------ #
@@ -163,6 +189,7 @@ class AlternationTrainer:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            self._maybe_probe(current_task=1, phase_type="task1")
             if step % self.log_every == 0:
                 self.logger.log({"phase": "task1", "task": 1, "step": step, **stats})
                 print(f"[task1] step={step:4d} V1={stats['value']:.4f}")
@@ -219,6 +246,7 @@ class AlternationTrainer:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            self._maybe_probe(current_task=k, phase_type="local")
 
             if step % self.log_every == 0:
                 self.logger.log(
@@ -276,6 +304,7 @@ class AlternationTrainer:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            self._maybe_probe(current_task=k, phase_type="global")
 
             if step % self.log_every == 0:
                 self.logger.log(

@@ -6,19 +6,24 @@ Hyperion or elsewhere) that needs to continue without the prior context.
 ## Where things stand
 
 The full method from `docs/Objective_for_Continual_Reinforcement_Learning.pdf`
-is implemented and **working in the exact-gradient setting**. The core claim is
-demonstrated: on a 2-task gridworld the constrained global policy retains both
-tasks while an unconstrained baseline forgets the newest one.
+is implemented and **working with a real neural network on a 3-task sequence**
+(exact estimator). Core claim demonstrated: the constrained global policy
+retains every task; the unconstrained baseline forgets the newest one.
 
-- 19/19 tests pass (`pytest -q`, ~5 s CPU). Includes an exact-vs-finite-
-  difference gradient check, Monte-Carlo/exact agreement, dual dynamics, and an
-  end-to-end acceptance test comparing constrained vs unconstrained retention.
-- `configs/gridworld_exact.yaml` is the canonical demo. Result:
-  `eval_matrix = [[0.535, 0.106], [0.556, 0.555]]` (rows = after task 1 / after
-  task 2; cols = value on task 1 / task 2). Unconstrained baseline collapses
-  task 2 to ~0.05.
-- Figures (PNG + SVG) via `python -m analysis.plots --run <dir>`: dual
-  trajectories, gap sequences (cycling diagnostic), forgetting matrix, retention.
+- 21/21 tests pass (`pytest -q`, ~20 s CPU). Includes an exact-vs-finite-
+  difference gradient check, Monte-Carlo/exact agreement, dual dynamics, and
+  two end-to-end acceptance tests (tabular 2-task, and multi-head neural
+  3-task).
+- **Headline (neural) result**, `configs/gridworld_nn_three_task.yaml`, a
+  multi-head MLP (shared trunk + one head per task) on 3 gridworld tasks:
+  constrained final row ≈ `[0.83, 0.83, 0.83]` (all retained, 100% of expert);
+  unconstrained (`duals.lr: 0`) ≈ `[0.83, 0.83, 0.20]` (newest task forgotten,
+  24% retained). Reproduce both + all figures with one command:
+  `python -m experiments.compare_constraint --config configs/gridworld_nn_three_task.yaml --name nn_three_task`
+- The tabular 2-task `gridworld_exact` remains the smallest sanity demo.
+- **Figures** land under `reports/<name>/` (tracked in git; raw runs stay in
+  `results/`, gitignored). The committed bundle for the neural experiment is in
+  `reports/nn_three_task/` (PNG + SVG, per-method diagnostics, retention CSV).
 
 ## Environment
 
@@ -53,23 +58,34 @@ against an older mental model, note:
 
 ## Open issues, most important first
 
-### 1. Warm-start saturation (blocks 3+ task sequences)
+### 1. Warm-start saturation (was blocking 3+ tasks; addressed by task heads)
 
-With a shared, non-task-conditioned policy, `θ⁽⁰⁾ = φ` (eq 2) inherits an
-increasingly saturated softmax as tasks accumulate. By the third task, policy
-gradient escapes the inherited init too slowly and the new task barely learns
-(`gridworld_three_task.yaml`, task 3 ≈ 0.01), even though task 3 reaches ~0.75
-from a fresh init. This is saturation, not a bug, and it is the first thing to
-fix before any multi-task result.
+With a *shared*, non-task-conditioned policy, `θ⁽⁰⁾ = φ` (eq 2) inherits an
+increasingly saturated softmax; by the third task the new task barely learns
+(`gridworld_three_task.yaml`, tabular, task 3 ≈ 0.01) even though task 3 reaches
+~0.75 from a fresh init. It is saturation, not a bug.
 
-Candidate fixes, cheapest first:
-- **Task-conditioned policy** (`policy.kind: mlp`, `task_conditioned: true`) —
-  gives the new task its own head capacity; already implemented, needs testing.
-- **Stronger / annealed entropy bonus** to keep the inherited policy escapable.
-- **Periodic policy softening** (scale logits toward zero) at each task boundary.
-- Reconsider whether the local *must* start exactly at `φ`; a partial or
-  softened warm-start may keep eq-2's guarantee approximately while restoring
-  plasticity. This touches the theory — flag to the author.
+**Resolved for the neural setting** by the multi-head policy
+(`policy.kind: multihead`): a shared Tanh trunk with one output head per task,
+selected by the task id. Each task gets its own output mapping, so there is no
+saturated shared logit to escape; the shared trunk still carries transfer and
+is what the constraint protects. Result on the 3-task gridworld:
+`[0.83, 0.83, 0.83]` (all learned and retained).
+
+Two secondary notes for the write-up:
+- **Larger local LR is a real but brittle partial fix** for the shared-policy
+  case: raising `lr_local` from 0.5 to ~20 recovers tabular task 3 from 0.28 to
+  0.83 (bigger steps escape the saturated init). It is fragile under sampling
+  noise and does not fix the shared-representation root cause, so prefer heads.
+  A warm-up LR boost per new task is a reasonable practical add if needed.
+- **Shared vs disjoint state spaces.** The gridworld deliberately *shares* the
+  state space across tasks (same cells, different goal), so the same state can
+  demand different actions — a hard, adversarial conflict. Different Atari games
+  have nearly *disjoint* observations, so that exact conflict is rare there;
+  forgetting in Atari comes instead from shared *parameters* being overwritten.
+  Task heads / conditioning help in both regimes; the mechanism differs. Keep a
+  shared-state family (gridworld/MiniGrid) in the benchmark precisely because it
+  is the harder stress test.
 
 ### 2. Rollout cost (settled in principle, tune in practice)
 
@@ -97,20 +113,39 @@ averaged references, the PID dual controller (`duals.kind: pid`).
 
 ## Recommended next experiment (lowest cost, highest signal)
 
-Do **not** start at Atari. In order:
+The neural 3-task result is done (exact estimator). Do **not** jump to Atari.
+In order:
 
-1. **Fix saturation on `gridworld_three_task`** (exact estimator). Turn on
-   task-conditioning, confirm all three tasks are learned and retained, and that
-   the constrained run beats the unconstrained baseline on average retained
-   value. This validates the method beyond 2 tasks at essentially zero compute.
-2. **Sweep `ε` and `duals.lr`** with `experiments/sweep.py` on the exact tier
-   (`configs/sweeps/eps_grid.yaml`) across 3 seeds; produce the constraint-
-   strength ablation (paper Fig 4). Exact estimator = seconds per run.
-3. **`gridworld_sampled`** to confirm the story survives REINFORCE noise.
-4. **`cartpole_family`** (MLP, sampled) — first non-tabular tier; expect to
-   retune `duals.lr` and `ε` (watch `μ`/`λ` magnitudes on the first run).
-5. Only then MiniGrid, then a 3-game Atari subset (Pong → Boxing → third),
-   which needs an actor-critic estimator (new backend in `crl/estimators/`).
+1. **`gridworld_nn_three_task_sampled`** — the single most valuable next run.
+   Same multi-head network and tasks, but the Monte-Carlo estimator, so it is
+   the *first test with real environment rollouts and sampling noise* and it
+   exercises the past-task rollout machinery. The plumbing is verified; the
+   hyperparameters are a starting point (retune `duals.lr` and
+   `episodes_per_grad` from the `μ`/`λ` and gap figures). One command:
+   `python -m experiments.compare_constraint --config configs/gridworld_nn_three_task_sampled.yaml --name nn_three_task_sampled`
+2. **Sweep `ε` and `duals.lr`** with `experiments/sweep.py` on the exact neural
+   tier (`configs/sweeps/eps_grid.yaml`) across 3 seeds; produce the
+   constraint-strength ablation (paper Fig 4). Exact estimator = seconds per run.
+3. **`cartpole_family`** (multi-head MLP, sampled) — first continuous-control
+   tier; expect to retune `duals.lr` and `ε`.
+4. Only then MiniGrid (another shared-state family), then a 3-game Atari subset
+   (Pong → Boxing → third), which needs an actor-critic estimator (new backend
+   in `crl/estimators/`).
+
+## Generating figures
+
+- Full bundle for an experiment (runs constrained + baseline, all figures +
+  tables into `reports/<name>/`):
+  `python -m experiments.compare_constraint --config <cfg> --name <name>`
+- Single-run diagnostics only:
+  `python -m analysis.plots --run results/<run_dir>`
+- Conceptual figures only (design-space map, method schematic):
+  `python -m analysis.schematics --out <figures_dir>`
+
+Every figure is written in both PNG and SVG into split `png/` and `svg/`
+subfolders, with titles, axis labels, legends, and the academic palette
+(green = ours, red = unconstrained baseline). `reports/` is tracked in git so
+figures can be committed on HPC and pulled locally.
 
 ## How to add things (the repo is registry-driven)
 

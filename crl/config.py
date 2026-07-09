@@ -117,6 +117,9 @@ class TrainerConfig:
     entropy_coef: float = 0.0
     eval_episodes: int = 32  # end-of-task evaluation matrix
     eval_all_tasks: bool = True  # include future tasks in the matrix
+    # Probe the global policy on every task this often (in cumulative primal
+    # steps) to build learning-curve data; 0 disables probing.
+    eval_probe_every: int = 25
 
 
 @dataclass

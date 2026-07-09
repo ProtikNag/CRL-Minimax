@@ -78,15 +78,16 @@ crl/
 ├── config.py            # typed YAML config, strict unknown-key rejection
 ├── seeding.py           # set_seed (torch/numpy/random/cuda)
 ├── envs/                # task families: gridworld (tabular), cartpole
-├── policies/            # tabular softmax, MLP (optionally task-conditioned)
+├── policies/            # tabular, MLP, multihead (shared trunk + per-task heads)
 ├── estimators/          # exact DP, monte_carlo (REINFORCE), surrogate (stub)
 ├── duals/               # projected-ascent and PID controllers
 ├── buffers.py           # per-task trajectory store (behavior log-probs)
 ├── logging_utils.py     # JSONL + config snapshot per run
 └── trainer.py           # the alternation loop (eqs 22-24 / 30-32)
-experiments/  run.py (single run) · sweep.py (grid, cluster-array ready)
-analysis/     plots.py (duals, gaps, forgetting matrix, retention; PNG+SVG)
-configs/      gridworld_exact · gridworld_sampled · gridworld_three_task · cartpole_family
+experiments/  run.py · sweep.py (grid, cluster-array ready) · compare_constraint.py
+analysis/     plots.py (single-run) · compare.py (Fig 3 / Tab 1) · schematics.py
+configs/      gridworld_exact · gridworld_sampled · gridworld_three_task ·
+              gridworld_nn_three_task[_sampled] · cartpole_family
 tests/        gradient checks · estimator agreement · dual dynamics · end-to-end
 ```
 
@@ -99,35 +100,57 @@ name. No component knows another's internals.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pytest -q                                             # 19 tests, ~5 s
-python -m experiments.run --config configs/gridworld_exact.yaml
-python -m analysis.plots  --run results/gridworld_exact_seed42
+pytest -q                                             # 21 tests, ~20 s
+
+# Neural, 3-task headline result (constrained vs baseline + full figure bundle):
+python -m experiments.compare_constraint \
+    --config configs/gridworld_nn_three_task.yaml --name nn_three_task
+# -> reports/nn_three_task/figures/{png,svg}/  and  tables/retention_table.csv
 ```
 
-The exact-gridworld demo reproduces the core result: the constrained global
-retains **both** tasks (values ≈ 0.56 / 0.56), while an unconstrained baseline
-(`duals.lr: 0`) forgets the current task (≈ 0.05) as it over-consolidates the
-past.
+**Headline result** (3-task gridworld, multi-head MLP, exact estimator). Value
+is what the algorithm optimizes; task performance is what matters. Both are
+reported (`reports/<name>/tables/`):
+
+| | Constrained (ours) | Unconstrained baseline |
+|---|---|---|
+| Value, per task | 0.83 / 0.83 / 0.83 | 0.83 / 0.83 / **0.20** |
+| Success rate (goal reached) | 100% / 100% / **100%** | 100% / 100% / **69%** |
+| Mean steps to goal | 4.8 / 4.5 / 4.4 | 4.9 / 4.5 / **59** |
+
+A value of 0.83 is optimal here (100% success, ~4.5-step paths). The baseline
+forgets the newest task: its deployed policy solves task 3 only 69% of the time
+and wanders (~59 steps). The tabular 2-task `gridworld_exact` is the smaller
+zero-neural-network sanity demo.
+
+Figures are written to `reports/<name>/figures/png/` and `.../svg/`, with
+per-method diagnostics under `.../figures/<method>/`. The bundle includes the
+paper's must-have set: design-space map (Fig 1), method schematic (Fig 2),
+per-task retention curves + summary (Fig 3), retention table (Tab 1), plus
+diagnostics (dual dynamics, gap sequences, forgetting matrix).
 
 ## 5. Benchmark tiers
 
-1. **Exact gridworld** (`gridworld_exact`). Zero-variance DP estimator;
-   verifies the update rules and dual dynamics. The canonical demo.
-2. **Sampled gridworld** (`gridworld_sampled`). Same tasks, REINFORCE
-   estimator; isolates estimator noise from method behavior.
-3. **CartPole family** (`cartpole_family`). First non-tabular tier (MLP).
+1. **Exact gridworld** (`gridworld_exact`, `gridworld_nn_three_task`).
+   Zero-variance DP estimator; verifies the update rules and, with the
+   multi-head network, the multi-task retention result. The canonical demos.
+2. **Sampled gridworld** (`gridworld_sampled`,
+   `gridworld_nn_three_task_sampled`). REINFORCE estimator; first test with
+   real rollouts and sampling noise. **The recommended next experiment.**
+3. **CartPole family** (`cartpole_family`). First continuous-control tier.
 4. **Paper tier.** MiniGrid goal families, then an Atari 3–6 game subset
    (Pong → Boxing → …), matching the scale of RePR. Requires actor-critic.
 
 ## 6. Open issues (ordered by severity)
 
-1. **Warm-start saturation** *(new, important).* With a shared (non
-   task-conditioned) policy, `θ⁽⁰⁾ = φ` inherits a saturated softmax, and by
-   the 3rd+ task policy gradient escapes it too slowly to learn the new task
-   (`gridworld_three_task` exposes this; task 3 is fully learnable from a fresh
-   init). The constraint handles *retention*, not *learnability under
-   saturation*. Candidate fixes: task-conditioned policy head, stronger
-   entropy, periodic policy softening. See `HANDOFF.md`.
+1. **Warm-start saturation** *(resolved by task heads for now).* With a *shared*
+   (non task-conditioned) policy, `θ⁽⁰⁾ = φ` inherits a saturated softmax and
+   later tasks fail to learn (`gridworld_three_task` still exposes this with a
+   tabular policy). The **multi-head** policy (`policy.kind: multihead`, shared
+   trunk + one head per task) removes it: the 3-task neural result learns and
+   retains all tasks. A larger local learning rate is a cheaper partial
+   mitigation (recovers the tabular case but is brittle under sampling noise).
+   Revisit if a setting appears where per-task heads are not available.
 2. **Alternation stability.** Each phase moves the other's frozen reference;
    the pair can cycle. Gap sequences are always logged (`phase: gaps`) to
    detect it. No general convergence theory — this is the research contribution.

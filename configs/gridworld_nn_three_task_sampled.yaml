@@ -1,0 +1,71 @@
+# RECOMMENDED NEXT EXPERIMENT: the neural 3-task result under real rollouts.
+#
+# Same multi-head network and tasks as gridworld_nn_three_task.yaml, but with
+# the Monte-Carlo (REINFORCE) estimator instead of the exact solve. This is the
+# first test of the method with actual environment rollouts and sampling noise,
+# and it exercises the past-task rollout machinery. Still cheap (a gridworld,
+# minutes on CPU), so it is the right low-cost checkpoint before MiniGrid/Atari.
+#
+# The plumbing is verified; the hyperparameters below are a STARTING POINT and
+# will need a tuning pass (watch mu/lambda magnitudes and the gap figure on the
+# first run; lower duals.lr if the multipliers oscillate, raise
+# episodes_per_grad if the gradient is too noisy).
+#
+# Run with:
+#   python -m experiments.compare_constraint \
+#     --config configs/gridworld_nn_three_task_sampled.yaml --name nn_three_task_sampled
+experiment:
+  name: gridworld_nn_three_task_sampled
+  seed: 42
+  results_dir: results
+  log_every: 25
+
+env:
+  family: gridworld
+  params:
+    size: 5
+    slip: 0.1
+    gamma: 0.95
+    goal_reward: 1.0
+    step_penalty: 0.0
+    start: uniform
+    max_steps: 100
+  tasks:
+    - goal: [0, 4]
+    - goal: [4, 4]
+    - goal: [4, 0]
+
+policy:
+  kind: multihead
+  hidden_sizes: [128, 128]
+  task_conditioned: true
+
+estimator:
+  kind: monte_carlo
+  episodes_per_grad: 32     # raise if the gradient is too noisy
+  episodes_per_eval: 32
+  episodes_per_ref: 128     # frozen references, once per phase (large batch)
+  baseline: batch_mean
+  time_discount_weighting: true
+
+duals:
+  kind: projected_ascent
+  lr: 2.0                   # lower than the exact tier: F-hat is noisy
+  init: 0.0
+  max_value: 200.0
+  warm_start: true
+
+trainer:
+  cycles_per_task: 3
+  local_steps: 200
+  global_steps: 200
+  task1_steps: 300
+  lr_local: 0.02
+  lr_global: 0.02
+  optimizer: adam
+  eps: 0.0025               # squared-value units (tolerated value gap ~ 0.05)
+  past_task_sampling: all   # switch to "sample" for O(1)-per-step past cost
+  entropy_coef: 0.01
+  eval_episodes: 64
+  eval_all_tasks: true
+  eval_probe_every: 25
