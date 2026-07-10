@@ -16,6 +16,7 @@ import gymnasium as gym
 import numpy as np
 import torch
 
+from crl.buffers import Trajectory
 from crl.envs.base import TabularTask, TaskFamily, TaskSpec
 
 # Action index -> (row delta, col delta): up, down, left, right.
@@ -117,6 +118,87 @@ class GridWorldTask(TabularTask):
             step_penalty=self._step_penalty,
             max_steps=self._max_steps,
         )
+
+    @torch.no_grad()
+    def vector_rollout(self, policy, num_episodes: int) -> list[Trajectory]:
+        """Collect ``num_episodes`` episodes in lockstep from the exact tensors.
+
+        Steps every episode of the batch with a *single* batched policy forward
+        pass per timestep, instead of the per-episode Python loop in
+        ``MonteCarloEstimator._run_episodes``. Because the gridworld exposes its
+        ``[S, A, S]`` transition tensor, next states are sampled directly from
+        it (``torch.multinomial``), so the sampled MDP is identical to the
+        gym ``TabularEnv`` and the estimate stays unbiased -- only the wall-clock
+        cost drops (one forward over N states beats N forwards over one state).
+
+        Environment stochasticity is drawn from the global torch RNG, so a
+        single ``set_seed`` makes whole runs reproducible, matching the scalar
+        path. Returns the same ``list[Trajectory]`` that path returns, so every
+        downstream estimator (value, REINFORCE surrogate) is unchanged.
+        """
+        transition = self.transition  # [S, A, S]
+        num_states = transition.shape[0]
+        goal = self._goal_state
+        eye = torch.eye(num_states, dtype=torch.float32)
+
+        state = torch.multinomial(self.initial_dist, num_episodes, replacement=True)
+        alive = torch.ones(num_episodes, dtype=torch.bool)
+        reached_goal = torch.zeros(num_episodes, dtype=torch.bool)
+        lengths = torch.zeros(num_episodes, dtype=torch.long)
+
+        obs_hist: list[torch.Tensor] = []
+        act_hist: list[torch.Tensor] = []
+        rew_hist: list[torch.Tensor] = []
+        logp_hist: list[torch.Tensor] = []
+
+        for _ in range(self._max_steps):
+            obs = eye[state]  # [N, S] one-hot, matching TabularEnv._obs
+            dist = policy.dist(obs, self.spec.task_id)
+            action = dist.sample()  # [N]
+            logp = dist.log_prob(action)  # [N]
+
+            probs = transition[state, action]  # [N, S]
+            next_state = torch.multinomial(probs, 1).squeeze(1)  # [N]
+            # Reward granted on the transition INTO the goal (matches TabularEnv).
+            entered_goal = (next_state == goal) & (state != goal)
+            reward = torch.where(
+                entered_goal,
+                torch.full_like(obs[:, 0], self._goal_reward),
+                torch.full_like(obs[:, 0], self._step_penalty),
+            )
+
+            obs_hist.append(obs)
+            act_hist.append(action)
+            rew_hist.append(reward)
+            logp_hist.append(logp)
+
+            lengths = torch.where(alive, lengths + 1, lengths)
+            hit = alive & (next_state == goal)  # goal is terminal
+            reached_goal = reached_goal | hit
+            alive = alive & ~hit
+            state = next_state
+            if not bool(alive.any()):
+                break
+
+        obs_stack = torch.stack(obs_hist)  # [T, N, S]
+        act_stack = torch.stack(act_hist)  # [T, N]
+        rew_stack = torch.stack(rew_hist)  # [T, N]
+        logp_stack = torch.stack(logp_hist)  # [T, N]
+
+        episodes: list[Trajectory] = []
+        for n in range(num_episodes):
+            length = int(lengths[n])
+            terminated = bool(reached_goal[n])  # else truncated at the horizon
+            episodes.append(
+                Trajectory(
+                    obs=obs_stack[:length, n],
+                    actions=act_stack[:length, n],
+                    rewards=rew_stack[:length, n],
+                    behavior_logps=logp_stack[:length, n],
+                    terminated=terminated,
+                )
+            )
+        return episodes
 
 
 def _build_task_tensors(

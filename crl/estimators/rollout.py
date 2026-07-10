@@ -58,7 +58,22 @@ class MonteCarloEstimator(ValueEstimator):
 
         Environment stochasticity is seeded from the global torch RNG so a
         single ``set_seed`` call makes whole runs reproducible.
+
+        Tasks that expose a batched ``vector_rollout`` (e.g. the tabular
+        gridworld, whose transition tensor lets N episodes step in lockstep
+        with one policy forward pass each timestep) take a fast path; the
+        estimate is identical in expectation, only much cheaper. Any other task
+        falls back to the per-episode gym loop below.
         """
+        vector_rollout = getattr(task, "vector_rollout", None)
+        if vector_rollout is not None:
+            episodes = vector_rollout(policy, num_episodes)
+            if self.buffer_set is not None:
+                buffer = self.buffer_set.for_task(task.spec.task_id)
+                for trajectory in episodes:
+                    buffer.add(trajectory)
+            return episodes
+
         env = self._env_for(task)
         episodes: list[Trajectory] = []
         # One reset-seed per collection; later resets continue the env RNG.

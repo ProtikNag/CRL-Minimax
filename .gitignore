@@ -7,3 +7,6 @@ wandb/
 *.pt
 .DS_Store
 *.egg-info/
+
+# scratch/validation result dirs
+results_*/

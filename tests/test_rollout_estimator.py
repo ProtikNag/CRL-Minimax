@@ -7,10 +7,11 @@ direction as the exact policy gradient.
 
 import torch
 
-from crl.config import EnvConfig
+from crl.config import EnvConfig, PolicyConfig
 from crl.envs import make_family
 from crl.estimators.exact import ExactEstimator
 from crl.estimators.rollout import MonteCarloEstimator
+from crl.policies import make_policy
 from crl.policies.tabular import TabularPolicy
 from crl.seeding import set_seed
 
@@ -54,3 +55,49 @@ def test_monte_carlo_gradient_direction_matches_exact():
 
     cosine = torch.nn.functional.cosine_similarity(exact_grad, mc_grad, dim=0)
     assert float(cosine) > 0.5, f"gradient cosine too low: {float(cosine):.3f}"
+
+
+def test_vector_rollout_matches_gym_env_semantics():
+    """The batched fast path samples the same MDP as the gym TabularEnv:
+    reward only on entering the goal, and terminated iff the goal was reached."""
+    set_seed(2)
+    cfg = EnvConfig(
+        family="gridworld",
+        params={"size": 4, "slip": 0.1, "gamma": 0.9, "max_steps": 40,
+                "goal_reward": 1.0, "step_penalty": 0.0},
+        tasks=[{"goal": [3, 3]}],
+    )
+    task = make_family(cfg).tasks[0]
+    policy = TabularPolicy(task.transition.shape[0], 4)
+    episodes = task.vector_rollout(policy, num_episodes=200)
+
+    assert len(episodes) == 200
+    for ep in episodes:
+        assert len(ep.rewards) <= 40  # never exceeds the horizon
+        # Reward is 1.0 exactly once (goal entry) for a terminated episode,
+        # and 0.0 everywhere else; a truncated episode collects no reward.
+        total = float(ep.rewards.sum())
+        assert total in (0.0, 1.0)
+        assert ep.terminated == (total == 1.0)
+        if ep.terminated:
+            assert float(ep.rewards[-1]) == 1.0  # reward lands on the final step
+
+
+def test_vector_rollout_value_matches_exact_multihead():
+    """Vectorized Monte-Carlo agrees with exact DP for a multi-head neural
+    policy across every task in a 3-task family (unbiasedness at scale)."""
+    set_seed(4)
+    cfg = EnvConfig(
+        family="gridworld",
+        params={"size": 5, "slip": 0.1, "gamma": 0.95, "max_steps": 100},
+        tasks=[{"goal": [0, 4]}, {"goal": [4, 4]}, {"goal": [4, 0]}],
+    )
+    family = make_family(cfg)
+    policy = make_policy(
+        PolicyConfig(kind="multihead", hidden_sizes=[64, 64], task_conditioned=True),
+        family,
+    )
+    exact = ExactEstimator()
+    mc = MonteCarloEstimator(episodes_per_eval=800)
+    for task in family.tasks:
+        assert abs(mc.evaluate(policy, task) - exact.evaluate(policy, task)) < 0.05
