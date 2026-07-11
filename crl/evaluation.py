@@ -42,9 +42,12 @@ def rollout_performance(
 ) -> Performance:
     """Run ``num_episodes`` episodes of ``policy`` on ``task`` and summarize.
 
-    An episode counts as a success if the environment TERMINATES (reaches an
-    absorbing goal) rather than being truncated by the step limit.
+    Success is env-dependent (``task.success_on_termination``): for a goal task
+    (gridworld) an episode succeeds if it TERMINATES at the goal; for a survival
+    task (CartPole) it succeeds if it survives to the horizon (is TRUNCATED)
+    rather than terminating early (the pole falling).
     """
+    success_on_termination = getattr(task, "success_on_termination", True)
     env = task.make_env()
     successes = 0
     total_return = 0.0
@@ -58,7 +61,7 @@ def rollout_performance(
             obs, reward, terminated, truncated, _ = env.step(action)
             total_return += float(reward)
             total_steps += 1
-        successes += int(terminated)
+        successes += int(terminated if success_on_termination else truncated)
     return Performance(
         success_rate=successes / num_episodes,
         mean_return=total_return / num_episodes,

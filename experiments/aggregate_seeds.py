@@ -35,22 +35,22 @@ import torch
 from analysis.aggregate import (
     SEQUENTIAL, build_performance_table_ci, build_retention_table_ci,
     plot_average_performance_curve, plot_forgetting_matrix_mean,
-    plot_retention_bars_ci, plot_retention_curves_ci,
+    plot_performance_bars_ci, plot_retention_bars_ci, plot_retention_curves_ci,
 )
 from analysis.plots import load_records, plot_duals, plot_gaps, plot_forgetting_matrix
-from analysis.schematics import design_space_map, method_schematic
 from crl.config import load_config
 from crl.envs import make_family
 from crl.evaluation import rollout_performance
 from crl.policies import make_policy
 
-METHODS = ("constrained", "unconstrained", "finetune", "joint")
+ALL_METHODS = ("constrained", "unconstrained", "finetune", "joint")
 
 
-def _discover(results_dir: Path, name: str, seeds: list[int]) -> dict[str, list[Path]]:
+def _discover(results_dir: Path, name: str, seeds: list[int],
+              methods: tuple[str, ...]) -> dict[str, list[Path]]:
     """{method: [existing run dirs, one per seed]} (skips missing runs)."""
     runs: dict[str, list[Path]] = {}
-    for method in METHODS:
+    for method in methods:
         dirs = []
         for seed in seeds:
             path = results_dir / f"{name}_{method}_seed{seed}"
@@ -91,13 +91,22 @@ def main() -> None:
     parser.add_argument("--seeds", type=int, nargs="+", required=True)
     parser.add_argument("--reports-dir", default="reports")
     parser.add_argument("--perf-episodes", type=int, default=200)
+    parser.add_argument("--methods", nargs="+", default=list(ALL_METHODS),
+                        choices=ALL_METHODS,
+                        help="Subset of methods to aggregate (default: all four).")
     args = parser.parse_args()
 
     config = load_config(args.config)
     results_dir = Path(config.experiment.results_dir)
-    runs = _discover(results_dir, args.name, args.seeds)
+    runs = _discover(results_dir, args.name, args.seeds, tuple(args.methods))
     if not runs:
         raise SystemExit("[aggregate] no completed runs found; nothing to do.")
+
+    # Env-aware performance semantics: goal tasks succeed on termination;
+    # survival tasks (CartPole) succeed by lasting to the horizon.
+    family = make_family(config.env)
+    success_on_termination = getattr(family.tasks[0], "success_on_termination", True)
+    max_steps = int(config.env.params.get("max_steps", 0))
 
     report_dir = Path(args.reports_dir) / args.name
     figures_dir = report_dir / "figures"
@@ -121,9 +130,23 @@ def main() -> None:
         plot_forgetting_matrix_mean(runs["constrained"], figures_dir,
                                     name="forgetting_matrix_mean")
 
-    # Concrete rollout performance (seed-averaged success rate / path length).
+    # Concrete rollout performance (seed-averaged success rate / episode length).
     success, steps = _performance_stacks(config, runs, args.perf_episodes)
-    build_performance_table_ci(success, steps, figures_dir, tables_dir)
+    build_performance_table_ci(success, steps, figures_dir, tables_dir,
+                               success_on_termination=success_on_termination)
+    # Interpretable headline bar chart: what the deployed policy actually does.
+    if success_on_termination:
+        plot_performance_bars_ci(
+            {m: v * 100 for m, v in success.items()}, figures_dir,
+            ylabel="Success rate (%)", title="Task success rate per task",
+            filename="performance_bars", reference=100.0, reference_label="perfect")
+    else:  # CartPole: balancing length is the graded headline metric.
+        plot_performance_bars_ci(
+            steps, figures_dir,
+            ylabel="Mean balancing steps", title="Balancing length per task",
+            filename="performance_bars",
+            reference=max_steps or None,
+            reference_label=f"horizon ({max_steps})" if max_steps else None)
 
     # Per-method diagnostics from seed 0 (dual dynamics + gaps are single-run).
     for method, dirs in runs.items():
@@ -137,10 +160,6 @@ def main() -> None:
             seed = run_dir.name.split("seed")[-1]
             with open(run_dir / "eval_matrix.json") as src:
                 (report_dir / f"eval_matrix_{method}_seed{seed}.json").write_text(src.read())
-
-    # Conceptual figures.
-    design_space_map(figures_dir)
-    method_schematic(figures_dir)
 
     print(f"[aggregate] report bundle written to {report_dir}")
 

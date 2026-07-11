@@ -313,9 +313,44 @@ def build_retention_table_ci(runs: dict[str, list[Path]], out_dir: Path,
     save_figure(fig, out_dir, "retention_table")
 
 
+def plot_performance_bars_ci(values: dict[str, np.ndarray], out_dir: Path, *,
+                             ylabel: str, title: str, filename: str,
+                             reference: float | None = None,
+                             reference_label: str | None = None) -> None:
+    """Generic grouped-bar headline: per-task metric with 95% CI whiskers.
+
+    ``values`` maps method -> [S, T]. Used for the interpretable performance
+    metric (e.g. CartPole balancing steps, higher = better) rather than the raw
+    value the algorithm optimizes.
+    """
+    num_tasks = next(iter(values.values())).shape[1]
+    methods = list(values)
+    x = np.arange(num_tasks)
+    width = 0.8 / len(methods)
+    n_seeds = next(iter(values.values())).shape[0]
+
+    fig, ax = plt.subplots(figsize=(2.2 + 1.2 * num_tasks, 4.8))
+    if reference is not None:
+        ax.axhline(reference, color=AC["muted"], lw=1.2, ls="--", zorder=0,
+                   label=reference_label or f"horizon ({reference:g})")
+    for m_idx, method in enumerate(methods):
+        mean, half = _mean_ci(values[method])
+        offset = (m_idx - (len(methods) - 1) / 2) * width
+        ax.bar(x + offset, mean, width, color=METHOD_COLORS.get(method, AC["blue"]),
+               label=METHOD_LABELS.get(method, method), yerr=half, capsize=2.5,
+               error_kw={"elinewidth": 1.0, "ecolor": AC["axis"]})
+    ax.set_xticks(x, [f"T{i + 1}" for i in range(num_tasks)])
+    ax.set_ylabel(ylabel)
+    ax.set_title(f"{title}  (mean ± 95% CI, {n_seeds} seeds)", loc="left")
+    ax.set_ylim(bottom=0)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=3, fontsize=9)
+    save_figure(fig, out_dir, filename)
+
+
 def build_performance_table_ci(success: dict[str, np.ndarray],
                                steps: dict[str, np.ndarray],
-                               out_dir: Path, tables_dir: Path) -> None:
+                               out_dir: Path, tables_dir: Path,
+                               success_on_termination: bool = True) -> None:
     """Seed-averaged rollout performance table: success rate and path length.
 
     ``success`` / ``steps`` map method -> [S, T] arrays (per-seed, per-task
@@ -370,7 +405,10 @@ def build_performance_table_ci(success: dict[str, np.ndarray],
                 table[r_idx, col].set_text_props(weight="600")
     ax.set_title(f"Task performance from rollouts (success rate, mean ± 95% CI, "
                  f"{n_seeds} seeds)", fontweight="600", pad=12)
-    fig.text(0.5, 0.01, "Success rate = fraction of episodes reaching the goal; "
-             "mean steps = path length (lower is better).",
-             ha="center", fontsize=9, color=AC["muted"])
+    caption = ("Success rate = fraction of episodes reaching the goal; "
+               "mean steps = path length (lower is better)."
+               if success_on_termination else
+               "Success rate = fraction of episodes surviving the full horizon; "
+               "mean steps = balancing length (higher is better).")
+    fig.text(0.5, 0.01, caption, ha="center", fontsize=9, color=AC["muted"])
     save_figure(fig, out_dir, "performance_table")

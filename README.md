@@ -77,17 +77,20 @@ Dual updates are projected ascent on the squared-shortfall violation
 crl/
 ├── config.py            # typed YAML config, strict unknown-key rejection
 ├── seeding.py           # set_seed (torch/numpy/random/cuda)
-├── envs/                # task families: gridworld (tabular), cartpole
+├── envs/                # gridworld (tabular) + cartpole; both expose a fast
+│                        #   batched vector_rollout used by the MC estimator
 ├── policies/            # tabular, MLP, multihead (shared trunk + per-task heads)
 ├── estimators/          # exact DP, monte_carlo (REINFORCE), surrogate (stub)
 ├── duals/               # projected-ascent and PID controllers
-├── buffers.py           # per-task trajectory store (behavior log-probs)
-├── logging_utils.py     # JSONL + config snapshot per run
-└── trainer.py           # the alternation loop (eqs 22-24 / 30-32)
-experiments/  run.py · sweep.py (grid, cluster-array ready) · compare_constraint.py
-analysis/     plots.py (single-run) · compare.py (Fig 3 / Tab 1) · schematics.py
-configs/      gridworld_exact · gridworld_sampled · gridworld_three_task ·
-              gridworld_nn_three_task[_sampled] · cartpole_family
+├── evaluation.py        # rollout performance metrics (env-aware success)
+├── baselines.py         # sequential fine-tune + joint multi-task baselines
+├── trainer.py           # the alternation loop (eqs 22-24 / 30-32)
+experiments/  run.py · multiseed_comparison.py (one seed -> N methods) ·
+              aggregate_seeds.py (mean ± 95% CI bundle) · sweep.py
+analysis/     plots.py (single-run diagnostics) · aggregate.py (multi-seed CI
+              figures/tables) · compare.py (single-seed) · style.py
+configs/      gridworld_tentask_sampled (headline) · gridworld_nn_three_task ·
+              gridworld_exact · cartpole_multihead · ...
 tests/        gradient checks · estimator agreement · dual dynamics · end-to-end
 ```
 
@@ -143,13 +146,10 @@ python -m experiments.aggregate_seeds \
 ```
 
 Figures are written to `reports/<name>/figures/png/` and `.../svg/`, with
-per-method diagnostics under `.../figures/<method>/`. The bundle includes the
-paper's must-have set: per-task retention curves + summary with 95% CI bands
-(Fig 3), retention/performance tables (Tab 1), average-performance-vs-task curve,
-seed-averaged forgetting matrix, method schematic and design-space map, plus
-diagnostics (dual dynamics, gap sequences). The single-seed four-method bundle
-for the earlier exact-estimator demos is still produced by
-`python -m experiments.baseline_comparison --config <cfg> --name <name>`.
+per-method diagnostics under `.../figures/<method>/`. The bundle: per-task
+retention curves + summary with 95% CI bands, retention/performance tables and
+a per-task performance bar chart, average-performance-vs-task curve, seed-averaged
+forgetting matrix, plus per-method diagnostics (dual dynamics, gap sequences).
 
 ## 5. Benchmark tiers
 
@@ -164,29 +164,23 @@ for the earlier exact-estimator demos is still produced by
    headline above (ours retains all ten, both baselines forget in opposite
    directions). Runs as a SLURM array (`scripts/hpc_tentask.sbatch`); the fast
    vectorized gridworld rollout keeps each seed to ~15-20 min on CPU.
-4. **CartPole family** (`cartpole_family`). First continuous-control tier.
+4. **CartPole family** (`cartpole_multihead`). Six physics-shifted tasks;
+   first continuous-control tier (multi-head policy, sampled estimator, batched
+   torch rollout). In progress.
 5. **Paper tier.** MiniGrid goal families, then an Atari 3–6 game subset
    (Pong → Boxing → …), matching the scale of RePR. Requires actor-critic.
 
 ## 6. Open issues (ordered by severity)
 
-1. **Warm-start saturation** *(resolved by task heads for now).* With a *shared*
-   (non task-conditioned) policy, `θ⁽⁰⁾ = φ` inherits a saturated softmax and
-   later tasks fail to learn (`gridworld_three_task` still exposes this with a
-   tabular policy). The **multi-head** policy (`policy.kind: multihead`, shared
-   trunk + one head per task) removes it: the 3-task neural result learns and
-   retains all tasks. A larger local learning rate is a cheaper partial
-   mitigation (recovers the tabular case but is brittle under sampling noise).
-   Revisit if a setting appears where per-task heads are not available.
-2. **Alternation stability.** Each phase moves the other's frozen reference;
+1. **Alternation stability.** Each phase moves the other's frozen reference;
    the pair can cycle. Gap sequences are always logged (`phase: gaps`) to
    detect it. No general convergence theory — this is the research contribution.
+2. **Feasibility under conflict.** Tight `ε` may be infeasible when tasks
+   demand different actions in shared states; `λ`/`μ` then saturate. The
+   multi-head + task-conditioned policy addresses this (used everywhere now).
 3. **Rollout cost.** Fresh past-task rollouts every step scale with `k`.
-   Mitigations in-repo: once-per-phase frozen references and
-   `past_task_sampling: sample` (unbiased O(1) past term). See `HANDOFF.md`.
-4. **Feasibility under conflict.** Tight `ε` may be infeasible when tasks
-   demand different actions in shared states; `λ` then diverges. The
-   task-conditioned policy option addresses this.
+   Mitigations in-repo: once-per-phase frozen references, `past_task_sampling:
+   sample` (unbiased O(1) past term), and batched `vector_rollout` per env.
 
 ## 7. Metrics
 

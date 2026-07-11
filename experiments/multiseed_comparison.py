@@ -51,8 +51,12 @@ def _run_custom(config: Config, train_fn, run_name: str) -> Path:
     return logger.run_dir
 
 
-def run_one_seed(config_path: str, name: str, seed: int) -> dict[str, Path]:
-    """Run the four methods at ``seed``; return {method: run_dir}."""
+ALL_METHODS = ("constrained", "unconstrained", "finetune", "joint")
+
+
+def run_one_seed(config_path: str, name: str, seed: int,
+                 methods: tuple[str, ...] = ALL_METHODS) -> dict[str, Path]:
+    """Run the selected methods at ``seed``; return {method: run_dir}."""
     base = load_config(config_path)
     base.experiment.seed = seed
     raw = base.to_dict()
@@ -66,25 +70,29 @@ def run_one_seed(config_path: str, name: str, seed: int) -> dict[str, Path]:
 
     runs: dict[str, Path] = {}
 
-    print(f"\n=== [seed {seed}] constrained (ours) ===")
-    run_from_config(config_from_dict(variant("constrained")))
-    runs["constrained"] = results_dir / f"{name}_constrained_seed{seed}"
+    if "constrained" in methods:
+        print(f"\n=== [seed {seed}] constrained (ours) ===")
+        run_from_config(config_from_dict(variant("constrained")))
+        runs["constrained"] = results_dir / f"{name}_constrained_seed{seed}"
 
-    print(f"\n=== [seed {seed}] unconstrained ablation (duals off) ===")
-    ablation = variant("unconstrained")
-    ablation["duals"]["lr"] = 0.0
-    run_from_config(config_from_dict(ablation))
-    runs["unconstrained"] = results_dir / f"{name}_unconstrained_seed{seed}"
+    if "unconstrained" in methods:
+        print(f"\n=== [seed {seed}] unconstrained ablation (duals off) ===")
+        ablation = variant("unconstrained")
+        ablation["duals"]["lr"] = 0.0
+        run_from_config(config_from_dict(ablation))
+        runs["unconstrained"] = results_dir / f"{name}_unconstrained_seed{seed}"
 
-    print(f"\n=== [seed {seed}] naive sequential fine-tuning ===")
-    runs["finetune"] = _run_custom(
-        config_from_dict(variant("finetune")), sequential_finetune,
-        f"{name}_finetune_seed{seed}")
+    if "finetune" in methods:
+        print(f"\n=== [seed {seed}] naive sequential fine-tuning ===")
+        runs["finetune"] = _run_custom(
+            config_from_dict(variant("finetune")), sequential_finetune,
+            f"{name}_finetune_seed{seed}")
 
-    print(f"\n=== [seed {seed}] joint multi-task (upper bound) ===")
-    runs["joint"] = _run_custom(
-        config_from_dict(variant("joint")), joint_multitask,
-        f"{name}_joint_seed{seed}")
+    if "joint" in methods:
+        print(f"\n=== [seed {seed}] joint multi-task (upper bound) ===")
+        runs["joint"] = _run_custom(
+            config_from_dict(variant("joint")), joint_multitask,
+            f"{name}_joint_seed{seed}")
 
     print(f"\n[multiseed] seed {seed} complete: {[str(p) for p in runs.values()]}")
     return runs
@@ -95,8 +103,11 @@ def main() -> None:
     parser.add_argument("--config", required=True)
     parser.add_argument("--name", required=True)
     parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("--methods", nargs="+", default=list(ALL_METHODS),
+                        choices=ALL_METHODS,
+                        help="Subset of methods to run (default: all four).")
     args = parser.parse_args()
-    run_one_seed(args.config, args.name, args.seed)
+    run_one_seed(args.config, args.name, args.seed, tuple(args.methods))
 
 
 if __name__ == "__main__":

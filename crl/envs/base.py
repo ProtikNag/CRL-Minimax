@@ -28,6 +28,13 @@ class TaskSpec:
 class Task(ABC):
     """One MDP. Environments returned by :meth:`make_env` are fresh copies."""
 
+    # What counts as "solving" an episode in the rollout performance metric.
+    # True  -> the episode TERMINATES at an absorbing success state (e.g. the
+    #          gridworld reaching its goal).
+    # False -> success is SURVIVING to the horizon without terminating (e.g.
+    #          CartPole, where termination means the pole fell = failure).
+    success_on_termination: bool = True
+
     def __init__(self, spec: TaskSpec, gamma: float) -> None:
         self.spec = spec
         self.gamma = gamma
