@@ -3,67 +3,72 @@
 State of the project and what to do next. Written for a fresh session (on
 Hyperion or elsewhere) that needs to continue without the prior context.
 
-## ►► START HERE: the next experiment (HPC)
+## ►► START HERE: the next experiment
 
-Scale from the validated 6-task exact result to **6–10 tasks under real
-rollouts** on the cluster. The exact-estimator many-task result is already
-validated (`gridworld_manytask_exact`, committed under
-`reports/gridworld_manytask/` — ours retains all 6 tasks at 100% success,
-fine-tuning collapses). The next step swaps to the sampled estimator, which is
-what actually needs HPC (every step rolls out the current task plus each past
-task).
+The **10-task, 5-seed, real-rollout proof-of-concept is done and committed**
+(`reports/gridworld_tentask/`) — see "Where things stand". The gridworld tier is
+now convincingly validated. The next steps move up in environment difficulty:
 
+1. **Constraint-strength ablation (paper Fig 4).** Sweep `eps` and `duals.lr`
+   with `experiments/sweep.py` on `configs/gridworld_tentask_sampled.yaml` across
+   the 5 seeds (`configs/sweeps/eps_grid.yaml`, `scripts/hpc_sweep.sbatch`). This
+   turns the point result into a sensitivity curve.
+2. **CartPole family** (`cartpole_family.yaml`, already implemented — switch its
+   policy to `kind: multihead`). First continuous-control tier; expect to retune
+   `duals.lr` and `eps`. Note the vectorized fast rollout is gridworld-only
+   (tabular transition tensor); CartPole uses the per-episode gym path, so keep
+   the step budget modest or add a batched CartPole rollout.
+3. **MiniGrid** (a new env family under `crl/envs/`), then a 3-game Atari subset
+   (Pong → Boxing → third), which needs an actor-critic estimator (new backend
+   in `crl/estimators/`).
+
+To re-run or extend the headline study:
 ```bash
-# On the cluster:
-sbatch scripts/hpc_baseline.sbatch          # runs configs/gridworld_manytask_sampled.yaml
-# or directly:
-python -m experiments.baseline_comparison \
-    --config configs/gridworld_manytask_sampled.yaml --name gridworld_manytask_sampled
+sbatch scripts/hpc_tentask.sbatch          # array over seeds 0-4, all four methods
+python -m experiments.aggregate_seeds \
+    --config configs/gridworld_tentask_sampled.yaml --name gridworld_tentask \
+    --seeds 0 1 2 3 4
 ```
-
-What to do:
-1. Run it; the hyperparameters in `gridworld_manytask_sampled.yaml` are a
-   starting point. Inspect `reports/.../figures/constrained/` — the dual (`μ`,
-   `λ`) magnitudes and the gap figure. Lower `duals.lr` if the multipliers
-   oscillate; raise `estimator.episodes_per_grad` if learning is too noisy.
-2. Once it works at 6 tasks, add goals under `env.tasks` to reach 8–10 tasks,
-   and set `trainer.past_task_sampling: sample` to keep per-step cost at O(1).
-3. Commit `reports/gridworld_manytask_sampled/` from the node and push so it can
-   be pulled locally (only `reports/` is tracked; `results/` stays on the node).
-
-After that: a **larger environment** than gridworld. Cheapest step up is the
-CartPole family (`cartpole_family.yaml`, already implemented — switch its policy
-to `kind: multihead`); then MiniGrid (a new env family to add under
-`crl/envs/`), then a 3-game Atari subset (needs an actor-critic estimator).
+To go to 12+ tasks, add goals under `env.tasks` in the config (heads scale
+automatically) and bump `--time` in the sbatch (a slow node needs >4 h for one
+seed's four methods; seed 0 of the first run was killed by the 4 h limit before
+`joint` finished, so that method has 4 seeds not 5 — harmless, joint is the
+upper-bound reference and the aggregator skips missing runs).
 
 ## Where things stand
 
 The full method from `docs/Objective_for_Continual_Reinforcement_Learning.pdf`
-is implemented and **working with a real neural network on a 3-task sequence**
-(exact estimator). Core claim demonstrated: the constrained global policy
-retains every task; the unconstrained baseline forgets the newest one.
+is implemented and **validated at 10 tasks under real rollouts, 5 seeds**. Core
+claim demonstrated with error bars: the constrained global policy retains every
+task and matches the joint upper bound; the two standard baselines forget in
+opposite directions.
 
-- 21/21 tests pass (`pytest -q`, ~20 s CPU). Includes an exact-vs-finite-
-  difference gradient check, Monte-Carlo/exact agreement, dual dynamics, and
-  two end-to-end acceptance tests (tabular 2-task, and multi-head neural
-  3-task).
-- **Headline (neural) result**, `configs/gridworld_nn_three_task.yaml`, a
-  multi-head MLP (shared trunk + one head per task) on 3 gridworld tasks:
-  constrained final row ≈ `[0.83, 0.83, 0.83]` (all retained, 100% of expert);
-  unconstrained (`duals.lr: 0`) ≈ `[0.83, 0.83, 0.20]` (newest task forgotten,
-  24% retained). Reproduce both + all figures with one command:
-  `python -m experiments.compare_constraint --config configs/gridworld_nn_three_task.yaml --name nn_three_task`
-- The tabular 2-task `gridworld_exact` remains the smallest sanity demo.
-- **Baselines** (all same network/tasks/estimator, only the procedure differs;
-  `python -m experiments.baseline_comparison --config <cfg> --name <name>`):
-  naive sequential fine-tuning of one network forgets the OLDEST task
-  (49% / 100% / 100% success); the constraint-off ablation forgets the NEWEST
-  (100% / 100% / 69%); joint multi-task is the upper bound (all 100%). Ours
-  matches the upper bound. The two standard failures are in opposite directions,
-  which is the core narrative. Baseline trainers live in `crl/baselines.py`.
+- 25/25 tests pass (`pytest -q`, ~1.5 min CPU). Includes an exact-vs-finite-
+  difference gradient check, Monte-Carlo/exact agreement (now exercising the
+  vectorized rollout), two vectorized-rollout equivalence tests, dual dynamics,
+  and two end-to-end acceptance tests (tabular 2-task, multi-head neural 3-task).
+- **Headline result**, `configs/gridworld_tentask_sampled.yaml`, multi-head MLP
+  on 10 gridworld tasks (9×9), **sampled estimator**, 5 seeds — mean final value
+  over all 10 tasks (±std) and success rate:
+  - constrained (ours): **0.848 ± 0.027**, 99.6% success — retains all 10
+  - joint upper bound: 0.876 ± 0.003, 100% — ceiling
+  - unconstrained ablation (`duals.lr: 0`): 0.759 ± 0.039, 95% — forgets NEWEST
+    (T10 → 0.27)
+  - naive fine-tuning: 0.542 ± 0.093, 79% — forgets OLDEST tasks
+- **Performance win:** the gridworld Monte-Carlo rollout was vectorized (lockstep
+  batched env stepping via the transition tensor, `GridWorldTask.vector_rollout`)
+  — ~13× faster gradients/evals, ~33× on frozen references, turning the 10-task
+  study from ~17 h/run into ~15-20 min/seed. Unbiased vs the exact estimator.
+- The tabular 2-task `gridworld_exact` remains the smallest sanity demo; the
+  earlier 3-task exact demos still run via `experiments.baseline_comparison`.
+- **Multi-seed pipeline:** `experiments/multiseed_comparison.py` (one seed → four
+  methods, SLURM-array friendly) + `experiments/aggregate_seeds.py` +
+  `analysis/aggregate.py` (mean ± 95% CI figures/tables). Baseline trainers live
+  in `crl/baselines.py`.
 - **Figures** land under `reports/<name>/` (tracked in git; raw runs stay in
-  `results/`, gitignored). The committed bundle for the neural experiment is in
-  `reports/nn_three_task/` (PNG + SVG, per-method diagnostics, retention CSV).
+  `results/`, gitignored). The committed bundle is `reports/gridworld_tentask/`
+  (CI retention curves/bars, seed-averaged forgetting matrix, average-performance
+  curve, value + success-rate tables, per-method diagnostics).
 
 ## Environment
 

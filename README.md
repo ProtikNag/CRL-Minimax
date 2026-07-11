@@ -100,44 +100,56 @@ name. No component knows another's internals.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pytest -q                                             # 21 tests, ~20 s
+pytest -q                                             # 25 tests, ~1.5 min
 
-# Neural, 3-task headline result (constrained vs baseline + full figure bundle):
-python -m experiments.compare_constraint \
-    --config configs/gridworld_nn_three_task.yaml --name nn_three_task
-# -> reports/nn_three_task/figures/{png,svg}/  and  tables/retention_table.csv
+# Headline: 10-task, 5-seed, REAL-ROLLOUT proof-of-concept (one seed shown here;
+# the full study is a SLURM array -- see scripts/hpc_tentask.sbatch):
+python -m experiments.multiseed_comparison \
+    --config configs/gridworld_tentask_sampled.yaml --name gridworld_tentask --seed 0
+python -m experiments.aggregate_seeds \
+    --config configs/gridworld_tentask_sampled.yaml --name gridworld_tentask --seeds 0
+# -> reports/gridworld_tentask/figures/{png,svg}/  and  tables/*.csv
 ```
 
-**Headline result** (3-task gridworld, multi-head MLP, exact estimator). Success
-rate (fraction of episodes that reach the goal) per task, deployed policy:
+**Headline result** (10-task 9×9 gridworld, multi-head MLP, **sampled/Monte-Carlo
+estimator — real rollouts**, 5 seeds). Mean over all 10 tasks of the deployed
+policy's final value (±std) and task success rate (fraction of episodes reaching
+the goal):
 
-| Method | Task 1 | Task 2 | Task 3 | Fails on |
-|--------|--------|--------|--------|----------|
-| **Constrained min-max (ours)** | **100%** | **100%** | **100%** | nothing |
-| Naive fine-tuning (single net, sequential) | 49% | 100% | 100% | oldest task |
-| Unconstrained ablation (duals off) | 100% | 100% | 69% | newest task |
-| Joint multi-task (upper bound) | 100% | 100% | 100% | — |
+| Method | Mean value (±std) | Mean success | Fails on |
+|--------|-------------------|--------------|----------|
+| **Constrained min-max (ours)** | **0.848 ± 0.027** | **99.6%** | nothing (retains all 10) |
+| Joint multi-task (upper bound) | 0.876 ± 0.003 | 100% | — (ceiling) |
+| Unconstrained ablation (duals off) | 0.759 ± 0.039 | 95.0% | newest task (T10 → 0.27) |
+| Naive fine-tuning (single net, sequential) | 0.542 ± 0.093 | 78.6% | oldest tasks |
 
 The two standard baselines fail in *opposite* directions: naive sequential
-fine-tuning forgets the **oldest** task (classic catastrophic forgetting), while
+fine-tuning forgets the **oldest** tasks (classic catastrophic forgetting), while
 the constraint-off ablation forgets the **newest** (the global over-consolidates
-the past). Our method retains all three and matches the joint upper bound. Both
-value and performance tables are written to `reports/<name>/tables/`; a value of
-0.83 is optimal here (100% success, ~4.5-step paths). The tabular 2-task
-`gridworld_exact` is the smaller zero-neural-network sanity demo.
+the past). Our method retains all ten and matches the joint upper bound within
+noise — now demonstrated at 10 tasks under real rollouts with error bars, not
+just the earlier 3-task exact-estimator demo. A value ≈0.85 is optimal here
+(~100% success, near-shortest paths). Value and success-rate tables (mean ± 95%
+CI) land in `reports/gridworld_tentask/tables/`. The tabular 2-task
+`gridworld_exact` remains the smallest zero-neural-network sanity demo.
 
-Reproduce the full four-method comparison and figure bundle with:
+Reproduce the full multi-seed study on a cluster, then aggregate:
 
 ```bash
-python -m experiments.baseline_comparison \
-    --config configs/gridworld_nn_three_task.yaml --name nn_three_task
+sbatch scripts/hpc_tentask.sbatch          # array over seeds 0-4, all four methods
+python -m experiments.aggregate_seeds \
+    --config configs/gridworld_tentask_sampled.yaml \
+    --name gridworld_tentask --seeds 0 1 2 3 4
 ```
 
 Figures are written to `reports/<name>/figures/png/` and `.../svg/`, with
 per-method diagnostics under `.../figures/<method>/`. The bundle includes the
-paper's must-have set: design-space map (Fig 1), method schematic (Fig 2),
-per-task retention curves + summary (Fig 3), retention table (Tab 1), plus
-diagnostics (dual dynamics, gap sequences, forgetting matrix).
+paper's must-have set: per-task retention curves + summary with 95% CI bands
+(Fig 3), retention/performance tables (Tab 1), average-performance-vs-task curve,
+seed-averaged forgetting matrix, method schematic and design-space map, plus
+diagnostics (dual dynamics, gap sequences). The single-seed four-method bundle
+for the earlier exact-estimator demos is still produced by
+`python -m experiments.baseline_comparison --config <cfg> --name <name>`.
 
 ## 5. Benchmark tiers
 
@@ -145,12 +157,13 @@ diagnostics (dual dynamics, gap sequences, forgetting matrix).
    Zero-variance DP estimator; verifies the update rules and, with the
    multi-head network, the multi-task retention result. The canonical demos.
 2. **Many-task exact** (`gridworld_manytask_exact`). Six tasks on a 7×7 grid;
-   validated scaling check (ours retains all six, fine-tuning collapses). Add
-   goals to reach 5–10 tasks.
-3. **Sampled / many-task** (`gridworld_manytask_sampled`,
-   `gridworld_nn_three_task_sampled`). REINFORCE estimator; real rollouts and
-   sampling noise. **The next experiment** (needs HPC at 6+ tasks; see
-   `HANDOFF.md` ►►START HERE and `scripts/hpc_baseline.sbatch`).
+   zero-variance scaling check with the DP estimator. A fast sanity tier that
+   isolates the formulation from sampling noise before the sampled run below.
+3. **Sampled / many-task** (`gridworld_tentask_sampled`). REINFORCE estimator;
+   real rollouts and sampling noise. **Done and validated:** the 10-task 5-seed
+   headline above (ours retains all ten, both baselines forget in opposite
+   directions). Runs as a SLURM array (`scripts/hpc_tentask.sbatch`); the fast
+   vectorized gridworld rollout keeps each seed to ~15-20 min on CPU.
 4. **CartPole family** (`cartpole_family`). First continuous-control tier.
 5. **Paper tier.** MiniGrid goal families, then an Atari 3–6 game subset
    (Pong → Boxing → …), matching the scale of RePR. Requires actor-critic.
