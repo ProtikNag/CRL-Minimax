@@ -3,15 +3,11 @@
 # A sequence of MinAtar games (different visuals + dynamics, shared 6-action
 # space) learned with a shared conv trunk + per-task action heads. Unlike the
 # compatible CartPole physics tasks, different games force genuinely conflicting
-# features into the shared trunk -- the regime where forgetting is expected.
+# features into the shared trunk -- training a later game collapses earlier ones
+# (fine-tune: SpaceInvaders 15 -> 0.8 after Breakout). Real forgetting to fix.
 #
 # Method is pure policy-gradient REINFORCE (no critic), matching the derivation.
-# Performance metric is the game score (mean episode return), not value.
-#
-# NOTE eps/duals are placeholders here: the finetune baseline (forgetting check)
-# does not use the constraint. Per-game reward scales differ ~10x, so the
-# constrained method will need per-task eps or reward scaling (added after the
-# forgetting check confirms the benchmark is non-degenerate).
+# Reported metric is game score (undiscounted return), not value.
 experiment:
   name: minatar_multihead
   seed: 0
@@ -23,47 +19,51 @@ env:
   family: minatar
   params:
     gamma: 0.99
-    max_steps: 500
+    max_steps: 300             # caps episode length (cost); good policies survive long
     sticky_action_prob: 0.1
     difficulty_ramping: true
   tasks:                       # strong-signal game first (forgetting most visible)
-    - { game: space_invaders }
-    - { game: breakout }
-    - { game: asterix }
-    - { game: seaquest }
+    # reward_scale = 1/expert (single-game trained value) so returns are ~O(1)
+    # across games -> the multi-task objective and squared-value eps are balanced.
+    - { game: space_invaders, reward_scale: 0.067 }   # expert ~15
+    - { game: breakout,       reward_scale: 0.25 }    # expert ~4
+    - { game: asterix,        reward_scale: 1.4 }     # expert ~0.7
+    - { game: seaquest,       reward_scale: 1.1 }     # expert ~0.9
 
 policy:
   kind: cnn_multihead          # shared conv trunk + one action head per game
   hidden_sizes: [128]
-  task_conditioned: false      # separate heads only; check forgetting first
+  task_conditioned: false      # separate heads only (trunk still shared -> forgets)
 
 estimator:
   kind: monte_carlo
-  episodes_per_grad: 32
-  episodes_per_eval: 32
+  episodes_per_grad: 24
+  episodes_per_eval: 24
   episodes_per_ref: 48
   baseline: batch_mean
   time_discount_weighting: true
 
 duals:
+  # Values are normalized to ~1, so a value drop of g gives F ~ g^2. duals.lr is
+  # a starting point -- watch mu/lambda on the first run and retune.
   kind: projected_ascent
-  lr: 0.02
+  lr: 1.0
   init: 0.0
   max_value: 100.0
   warm_start: true
 
 trainer:
   cycles_per_task: 2
-  local_steps: 600
-  global_steps: 200
-  task1_steps: 1600
+  local_steps: 400
+  global_steps: 150
+  task1_steps: 1200
   lr_local: 0.001
   lr_global: 0.001
   optimizer: adam
-  eps: 1.0
+  eps: 0.04                    # squared normalized-value units: tolerated drop ~0.2
   past_task_sampling: sample
   entropy_coef: 0.005
-  eval_episodes: 32
+  eval_episodes: 24
   eval_all_tasks: true
   eval_probe_every: 100
-  report_return: true          # paper metric = game score (undiscounted return), not value
+  report_return: true          # paper metric = game score (undiscounted return)
