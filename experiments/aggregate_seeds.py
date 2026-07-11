@@ -63,9 +63,21 @@ def _discover(results_dir: Path, name: str, seeds: list[int],
     return runs
 
 
+def _raw_family(config):
+    """Family with per-task reward_scale stripped, so rollout performance reports
+    ACTUAL game scores (raw return), not the normalized value the method trains on."""
+    import copy
+    env = copy.deepcopy(config.env)
+    for t in env.tasks:
+        t.pop("reward_scale", None)
+    return make_family(env)
+
+
 def _performance_stacks(config, runs: dict[str, list[Path]], num_episodes: int):
-    """Roll out each final policy; return per-method [S, T] success/steps arrays."""
-    family = make_family(config.env)
+    """Roll out each final policy; return per-method [S, T] success/steps/return
+    arrays. Returns are ACTUAL (raw) game scores -- evaluated with reward scaling
+    removed -- so the performance table reads in real game-score units."""
+    family = _raw_family(config)
     success: dict[str, np.ndarray] = {}
     steps: dict[str, np.ndarray] = {}
     returns: dict[str, np.ndarray] = {}
@@ -139,22 +151,34 @@ def main() -> None:
                                     name="forgetting_matrix_mean",
                                     metric_label=metric_label)
 
-    # Concrete rollout performance (seed-averaged, on the final policy).
+    # Concrete rollout performance on the final policy (ACTUAL raw game scores).
     success, steps, returns = _performance_stacks(config, runs, args.perf_episodes)
-    build_performance_table_ci(success, steps, figures_dir, tables_dir,
-                               success_on_termination=success_on_termination)
-    # Interpretable headline bar chart: what the deployed policy actually does.
+    # Interpretable headline: what the deployed policy actually does.
     if success_on_termination:  # gridworld: goal-reaching
+        build_performance_table_ci(success, steps, figures_dir, tables_dir,
+                                   success_on_termination=True)
         plot_performance_bars_ci(
             {m: v * 100 for m, v in success.items()}, figures_dir,
             ylabel="Success rate (%)", title="Task success rate per task",
             filename="performance_bars", reference=100.0, reference_label="perfect")
-    elif report_return:  # MinAtar: game score is the headline
+    elif report_return:  # MinAtar: actual game score is the headline
+        from crl.seeding import set_seed
+        game_names = [t.get("game", f"T{i+1}") for i, t in enumerate(config.env.tasks)]
+        raw_fam = _raw_family(config)
+        set_seed(123)
+        rnd = make_policy(config.policy, raw_fam)
+        rnd_scores = [rollout_performance(rnd, raw_fam.tasks[i],
+                                          args.perf_episodes).mean_return
+                      for i in range(len(raw_fam))]
+        build_score_table_ci(returns, game_names, figures_dir, tables_dir,
+                             random_scores=rnd_scores)
         plot_performance_bars_ci(
             returns, figures_dir,
-            ylabel="Game score (mean return)", title="Game score per task",
+            ylabel="Game score (raw mean return)", title="Actual game score per task",
             filename="performance_bars")
     else:  # CartPole: balancing length is the graded headline metric.
+        build_performance_table_ci(success, steps, figures_dir, tables_dir,
+                                   success_on_termination=False)
         plot_performance_bars_ci(
             steps, figures_dir,
             ylabel="Mean balancing steps", title="Balancing length per task",

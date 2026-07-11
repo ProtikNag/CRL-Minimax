@@ -354,6 +354,64 @@ def plot_performance_bars_ci(values: dict[str, np.ndarray], out_dir: Path, *,
     save_figure(fig, out_dir, filename)
 
 
+def build_score_table_ci(returns: dict[str, np.ndarray], game_names: list[str],
+                         out_dir: Path, tables_dir: Path,
+                         random_scores: list[float] | None = None) -> None:
+    """Actual game-score table (method x game, mean +/- 95% CI) + CSV.
+
+    ``returns`` maps method -> [S, T] raw (unscaled) final-policy game scores.
+    This is the paper's headline performance table for MinAtar.
+    """
+    methods = list(returns)
+    num_games = next(iter(returns.values())).shape[1]
+    n_seeds = next(iter(returns.values())).shape[0]
+
+    rows = []
+    for method in methods:
+        r = returns[method]  # [S, T]
+        mean, half = _mean_ci(r)
+        seed_mean = r.mean(axis=1)
+        mmean, mhalf = _mean_ci(seed_mean)
+        rows.append({"method": method,
+                     **{game_names[t]: (round(float(mean[t]), 2), round(float(half[t]), 2))
+                        for t in range(num_games)},
+                     "mean": (round(float(mmean), 2), round(float(mhalf), 2))})
+
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    with open(tables_dir / "score_table.csv", "w", newline="") as handle:
+        cols = ["method"] + game_names + ["mean"]
+        writer = csv.writer(handle)
+        writer.writerow(cols)
+        if random_scores is not None:
+            writer.writerow(["random"] + [round(s, 2) for s in random_scores]
+                            + [round(float(np.mean(random_scores)), 2)])
+        for r in rows:
+            writer.writerow([METHOD_LABELS.get(r["method"], r["method"]).split(" (")[0]]
+                            + [r[g][0] for g in game_names] + [r["mean"][0]])
+
+    header = ["Method"] + game_names + ["Mean"]
+    cells = []
+    if random_scores is not None:
+        cells.append(["Random"] + [f"{s:.2f}" for s in random_scores]
+                     + [f"{np.mean(random_scores):.2f}"])
+    for r in rows:
+        cells.append([METHOD_LABELS.get(r["method"], r["method"]).split(" (")[0]]
+                     + [f"{r[g][0]:.2f} ± {r[g][1]:.2f}" for g in game_names]
+                     + [f"{r['mean'][0]:.2f} ± {r['mean'][1]:.2f}"])
+    fig, ax = plt.subplots(figsize=(2.0 + 1.9 * (num_games + 1), 0.5 + 0.5 * (len(cells) + 1)))
+    ax.axis("off")
+    table = ax.table(cellText=cells, colLabels=header, loc="center", cellLoc="center")
+    table.auto_set_font_size(False)
+    table.set_fontsize(9.5)
+    table.scale(1, 1.5)
+    for col in range(len(header)):
+        table[0, col].set_facecolor(AC["surface"])
+        table[0, col].set_text_props(weight="600")
+    ax.set_title(f"Actual game score per task (raw mean return, mean ± 95% CI, "
+                 f"{n_seeds} seed{'s' if n_seeds != 1 else ''})", fontweight="600", pad=12)
+    save_figure(fig, out_dir, "score_table")
+
+
 def build_performance_table_ci(success: dict[str, np.ndarray],
                                steps: dict[str, np.ndarray],
                                out_dir: Path, tables_dir: Path,
