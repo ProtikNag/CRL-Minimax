@@ -68,8 +68,9 @@ def _performance_stacks(config, runs: dict[str, list[Path]], num_episodes: int):
     family = make_family(config.env)
     success: dict[str, np.ndarray] = {}
     steps: dict[str, np.ndarray] = {}
+    returns: dict[str, np.ndarray] = {}
     for method, dirs in runs.items():
-        s_rows, st_rows = [], []
+        s_rows, st_rows, r_rows = [], [], []
         for run_dir in dirs:
             policy = make_policy(config.policy, family)
             policy.load_state_dict(torch.load(run_dir / "final_policy.pt",
@@ -79,9 +80,11 @@ def _performance_stacks(config, runs: dict[str, list[Path]], num_episodes: int):
                      for task in family.tasks]
             s_rows.append([p.success_rate for p in perfs])
             st_rows.append([p.mean_steps for p in perfs])
+            r_rows.append([p.mean_return for p in perfs])
         success[method] = np.array(s_rows)
         steps[method] = np.array(st_rows)
-    return success, steps
+        returns[method] = np.array(r_rows)
+    return success, steps, returns
 
 
 def main() -> None:
@@ -107,17 +110,22 @@ def main() -> None:
     family = make_family(config.env)
     success_on_termination = getattr(family.tasks[0], "success_on_termination", True)
     max_steps = int(config.env.params.get("max_steps", 0))
+    # The eval matrix / curves are in the reported metric: undiscounted game
+    # score when report_return is set (MinAtar), else discounted value.
+    report_return = getattr(config.trainer, "report_return", False)
+    metric_label = "score" if report_return else "value"
 
     report_dir = Path(args.reports_dir) / args.name
     figures_dir = report_dir / "figures"
     tables_dir = report_dir / "tables"
     n_seeds = len(next(iter(runs.values())))
-    print(f"[aggregate] {args.name}: methods={list(runs)} seeds={n_seeds}")
+    print(f"[aggregate] {args.name}: methods={list(runs)} seeds={n_seeds} "
+          f"metric={metric_label}")
 
-    # Headline seed-averaged figures (value-based).
-    plot_retention_curves_ci(runs, figures_dir)
-    plot_retention_bars_ci(runs, figures_dir)
-    plot_average_performance_curve(runs, figures_dir)
+    # Headline seed-averaged figures (in the reported performance metric).
+    plot_retention_curves_ci(runs, figures_dir, metric_label=metric_label)
+    plot_retention_bars_ci(runs, figures_dir, metric_label=metric_label)
+    plot_average_performance_curve(runs, figures_dir, metric_label=metric_label)
     build_retention_table_ci(runs, figures_dir, tables_dir)
 
     # Seed-averaged forgetting matrix for every sequential method.
@@ -125,21 +133,27 @@ def main() -> None:
         if method in runs:
             plot_forgetting_matrix_mean(
                 runs[method], figures_dir / method,
-                name="forgetting_matrix_mean")
+                name="forgetting_matrix_mean", metric_label=metric_label)
     if "constrained" in runs:
         plot_forgetting_matrix_mean(runs["constrained"], figures_dir,
-                                    name="forgetting_matrix_mean")
+                                    name="forgetting_matrix_mean",
+                                    metric_label=metric_label)
 
-    # Concrete rollout performance (seed-averaged success rate / episode length).
-    success, steps = _performance_stacks(config, runs, args.perf_episodes)
+    # Concrete rollout performance (seed-averaged, on the final policy).
+    success, steps, returns = _performance_stacks(config, runs, args.perf_episodes)
     build_performance_table_ci(success, steps, figures_dir, tables_dir,
                                success_on_termination=success_on_termination)
     # Interpretable headline bar chart: what the deployed policy actually does.
-    if success_on_termination:
+    if success_on_termination:  # gridworld: goal-reaching
         plot_performance_bars_ci(
             {m: v * 100 for m, v in success.items()}, figures_dir,
             ylabel="Success rate (%)", title="Task success rate per task",
             filename="performance_bars", reference=100.0, reference_label="perfect")
+    elif report_return:  # MinAtar: game score is the headline
+        plot_performance_bars_ci(
+            returns, figures_dir,
+            ylabel="Game score (mean return)", title="Game score per task",
+            filename="performance_bars")
     else:  # CartPole: balancing length is the graded headline metric.
         plot_performance_bars_ci(
             steps, figures_dir,

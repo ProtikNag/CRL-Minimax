@@ -95,7 +95,8 @@ def _forgetting_stack(run_dirs: list[Path]) -> np.ndarray:
 # figures
 # --------------------------------------------------------------------------- #
 
-def plot_retention_curves_ci(runs: dict[str, list[Path]], out_dir: Path) -> None:
+def plot_retention_curves_ci(runs: dict[str, list[Path]], out_dir: Path,
+                             metric_label: str = "value") -> None:
     """Per-task retention panels + summary, mean line and 95% CI band per method."""
     seq = {m: runs[m] for m in SEQUENTIAL if m in runs}
     data = {m: _probe_stack(dirs) for m, dirs in seq.items()}
@@ -106,6 +107,8 @@ def plot_retention_curves_ci(runs: dict[str, list[Path]], out_dir: Path) -> None
     probes = [r for r in load_records(next(iter(seq.values()))[0]) if r.get("phase") == "probe"]
     boundaries = task_boundaries(probes)
     max_step = int(ref_steps.max())
+    # Adaptive y-limit: normalized scores sit near 1, but raw scores can exceed it.
+    ymax = max(1.0, max(float(s.max()) for _, s in data.values()) * 1.08)
 
     ncols = 2
     nrows = int(np.ceil((num_tasks + 1) / ncols))
@@ -115,7 +118,7 @@ def plot_retention_curves_ci(runs: dict[str, list[Path]], out_dir: Path) -> None
 
     def mark(ax):
         ax.set_xlim(0, max_step)
-        ax.set_ylim(0, 1.0)
+        ax.set_ylim(0, ymax)
         for step, task in boundaries:
             if step > 0:
                 ax.axvline(step, color=AC["faint"], lw=0.8, ls=":", zorder=0)
@@ -135,7 +138,7 @@ def plot_retention_curves_ci(runs: dict[str, list[Path]], out_dir: Path) -> None
                             lw=0)
         mark(ax)
         ax.set_title(f"Task {task_idx + 1}", fontsize=11, loc="left")
-        ax.set_ylabel("value")
+        ax.set_ylabel(metric_label)
 
     # Summary panel: mean value across tasks.
     ax = axes[num_tasks]
@@ -147,7 +150,7 @@ def plot_retention_curves_ci(runs: dict[str, list[Path]], out_dir: Path) -> None
         ax.fill_between(steps, mean - half, mean + half, color=color, alpha=0.16, lw=0)
     mark(ax)
     ax.set_title("Mean across all tasks", fontsize=11, loc="left")
-    ax.set_ylabel("mean value")
+    ax.set_ylabel(f"mean {metric_label}")
 
     for ax in axes[num_tasks + 1:]:
         ax.set_visible(False)
@@ -165,7 +168,8 @@ def plot_retention_curves_ci(runs: dict[str, list[Path]], out_dir: Path) -> None
     save_figure(fig, out_dir, "retention_curves_ci")
 
 
-def plot_retention_bars_ci(runs: dict[str, list[Path]], out_dir: Path) -> None:
+def plot_retention_bars_ci(runs: dict[str, list[Path]], out_dir: Path,
+                           metric_label: str = "value") -> None:
     """Grouped final-value bars with 95% CI whiskers, per task and method."""
     finals = {m: _final_stack(dirs) for m, dirs in runs.items()}
     num_tasks = next(iter(finals.values())).shape[1]
@@ -182,8 +186,8 @@ def plot_retention_bars_ci(runs: dict[str, list[Path]], out_dir: Path) -> None:
                label=METHOD_LABELS.get(method, method),
                yerr=half, capsize=2.5, error_kw={"elinewidth": 1.0, "ecolor": AC["axis"]})
     ax.set_xticks(x, [f"T{i + 1}" for i in range(num_tasks)])
-    ax.set_ylabel("Final value (end of sequence)")
-    ax.set_title(f"Final retained value per task  (mean ± 95% CI, {n_seeds} seeds)",
+    ax.set_ylabel(f"Final {metric_label} (end of sequence)")
+    ax.set_title(f"Final retained {metric_label} per task  (mean ± 95% CI, {n_seeds} seeds)",
                  loc="left")
     ax.set_ylim(bottom=0)
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=2, fontsize=9)
@@ -191,7 +195,8 @@ def plot_retention_bars_ci(runs: dict[str, list[Path]], out_dir: Path) -> None:
 
 
 def plot_forgetting_matrix_mean(run_dirs: list[Path], out_dir: Path,
-                                name: str = "forgetting_matrix_mean") -> None:
+                                name: str = "forgetting_matrix_mean",
+                                metric_label: str = "value") -> None:
     """Seed-averaged forgetting matrix: rows = after task k, cols = task."""
     stack = _forgetting_stack(run_dirs)  # [S, R, C]
     mean = np.nanmean(stack, axis=0)
@@ -200,7 +205,8 @@ def plot_forgetting_matrix_mean(run_dirs: list[Path], out_dir: Path,
 
     from analysis.style import blue_sequential
     fig, ax = plt.subplots(figsize=(1.6 + 0.72 * num_cols, 1.4 + 0.62 * num_rows))
-    image = ax.imshow(mean, cmap=blue_sequential(), aspect="auto", vmin=0.0, vmax=1.0)
+    vmax = max(1.0, float(np.nanmax(mean)))
+    image = ax.imshow(mean, cmap=blue_sequential(), aspect="auto", vmin=0.0, vmax=vmax)
     hi = np.nanmax(mean)
     for r in range(num_rows):
         for c in range(num_cols):
@@ -212,13 +218,14 @@ def plot_forgetting_matrix_mean(run_dirs: list[Path], out_dir: Path,
     ax.set_yticks(range(num_rows), [f"after T{k + 1}" for k in range(num_rows)])
     ax.set_xlabel("Evaluated on task")
     ax.set_ylabel("Training progress")
-    ax.set_title("Forgetting matrix (seed-mean global value)")
+    ax.set_title(f"Forgetting matrix (seed-mean {metric_label})")
     ax.grid(False)
-    fig.colorbar(image, ax=ax, label="value", shrink=0.85)
+    fig.colorbar(image, ax=ax, label=metric_label, shrink=0.85)
     save_figure(fig, out_dir, name)
 
 
-def plot_average_performance_curve(runs: dict[str, list[Path]], out_dir: Path) -> None:
+def plot_average_performance_curve(runs: dict[str, list[Path]], out_dir: Path,
+                                   metric_label: str = "value") -> None:
     """Average performance over tasks-seen-so-far vs number of tasks (CI band).
 
     For each method and each training milestone k (after task k finishes), the
@@ -241,8 +248,8 @@ def plot_average_performance_curve(runs: dict[str, list[Path]], out_dir: Path) -
                 label=METHOD_LABELS.get(method, method))
         ax.fill_between(ks, mean - half, mean + half, color=color, alpha=0.16, lw=0)
     ax.set_xlabel("Number of tasks trained so far")
-    ax.set_ylabel("Average value over tasks seen")
-    ax.set_ylim(0, 1.0)
+    ax.set_ylabel(f"Average {metric_label} over tasks seen")
+    ax.set_ylim(0, max(1.0, ax.get_ylim()[1]))
     ax.set_title("Average performance as the task sequence grows", loc="left")
     ax.legend(loc="lower left", fontsize=9)
     save_figure(fig, out_dir, "average_performance_curve")
