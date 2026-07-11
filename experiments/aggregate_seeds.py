@@ -34,8 +34,9 @@ import torch
 
 from analysis.aggregate import (
     SEQUENTIAL, build_performance_table_ci, build_retention_table_ci,
-    plot_average_performance_curve, plot_forgetting_matrix_mean,
-    plot_performance_bars_ci, plot_retention_bars_ci, plot_retention_curves_ci,
+    build_score_table_ci, plot_average_performance_curve,
+    plot_forgetting_matrix_mean, plot_performance_bars_ci,
+    plot_retention_bars_ci, plot_retention_curves_ci,
 )
 from analysis.plots import load_records, plot_duals, plot_gaps, plot_forgetting_matrix
 from crl.config import load_config
