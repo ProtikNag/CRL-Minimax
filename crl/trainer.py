@@ -136,11 +136,20 @@ class AlternationTrainer:
             return float(k - 1)
         return 1.0
 
+    def _report_eval(self, policy: Policy, task: Task, num_episodes=None) -> float:
+        """Reporting metric: undiscounted return (task performance) when
+        ``report_return`` is set, else the discounted value. This affects only
+        the eval matrix and probes -- the constraint/objective always use the
+        discounted value."""
+        if self.cfg.report_return:
+            return self.estimator.evaluate_return(policy, task, num_episodes)
+        return self.estimator.evaluate(policy, task, num_episodes)
+
     def _evaluate_row(self, k: int) -> list[float]:
         """Row of the forgetting matrix after finishing task k (global policy)."""
         last = len(self.family) if self.cfg.eval_all_tasks else k
         return [
-            self.estimator.evaluate(
+            self._report_eval(
                 self.global_policy, self.family.tasks[i], self.cfg.eval_episodes
             )
             for i in range(last)
@@ -158,7 +167,7 @@ class AlternationTrainer:
         if not every or self.cumulative_step % every != 0:
             return
         values = [
-            self.estimator.evaluate(self.global_policy, self.family.tasks[i])
+            self._report_eval(self.global_policy, self.family.tasks[i])
             for i in range(len(self.family))
         ]
         self.logger.log(

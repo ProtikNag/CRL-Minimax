@@ -37,6 +37,17 @@ class ValueEstimator(ABC):
         backends ignore it.
         """
 
+    def evaluate_return(
+        self, policy: Policy, task: Task, num_episodes: int | None = None
+    ) -> float:
+        """Mean undiscounted episode return (task performance / score).
+
+        Used only for reporting when ``trainer.report_return`` is set. Defaults
+        to :meth:`evaluate` (the discounted value) so backends without a
+        distinct notion -- e.g. the exact DP estimator -- still work.
+        """
+        return self.evaluate(policy, task, num_episodes)
+
     @abstractmethod
     def surrogate_objective(
         self, policy: Policy, task: Task

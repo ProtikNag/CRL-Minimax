@@ -46,20 +46,25 @@ class _BaselineRunner:
         self.omega = [1.0 / len(family)] * len(family)
         self.cumulative_step = 0
 
+    def _report_eval(self, task, num_episodes=None) -> float:
+        """Undiscounted return (task performance) when report_return is set."""
+        if self.cfg.report_return:
+            return self.estimator.evaluate_return(self.policy, task, num_episodes)
+        return self.estimator.evaluate(self.policy, task, num_episodes)
+
     def _probe(self, current_task: int, phase_type: str) -> None:
         self.cumulative_step += 1
         every = self.cfg.eval_probe_every
         if not every or self.cumulative_step % every != 0:
             return
-        values = [self.estimator.evaluate(self.policy, self.family.tasks[i])
+        values = [self._report_eval(self.family.tasks[i])
                   for i in range(len(self.family))]
         self.logger.log({"phase": "probe", "cumulative_step": self.cumulative_step,
                          "current_task": current_task, "phase_type": phase_type,
                          "values": values})
 
     def _eval_row(self) -> list[float]:
-        return [self.estimator.evaluate(self.policy, self.family.tasks[i],
-                                        self.cfg.eval_episodes)
+        return [self._report_eval(self.family.tasks[i], self.cfg.eval_episodes)
                 for i in range(len(self.family))]
 
     def _finish(self, eval_matrix: list[list[float]]) -> list[list[float]]:

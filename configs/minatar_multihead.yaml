@@ -66,3 +66,4 @@ trainer:
   eval_episodes: 32
   eval_all_tasks: true
   eval_probe_every: 100
+  report_return: true          # paper metric = game score (undiscounted return), not value

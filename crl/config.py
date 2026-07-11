@@ -120,6 +120,11 @@ class TrainerConfig:
     # Probe the global policy on every task this often (in cumulative primal
     # steps) to build learning-curve data; 0 disables probing.
     eval_probe_every: int = 25
+    # Report the *undiscounted* return (task performance / game score) in the
+    # eval matrix and probes, instead of the discounted value. The constraint
+    # and objective still use discounted value; only reporting changes. Set for
+    # environments where the paper metric is the score (e.g. MinAtar).
+    report_return: bool = False
 
 
 @dataclass

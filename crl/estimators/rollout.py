@@ -129,6 +129,16 @@ class MonteCarloEstimator(ValueEstimator):
         ]
         return sum(discounted) / len(discounted)
 
+    def evaluate_return(
+        self, policy: Policy, task: Task, num_episodes: int | None = None
+    ) -> float:
+        """Mean *undiscounted* episode return -- the reported task performance
+        (e.g. MinAtar game score), as opposed to the discounted value the
+        objective optimizes. Reward scaling (if any) is already applied."""
+        n = num_episodes or self.episodes_per_eval
+        episodes = self._run_episodes(policy, task, n)
+        return float(sum(float(ep.rewards.sum()) for ep in episodes) / len(episodes))
+
     def surrogate_objective(
         self, policy: Policy, task: Task
     ) -> tuple[torch.Tensor, torch.Tensor, dict[str, float]]:
