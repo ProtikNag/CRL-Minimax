@@ -10,3 +10,7 @@ wandb/
 
 # scratch/validation result dirs
 results_*/
+
+# SLURM job logs
+slurm-*.out
+slurm-*.err
