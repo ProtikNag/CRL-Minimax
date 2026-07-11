@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 
+import torch
+
 from crl.buffers import BufferSet
 from crl.config import Config, load_config
 from crl.envs import make_family
@@ -19,11 +21,19 @@ from crl.seeding import set_seed
 from crl.trainer import AlternationTrainer
 
 
+def resolve_device(name: str) -> torch.device:
+    """Resolve a config device string; 'auto'/'cuda' fall back to CPU if no GPU."""
+    if name in ("auto", "cuda") and torch.cuda.is_available():
+        return torch.device("cuda")
+    return torch.device("cpu")
+
+
 def run_from_config(config: Config) -> list[list[float]]:
     """Build every component from config and train; returns the eval matrix."""
     set_seed(config.experiment.seed)
+    device = resolve_device(config.experiment.device)
     family = make_family(config.env)
-    policy = make_policy(config.policy, family)
+    policy = make_policy(config.policy, family).to(device)
     estimator = make_estimator(config.estimator, buffer_set=BufferSet())
     run_name = f"{config.experiment.name}_seed{config.experiment.seed}"
     logger = RunLogger(config.experiment.results_dir, run_name, config.to_dict())
@@ -33,7 +43,7 @@ def run_from_config(config: Config) -> list[list[float]]:
         f"[run] name={run_name} seed={config.experiment.seed} "
         f"env={config.env.family}({len(family)} tasks) "
         f"policy={config.policy.kind} estimator={config.estimator.kind} "
-        f"eps={config.trainer.eps}"
+        f"eps={config.trainer.eps} device={device}"
     )
 
     trainer = AlternationTrainer(config, family, policy, estimator, logger)

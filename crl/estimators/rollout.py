@@ -151,16 +151,19 @@ class MonteCarloEstimator(ValueEstimator):
             advantage = padded * mask
 
         # Single batched log-prob pass over all visited states (differentiable).
-        flat_obs = torch.cat([ep.obs for ep in episodes])
-        flat_actions = torch.cat([ep.actions for ep in episodes])
+        # Everything is moved to the policy's device so GPU policies (e.g. the
+        # MinAtar CNN) work unchanged; on CPU these .to() calls are no-ops.
+        device = next(policy.parameters()).device
+        flat_obs = torch.cat([ep.obs for ep in episodes]).to(device)
+        flat_actions = torch.cat([ep.actions for ep in episodes]).to(device)
         flat_advantage = torch.cat(
             [advantage[row, : len(ep.rewards)] for row, ep in enumerate(episodes)]
-        )
+        ).to(device)
         if self.time_discount_weighting:
             flat_time_weight = torch.cat(
                 [gamma ** torch.arange(len(ep.rewards), dtype=torch.float32)
                  for ep in episodes]
-            )
+            ).to(device)
         else:
             flat_time_weight = torch.ones_like(flat_advantage)
 

@@ -32,14 +32,15 @@ from crl.estimators import make_estimator
 from crl.logging_utils import RunLogger
 from crl.policies import make_policy
 from crl.seeding import set_seed
-from experiments.run import run_from_config
+from experiments.run import resolve_device, run_from_config
 
 
 def _run_custom(config: Config, train_fn, run_name: str) -> Path:
     """Build components and run a baseline training function; return run dir."""
     set_seed(config.experiment.seed)
+    device = resolve_device(config.experiment.device)
     family = make_family(config.env)
-    policy = make_policy(config.policy, family)
+    policy = make_policy(config.policy, family).to(device)
     estimator = make_estimator(config.estimator, buffer_set=BufferSet())
     logger = RunLogger(config.experiment.results_dir, run_name, config.to_dict())
     print(f"[run] {run_name} seed={config.experiment.seed} "
