@@ -40,12 +40,14 @@ class _MinAtarGymEnv(gym.Env):
     """Minimal Gymnasium adapter (used by the rollout-performance metric)."""
 
     def __init__(self, game: str, max_channels: int, max_steps: int,
-                 sticky_action_prob: float, difficulty_ramping: bool) -> None:
+                 sticky_action_prob: float, difficulty_ramping: bool,
+                 reward_scale: float) -> None:
         from minatar import Environment
         self._env = Environment(game, sticky_action_prob=sticky_action_prob,
                                 difficulty_ramping=difficulty_ramping)
         self._max_channels = max_channels
         self._max_steps = max_steps
+        self._reward_scale = reward_scale
         self._steps = 0
         self.action_space = gym.spaces.Discrete(self._env.num_actions())
 
@@ -61,7 +63,8 @@ class _MinAtarGymEnv(gym.Env):
         self._steps += 1
         truncated = self._steps >= self._max_steps
         obs = _pad_state(self._env.state(), self._max_channels)
-        return obs, float(reward), bool(done), bool(truncated and not done), {}
+        return (obs, float(reward) * self._reward_scale, bool(done),
+                bool(truncated and not done), {})
 
 
 class MinAtarTask(Task):
@@ -71,17 +74,18 @@ class MinAtarTask(Task):
 
     def __init__(self, spec: TaskSpec, gamma: float, game: str, max_channels: int,
                  max_steps: int, sticky_action_prob: float,
-                 difficulty_ramping: bool) -> None:
+                 difficulty_ramping: bool, reward_scale: float = 1.0) -> None:
         super().__init__(spec, gamma)
         self._game = game
         self._max_channels = max_channels
         self._max_steps = max_steps
         self._sticky = sticky_action_prob
         self._ramping = difficulty_ramping
+        self._reward_scale = reward_scale
 
     def make_env(self) -> gym.Env:
         return _MinAtarGymEnv(self._game, self._max_channels, self._max_steps,
-                              self._sticky, self._ramping)
+                              self._sticky, self._ramping, self._reward_scale)
 
     @torch.no_grad()
     def vector_rollout(self, policy, num_episodes: int) -> list[Trajectory]:
@@ -122,7 +126,7 @@ class MinAtarTask(Task):
                 reward, done = envs[i].act(a)
                 obs_hist[i].append(obs[j].to("cpu"))
                 act_hist[i].append(a)
-                rew_hist[i].append(float(reward))
+                rew_hist[i].append(float(reward) * self._reward_scale)
                 logp_hist[i].append(float(logps[j]))
                 if done:
                     alive[i] = False
@@ -179,7 +183,12 @@ class MinAtarFamily(TaskFamily):
         self.obs_dim = max_channels * 10 * 10
         self.num_actions = 6
         self.tasks = []
-        for task_id, g in enumerate(games):
+        for task_id, t in enumerate(tasks):
+            g = t["game"]
+            # Per-task reward scale so returns are ~O(1) across games (default 1);
+            # normalizes the multi-task objective and the squared-value constraint.
+            scale = float(t.get("reward_scale", 1.0))
             spec = TaskSpec(task_id, f"minatar-{g}", {"game": g})
             self.tasks.append(
-                MinAtarTask(spec, gamma, g, max_channels, max_steps, sticky, ramping))
+                MinAtarTask(spec, gamma, g, max_channels, max_steps, sticky,
+                            ramping, scale))
