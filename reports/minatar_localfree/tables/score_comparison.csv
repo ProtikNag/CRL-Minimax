@@ -1,0 +1,5 @@
+method,SpaceInv,Breakout,Asterix,Seaquest,mean
+random,2.860,0.510,0.470,0.180,1.005
+new_localfree,28.560,1.490,0.390,1.000,7.860
+prev_constrained,23.285,1.500,0.570,0.890,6.561
+joint_ub,25.150,5.145,3.635,2.550,9.120
