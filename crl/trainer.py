@@ -237,16 +237,24 @@ class AlternationTrainer:
             shortfalls_sq: dict[str, float] = {}
             total_constraint = 0.0
             max_lambda = 0.0
+            # Variant: pure-plasticity local. Skip the lambda shortfall terms so
+            # the local policy maximizes V_k alone (the global phase still
+            # consolidates past tasks under its own mu constraint). We still
+            # measure the past shortfalls for logging, but they do not enter the
+            # loss and lambda stays at 0.
             for i in active:
                 obj_i, _, stats_i = self.estimator.surrogate_objective(
                     local_policy, self.family.tasks[i]
                 )
                 shortfall = max(0.0, refs_past[i] - stats_i["value"])  # V_i^G - V_i^L
                 constraint_i = shortfall * shortfall  # eq 24: squared hinge
-                lam = self._lambda_for(i).update(constraint_i, self._eps_local(i))
-                # Detached coefficient 2 * shortfall multiplies the value gradient.
-                coeff = lam * 2.0 * shortfall * scale
-                loss = loss - coeff * obj_i
+                if self.cfg.local_unconstrained:
+                    lam = 0.0
+                else:
+                    lam = self._lambda_for(i).update(constraint_i, self._eps_local(i))
+                    # Detached coeff 2 * shortfall multiplies the value gradient.
+                    coeff = lam * 2.0 * shortfall * scale
+                    loss = loss - coeff * obj_i
                 lambdas[f"lambda_{i}"] = lam
                 shortfalls_sq[f"F_L_{i}"] = constraint_i
                 total_constraint += constraint_i

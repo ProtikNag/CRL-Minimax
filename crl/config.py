@@ -125,6 +125,13 @@ class TrainerConfig:
     # and objective still use discounted value; only reporting changes. Set for
     # environments where the paper metric is the score (e.g. MinAtar).
     report_return: bool = False
+    # Variant: drop the past-task constraint from the LOCAL phase, so the local
+    # policy is a pure-plasticity learner of the current task (maximizes V_k
+    # only, no lambda shortfall terms). The GLOBAL phase is unchanged -- it is
+    # still constrained w.r.t. the frozen local via mu. This tests whether
+    # letting the local fully master the new task (then consolidating into the
+    # global) fixes current-task underlearning without losing past retention.
+    local_unconstrained: bool = False
 
 
 @dataclass

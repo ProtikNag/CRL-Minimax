@@ -1,0 +1,65 @@
+# === MinAtar variant: unconstrained (pure-plasticity) local, consolidating global ===
+#
+# Same tasks / network / estimator / duals as minatar_multihead.yaml. The ONLY
+# change is trainer.local_unconstrained: the local phase drops the past-task
+# lambda constraint, so the local policy learns the current game as well as it
+# can (maximizes V_k alone). The global phase is unchanged -- still constrained
+# w.r.t. the frozen local via mu, so it consolidates past games while tracking
+# the freshly-mastered current game. Tests whether this fixes the current-task
+# underlearning seen in the fully-constrained method, without losing retention.
+experiment:
+  name: minatar_localfree
+  seed: 0
+  results_dir: results
+  device: auto
+  log_every: 100
+
+env:
+  family: minatar
+  params:
+    gamma: 0.99
+    max_steps: 300
+    sticky_action_prob: 0.1
+    difficulty_ramping: true
+  tasks:
+    - { game: space_invaders, reward_scale: 0.067 }   # expert ~15
+    - { game: breakout,       reward_scale: 0.25 }    # expert ~4
+    - { game: asterix,        reward_scale: 1.4 }     # expert ~0.7
+    - { game: seaquest,       reward_scale: 1.1 }     # expert ~0.9
+
+policy:
+  kind: cnn_multihead
+  hidden_sizes: [128]
+  task_conditioned: false
+
+estimator:
+  kind: monte_carlo
+  episodes_per_grad: 24
+  episodes_per_eval: 24
+  episodes_per_ref: 48
+  baseline: batch_mean
+  time_discount_weighting: true
+
+duals:
+  kind: projected_ascent
+  lr: 1.0
+  init: 0.0
+  max_value: 100.0
+  warm_start: true
+
+trainer:
+  cycles_per_task: 2
+  local_steps: 400
+  global_steps: 150
+  task1_steps: 1200
+  lr_local: 0.001
+  lr_global: 0.001
+  optimizer: adam
+  eps: 0.04
+  past_task_sampling: sample
+  entropy_coef: 0.005
+  eval_episodes: 24
+  eval_all_tasks: true
+  eval_probe_every: 100
+  report_return: true
+  local_unconstrained: true    # <-- the variant: pure-plasticity local phase
