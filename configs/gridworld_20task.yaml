@@ -1,0 +1,78 @@
+# === 20-task GridWorld (15x15), EXACT estimator, multi-head MLP ===
+#
+# 20 goal-relocation tasks on a large 15x15 grid (225 states), shared MLP
+# trunk + per-task heads. Goals are spread across the grid in a zigzag order
+# so consecutive tasks demand conflicting actions -> heavy interference in
+# the shared trunk. EXACT gradients remove any exploration confound, so the
+# ONLY failure mode is forgetting: naive fine-tuning overwrites the trunk for
+# the newest goal and loses the old ones. Full theory (constrained local).
+experiment:
+  name: gridworld_20task
+  seed: 0
+  results_dir: results
+  device: cpu
+  log_every: 100
+
+env:
+  family: gridworld
+  params:
+    size: 15
+    slip: 0.1
+    gamma: 0.95
+    goal_reward: 1.0
+    step_penalty: 0.0
+    start: uniform
+    max_steps: 150
+  tasks:
+    - { goal: [1, 1] }
+    - { goal: [13, 13] }
+    - { goal: [1, 4] }
+    - { goal: [13, 10] }
+    - { goal: [1, 7] }
+    - { goal: [13, 7] }
+    - { goal: [1, 10] }
+    - { goal: [13, 4] }
+    - { goal: [1, 13] }
+    - { goal: [13, 1] }
+    - { goal: [5, 1] }
+    - { goal: [9, 13] }
+    - { goal: [5, 4] }
+    - { goal: [9, 10] }
+    - { goal: [5, 7] }
+    - { goal: [9, 7] }
+    - { goal: [5, 10] }
+    - { goal: [9, 4] }
+    - { goal: [5, 13] }
+    - { goal: [9, 1] }
+
+policy:
+  kind: multihead              # shared MLP trunk + one action head per task
+  hidden_sizes: [64]           # bottleneck trunk -> forces cross-task sharing
+  task_conditioned: false
+
+estimator:
+  kind: exact                  # zero-variance DP gradients (isolates forgetting)
+
+duals:
+  kind: projected_ascent
+  lr: 5.0
+  init: 0.0
+  max_value: 100.0
+  warm_start: true
+
+trainer:
+  cycles_per_task: 2
+  local_steps: 400
+  global_steps: 150
+  task1_steps: 800
+  lr_local: 0.01
+  lr_global: 0.01
+  optimizer: adam
+  eps: 0.01                    # squared-value units (tolerated value drop ~0.1)
+  past_task_sampling: sample
+  entropy_coef: 0.005
+  eval_episodes: 100
+  eval_all_tasks: true
+  eval_probe_every: 50
+  report_return: false         # gridworld metric = value / success rate
+  local_unconstrained: false
