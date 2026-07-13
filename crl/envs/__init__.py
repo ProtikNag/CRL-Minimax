@@ -6,11 +6,13 @@ from crl.config import EnvConfig
 from crl.envs.base import TabularTask, Task, TaskFamily, TaskSpec
 from crl.envs.biggrid import BigGridFamily
 from crl.envs.gridworld import GridWorldFamily
+from crl.envs.maze import MazeFamily
 from crl.envs.minatar import MinAtarFamily
 
 FAMILY_REGISTRY: dict[str, type[TaskFamily]] = {
     "gridworld": GridWorldFamily,  # tabular test-harness for the theory (exact grads)
     "biggrid": BigGridFamily,      # large procedural gridworld, sampled REINFORCE
+    "maze": MazeFamily,            # continual maze navigation (one maze per task)
     "minatar": MinAtarFamily,      # the experiment family
 }
 
