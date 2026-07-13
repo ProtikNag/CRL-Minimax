@@ -1,0 +1,80 @@
+# === 20-task BigGrid (50x50), SAMPLED REINFORCE, ONE head, NO task-id ===
+# Large procedural grid (no dense DP tensor). Single shared MLP head, no
+# task-id and no goal in the observation -> the policy gets NO task signal,
+# so perfect retention is infeasible: the constraint must find the best single
+# broadly-competent policy while naive fine-tuning collapses to the latest goal.
+# Reward is GRADED proximity (return = closest-approach proximity in [0,1];
+# reaching the goal = 1). UNCONSTRAINED-LOCAL variant.
+experiment:
+  name: biggrid_20task_localfree
+  seed: 0
+  results_dir: results
+  device: cpu
+  log_every: 100
+
+env:
+  family: biggrid
+  params:
+    size: 50
+    slip: 0.1
+    gamma: 0.99
+    max_steps: 160
+    goal_in_obs: false        # NO task signal (position-only observation)
+  tasks:
+    - { goal: [4, 4] }
+    - { goal: [44, 44] }
+    - { goal: [4, 14] }
+    - { goal: [44, 34] }
+    - { goal: [4, 24] }
+    - { goal: [44, 24] }
+    - { goal: [4, 34] }
+    - { goal: [44, 14] }
+    - { goal: [4, 44] }
+    - { goal: [44, 4] }
+    - { goal: [14, 4] }
+    - { goal: [34, 44] }
+    - { goal: [14, 14] }
+    - { goal: [34, 34] }
+    - { goal: [14, 34] }
+    - { goal: [34, 14] }
+    - { goal: [14, 44] }
+    - { goal: [34, 4] }
+    - { goal: [24, 4] }
+    - { goal: [24, 44] }
+
+policy:
+  kind: mlp                   # ONE shared head (no per-task heads)
+  hidden_sizes: [256, 128]
+  task_conditioned: false     # NO task-id input
+
+estimator:
+  kind: monte_carlo           # sampled REINFORCE (no exact DP)
+  episodes_per_grad: 48
+  episodes_per_eval: 48
+  episodes_per_ref: 96
+  baseline: batch_mean
+  time_discount_weighting: true
+
+duals:
+  kind: projected_ascent
+  lr: 2.0
+  init: 0.0
+  max_value: 100.0
+  warm_start: true
+
+trainer:
+  cycles_per_task: 2
+  local_steps: 350
+  global_steps: 150
+  task1_steps: 700
+  lr_local: 0.002
+  lr_global: 0.002
+  optimizer: adam
+  eps: 0.01
+  past_task_sampling: sample
+  entropy_coef: 0.01
+  eval_episodes: 64
+  eval_all_tasks: true
+  eval_probe_every: 100
+  report_return: true         # graded proximity return in [0,1]
+  local_unconstrained: true
