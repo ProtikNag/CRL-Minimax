@@ -12,7 +12,7 @@ CONFIG_DIR = Path(__file__).resolve().parent.parent / "configs"
 
 
 @pytest.mark.parametrize(
-    "name", ["gridworld_exact.yaml", "gridworld_sampled.yaml", "cartpole_family.yaml"]
+    "name", ["gridworld_exact.yaml", "gridworld_sampled.yaml", "minatar_multihead.yaml"]
 )
 def test_shipped_configs_load(name):
     config = load_config(CONFIG_DIR / name)

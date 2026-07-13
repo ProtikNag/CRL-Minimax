@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from crl.config import EnvConfig
 from crl.envs.base import TabularTask, Task, TaskFamily, TaskSpec
-from crl.envs.cartpole import CartPoleFamily
 from crl.envs.gridworld import GridWorldFamily
 from crl.envs.minatar import MinAtarFamily
 
 FAMILY_REGISTRY: dict[str, type[TaskFamily]] = {
-    "gridworld": GridWorldFamily,
-    "cartpole": CartPoleFamily,
-    "minatar": MinAtarFamily,
+    "gridworld": GridWorldFamily,  # tabular test-harness for the theory (exact grads)
+    "minatar": MinAtarFamily,      # the experiment family
 }
 
 
