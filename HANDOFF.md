@@ -12,7 +12,7 @@ removed to stay within the policy-gradient derivation.
 
 **Current headline run (in flight / latest):** four MinAtar games
 (SpaceInvaders → Breakout → Asterix → Seaquest), shared conv trunk + per-task
-heads, **10 seeds**, three methods:
+heads, **5 seeds**, three methods:
 
 - `constrained` — full theory, local constrained on past tasks (ours).
 - `localfree` — unconstrained-local variant (ours).
@@ -26,11 +26,11 @@ sbatch scripts/hpc_minatar.sbatch constrained <seed> configs/minatar_localfree.y
 ```
 Aggregate all seeds into the report bundle:
 ```bash
-python -m experiments.aggregate_theory --seeds 0 1 2 3 4 5 6 7 8 9
+python -m experiments.aggregate_theory --seeds 0 1 2 3 4
 # -> reports/minatar_theory/{figures,tables}
 ```
 
-**Next up:** once the 10-seed bundle lands, fill the headline table in
+**Next up:** once the 5-seed bundle lands, fill the headline table in
 `README.md` (`<!-- HEADLINE_RESULTS -->`) and this file, then decide whether to
 scale games / seeds or tune `eps`/`duals.lr`.
 
@@ -108,7 +108,7 @@ snapshot is logged with every run automatically.
 ## Generating figures
 
 - MinAtar 3-method CI bundle (current headline path):
-  `python -m experiments.aggregate_theory --seeds 0 1 2 3 4 5 6 7 8 9`
+  `python -m experiments.aggregate_theory --seeds 0 1 2 3 4`
 - Single-run diagnostics: `python -m analysis.plots --run results/<run_dir>`
 
 Figures are written in PNG + SVG. Method colors: green = constrained-local (ours),

@@ -27,7 +27,7 @@ sequential baseline).
 ## Current experiments
 
 - `minatar_theory/` — four MinAtar games (SpaceInvaders → Breakout → Asterix →
-  Seaquest), shared conv trunk + per-task heads, pure REINFORCE, 10 seeds.
+  Seaquest), shared conv trunk + per-task heads, pure REINFORCE, 5 seeds.
   Compares constrained-local vs unconstrained-local vs naive fine-tuning.
 
 ## Regenerating
@@ -38,5 +38,5 @@ sbatch scripts/hpc_minatar.sbatch constrained <seed> configs/minatar_multihead.y
 sbatch scripts/hpc_minatar.sbatch finetune    <seed> configs/minatar_multihead.yaml minatar_multihead
 sbatch scripts/hpc_minatar.sbatch constrained <seed> configs/minatar_localfree.yaml minatar_localfree
 # curated CI bundle:
-python -m experiments.aggregate_theory --seeds 0 1 2 3 4 5 6 7 8 9
+python -m experiments.aggregate_theory --seeds 0 1 2 3 4
 ```

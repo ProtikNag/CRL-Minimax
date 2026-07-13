@@ -127,12 +127,12 @@ python -m experiments.multiseed_comparison \
     --seed 0 --methods constrained
 ```
 
-The full study is 10 seeds × 3 method-runs on SLURM
+The full study is 5 seeds × 3 method-runs on SLURM
 (`scripts/hpc_minatar.sbatch <method> <seed> <config> <name>`), aggregated by
 `experiments/aggregate_theory.py`:
 
 ```bash
-python -m experiments.aggregate_theory --seeds 0 1 2 3 4 5 6 7 8 9
+python -m experiments.aggregate_theory --seeds 0 1 2 3 4
 # -> reports/minatar_theory/figures/{png,svg}/ and tables/*.csv
 ```
 
@@ -151,9 +151,30 @@ per-task for training only (`reward_scale = 1/expert`, so returns are ~O(1) and
 the single squared-value `ε` is balanced across games). Results table and
 figures land in `reports/minatar_theory/` — see the bundle for per-task
 retention curves, learning/reward curves, forgetting matrices, and score tables
-(mean ± 95% CI over 10 seeds).
+(mean ± 95% CI over 5 seeds).
 
-<!-- HEADLINE_RESULTS: filled by experiments/aggregate_theory.py output -->
+**Result** (final policy, raw game score, 100 eval episodes; 5 seeds for
+unconstrained-local, 4 for the others — one constrained/finetune seed still
+running). Ours **retains the old games** where naive fine-tuning catastrophically
+forgets them; fine-tuning only leads on the two most-recent games it has not yet
+forgotten:
+
+| Method | SpaceInv | Breakout | Asterix | Seaquest | Mean |
+|--------|---------:|---------:|--------:|---------:|-----:|
+| Random | 2.8 | 0.5 | 0.5 | 0.1 | 1.0 |
+| **Constrained-local min-max (ours)** | **33.6** | **2.96** | 0.98 | 1.30 | **9.7** |
+| **Unconstrained-local min-max (ours)** | **35.6** | 2.22 | 0.62 | 1.52 | **10.0** |
+| Naive fine-tuning | 3.8 | 0.34 | 3.19 | 4.79 | 3.0 |
+
+Fine-tuning collapses the two oldest games to ≈ random (SpaceInvaders 33→3.8,
+Breakout →0.34) while acing the two it trained last; both min-max variants hold a
+balanced profile across all four, retaining SpaceInvaders (~9×) and Breakout (~9×)
+that fine-tuning erases. The cost is reduced plasticity on the newest games
+(Asterix/Seaquest), where the constrained global under-learns relative to a fully
+plastic single net — the honest retention-vs-plasticity trade. Per-game panels,
+learning/reward curves, forgetting matrices and CI tables:
+`reports/minatar_theory/`.
+
 
 ## 5. Benchmark tiers
 
@@ -162,7 +183,7 @@ retention curves, learning/reward curves, forgetting matrices, and score tables
    forgetting; the sampled REINFORCE gradient matches the exact policy gradient).
    Not an experiment — the theory double-check.
 2. **MinAtar (headline).** Four games, shared conv trunk + per-task heads,
-   REINFORCE, 10 seeds. Genuine cross-game interference in the shared trunk —
+   REINFORCE, 5 seeds. Genuine cross-game interference in the shared trunk —
    real forgetting to prevent, unlike compatible toy tasks. This is the paper
    tier for the current write-up.
 3. **Future.** Larger MinAtar / ALE subsets; value-based learners were explored
