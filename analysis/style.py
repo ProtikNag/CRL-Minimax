@@ -48,13 +48,15 @@ AC_SERIES = [AC["blue"], AC["amber"], AC["green"], AC["red"],
 
 # Method colors used consistently across every comparison figure.
 METHOD_COLORS = {
-    "constrained": AC["green"],     # ours
+    "constrained": AC["green"],     # ours: full theory (constrained local)
+    "localfree": AC["blue"],        # ours: unconstrained-local variant
     "finetune": AC["red"],          # naive sequential fine-tuning (forgets old)
     "unconstrained": AC["amber"],   # two-policy ablation (forgets newest)
     "joint": AC["violet"],          # joint multi-task upper bound
 }
 METHOD_LABELS = {
-    "constrained": "Constrained min-max (ours)",
+    "constrained": "Constrained-local min-max (ours)",
+    "localfree": "Unconstrained-local min-max (ours)",
     "finetune": "Naive fine-tuning (single net)",
     "unconstrained": "Unconstrained ablation (duals off)",
     "joint": "Joint multi-task (upper bound)",

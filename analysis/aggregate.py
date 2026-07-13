@@ -31,7 +31,7 @@ from analysis.style import AC, METHOD_COLORS, METHOD_LABELS, save_figure
 import matplotlib.pyplot as plt
 
 # Sequential methods share an identical step schedule; joint is the upper bound.
-SEQUENTIAL = ("constrained", "finetune", "unconstrained")
+SEQUENTIAL = ("constrained", "localfree", "finetune", "unconstrained")
 
 # Student-t 0.975 quantile by seed count (two-sided 95% CI). Falls back to the
 # normal 1.96 for larger n.
