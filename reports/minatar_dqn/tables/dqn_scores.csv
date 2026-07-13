@@ -1,0 +1,6 @@
+game,random,finetune_final,ours_final,best_possible,ours_pct_of_best,finetune_pct_of_best
+SpaceInvaders,0.00,0.00,21.08,22.34,94%,0%
+Breakout,0.00,0.53,3.37,3.22,105%,16%
+Asterix,0.48,0.71,1.04,1.77,59%,40%
+Seaquest,0.00,0.98,0.59,1.09,54%,90%
+MEAN,0.12,0.55,6.52,7.10,78%,37%
