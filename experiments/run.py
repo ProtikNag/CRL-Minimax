@@ -2,7 +2,7 @@
 
 Usage:
     python -m experiments.run --config configs/gridworld_exact.yaml
-    python -m experiments.run --config configs/cartpole_family.yaml --seed 7
+    python -m experiments.run --config configs/minatar_multihead.yaml --seed 7
 """
 
 from __future__ import annotations

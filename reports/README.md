@@ -20,22 +20,23 @@ reports/<experiment_name>/
 └── eval_matrix_<method>.json    # raw task×phase evaluation matrices
 ```
 
-`<method>` is one of `constrained` (ours), `finetune` (naive single-network
-sequential), `unconstrained` (constraint-off ablation), `joint` (upper bound).
+`<method>` is one of `constrained` (ours, full theory / constrained-local),
+`localfree` (ours, unconstrained-local variant), `finetune` (naive single-network
+sequential baseline).
 
 ## Current experiments
 
-- `nn_three_task/` — 3-task 5×5 gridworld, multi-head MLP, exact estimator.
-  The first neural multi-task result.
-- `gridworld_manytask/` — 6-task 7×7 gridworld, exact. Scaling check: ours
-  retains all six; fine-tuning shows decaying catastrophic forgetting.
+- `minatar_theory/` — four MinAtar games (SpaceInvaders → Breakout → Asterix →
+  Seaquest), shared conv trunk + per-task heads, pure REINFORCE, 10 seeds.
+  Compares constrained-local vs unconstrained-local vs naive fine-tuning.
 
 ## Regenerating
 
 ```bash
-python -m experiments.baseline_comparison \
-    --config configs/<cfg>.yaml --name <experiment_name>
+# raw runs (per seed, 3 method-runs):
+sbatch scripts/hpc_minatar.sbatch constrained <seed> configs/minatar_multihead.yaml minatar_multihead
+sbatch scripts/hpc_minatar.sbatch finetune    <seed> configs/minatar_multihead.yaml minatar_multihead
+sbatch scripts/hpc_minatar.sbatch constrained <seed> configs/minatar_localfree.yaml minatar_localfree
+# curated CI bundle:
+python -m experiments.aggregate_theory --seeds 0 1 2 3 4 5 6 7 8 9
 ```
-
-Writes both the raw runs (to `results/`) and this curated bundle (to
-`reports/<experiment_name>/`).
