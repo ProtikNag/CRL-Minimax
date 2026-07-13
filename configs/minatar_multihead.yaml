@@ -1,13 +1,16 @@
-# === MinAtar continual proof-of-concept: multi-head CNN over MinAtar games ===
+# === MinAtar continual, theoretical REINFORCE — CONSTRAINED-LOCAL (full theory) ===
 #
-# A sequence of MinAtar games (different visuals + dynamics, shared 6-action
-# space) learned with a shared conv trunk + per-task action heads. Unlike the
-# compatible CartPole physics tasks, different games force genuinely conflicting
-# features into the shared trunk -- training a later game collapses earlier ones
-# (fine-tune: SpaceInvaders 15 -> 0.8 after Breakout). Real forgetting to fix.
+# The method of docs/Objective_for_Continual_Reinforcement_Learning.pdf, applied
+# to a sequence of MinAtar games (shared conv trunk + per-task action heads).
+# Pure policy-gradient REINFORCE (no critic), matching the derivation exactly:
+#   local phase  -- eqs 7-10, 22-24 (per-past-task lambda shortfall constraint)
+#   global phase -- eqs 11-14, 30-32 (current-task mu shortfall constraint)
+# This config is the FULL theory: the local phase IS constrained on past tasks
+# (local_unconstrained: false). Compared against the unconstrained-local variant
+# (configs/minatar_localfree.yaml) and naive fine-tuning.
 #
-# Method is pure policy-gradient REINFORCE (no critic), matching the derivation.
-# Reported metric is game score (undiscounted return), not value.
+# Reported metric is raw game score (undiscounted return). Budget raised over the
+# first proof-of-concept so each new game has time to learn.
 experiment:
   name: minatar_multihead
   seed: 0
@@ -19,33 +22,29 @@ env:
   family: minatar
   params:
     gamma: 0.99
-    max_steps: 300             # caps episode length (cost); good policies survive long
+    max_steps: 400             # episode horizon (raised for more score headroom)
     sticky_action_prob: 0.1
     difficulty_ramping: true
-  tasks:                       # strong-signal game first (forgetting most visible)
-    # reward_scale = 1/expert (single-game trained value) so returns are ~O(1)
-    # across games -> the multi-task objective and squared-value eps are balanced.
-    - { game: space_invaders, reward_scale: 0.067 }   # expert ~15
-    - { game: breakout,       reward_scale: 0.25 }    # expert ~4
-    - { game: asterix,        reward_scale: 1.4 }     # expert ~0.7
-    - { game: seaquest,       reward_scale: 1.1 }     # expert ~0.9
+  tasks:                       # reward_scale = 1/expert -> returns ~O(1) across games
+    - { game: space_invaders, reward_scale: 0.067 }
+    - { game: breakout,       reward_scale: 0.25 }
+    - { game: asterix,        reward_scale: 1.4 }
+    - { game: seaquest,       reward_scale: 1.1 }
 
 policy:
   kind: cnn_multihead          # shared conv trunk + one action head per game
   hidden_sizes: [128]
-  task_conditioned: false      # separate heads only (trunk still shared -> forgets)
+  task_conditioned: false      # separate heads only (trunk shared -> can forget)
 
 estimator:
   kind: monte_carlo
-  episodes_per_grad: 24
-  episodes_per_eval: 24
+  episodes_per_grad: 32        # up from 24 (lower-variance gradient)
+  episodes_per_eval: 32
   episodes_per_ref: 48
   baseline: batch_mean
   time_discount_weighting: true
 
 duals:
-  # Values are normalized to ~1, so a value drop of g gives F ~ g^2. duals.lr is
-  # a starting point -- watch mu/lambda on the first run and retune.
   kind: projected_ascent
   lr: 1.0
   init: 0.0
@@ -54,16 +53,17 @@ duals:
 
 trainer:
   cycles_per_task: 2
-  local_steps: 400
-  global_steps: 150
-  task1_steps: 1200
+  local_steps: 1200            # up from 400 -- new game gets time to learn
+  global_steps: 450            # up from 150 -- global consolidates/tracks local
+  task1_steps: 2500            # up from 1200
   lr_local: 0.001
   lr_global: 0.001
   optimizer: adam
-  eps: 0.04                    # squared normalized-value units: tolerated drop ~0.2
+  eps: 0.04                    # squared normalized-value units (tolerated drop ~0.2)
   past_task_sampling: sample
-  entropy_coef: 0.005
-  eval_episodes: 24
+  entropy_coef: 0.005          # small exploration bonus (practical add-on to REINFORCE)
+  eval_episodes: 32
   eval_all_tasks: true
-  eval_probe_every: 100
+  eval_probe_every: 100        # learning-curve / reward-curve probe cadence
   report_return: true          # paper metric = game score (undiscounted return)
+  local_unconstrained: false   # FULL theory: local is constrained on past tasks
