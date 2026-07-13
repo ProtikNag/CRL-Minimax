@@ -74,8 +74,13 @@ class AlternationTrainer:
         self.log_every = config.experiment.log_every
 
         num_tasks = len(family)
-        if self.cfg.omega is None:
-            self.omega = [1.0 / num_tasks] * num_tasks  # uniform 1/k
+        # Uniform weights follow the derivation (Setup): omega_i = 1/k where k is
+        # the CURRENT task count (number of tasks seen so far), not 1/num_tasks.
+        # The weight per task therefore shrinks as tasks accumulate. When an
+        # explicit omega list is given it is used verbatim (indexed by task).
+        self._uniform_omega = self.cfg.omega is None
+        if self._uniform_omega:
+            self.omega = None
         else:
             if len(self.cfg.omega) != num_tasks:
                 raise ValueError(
@@ -103,6 +108,14 @@ class AlternationTrainer:
     # ------------------------------------------------------------------ #
     # helpers
     # ------------------------------------------------------------------ #
+
+    def _omega(self, task_index: int, k: int) -> float:
+        """Weight omega_i for task ``task_index`` (0-based) when the current task
+        count is ``k``. Uniform default = 1/k for every appeared task (Setup);
+        an explicit omega list is indexed directly."""
+        if self._uniform_omega:
+            return 1.0 / k
+        return self.omega[task_index]
 
     def _eps_local(self, task_index: int) -> float:
         """Tolerance eps_i for past task ``task_index`` (0-based)."""
@@ -194,7 +207,8 @@ class AlternationTrainer:
             objective, entropy_term, stats = self.estimator.surrogate_objective(
                 self.global_policy, task
             )
-            loss = -(self.omega[0] * objective + self.cfg.entropy_coef * entropy_term)
+            # Task 1 is the current task with k=1, so omega_1 = 1/1 = 1.
+            loss = -(self._omega(0, 1) * objective + self.cfg.entropy_coef * entropy_term)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -230,7 +244,7 @@ class AlternationTrainer:
                 local_policy, task_k
             )
             # eq 22: omega_k grad V_k + sum_i lambda_i * 2 * shortfall_i * grad V_i.
-            loss = -(self.omega[k - 1] * objective_k)
+            loss = -(self._omega(k - 1, k) * objective_k)
             loss = loss - self.cfg.entropy_coef * entropy_term_k
 
             lambdas: dict[str, float] = {}
@@ -302,7 +316,7 @@ class AlternationTrainer:
                 obj_i, _, stats_i = self.estimator.surrogate_objective(
                     self.global_policy, self.family.tasks[i]
                 )
-                past_objective = past_objective + self.omega[i] * scale * obj_i
+                past_objective = past_objective + self._omega(i, k) * scale * obj_i
                 past_values[f"V_past_{i}"] = stats_i["value"]
 
             objective_k, entropy_term_k, stats_k = self.estimator.surrogate_objective(
