@@ -80,6 +80,36 @@ def train_expert(qnet, task, cfg, gamma, obs_shape, device, logger) -> float:
     return score
 
 
+def run_finetune(config, seed: int) -> None:
+    """Naive sequential DDQN baseline: one shared net trained task-by-task with
+    NO constraint (no global/local split). Shows catastrophic forgetting."""
+    set_seed(seed)
+    device = resolve_device(config.experiment.device)
+    family = make_family(config.env)
+    qnet = make_policy(config.policy, family).to(device)
+    gamma = family.tasks[0].gamma
+    run_name = f"{config.experiment.name}_finetune_seed{seed}"
+    logger = RunLogger(config.experiment.results_dir, run_name, config.to_dict())
+    print(f"[dqn-finetune] {run_name} device={device} tasks={len(family)}")
+    eval_matrix = []
+    try:
+        for k, task in enumerate(family.tasks):
+            print(f"\n=== finetune task {k+1}/{len(family)}: {task._game} ===")
+            # train the SHARED net on this task alone (steps = task1 budget).
+            train_expert(qnet, task, config.dqn, gamma, family.obs_shape,
+                         device, logger)
+            row = [greedy_value(qnet, family.tasks[i], config.dqn.eval_episodes,
+                                gamma, device)[1] for i in range(k + 1)]
+            eval_matrix.append(row)
+            logger.log({"phase": "eval", "task": k + 1, "values": row})
+            print(f"[eval t{k+1}] {row}")
+        logger.save_json("eval_matrix.json", eval_matrix)
+        torch.save(qnet.state_dict(), logger.run_dir / "final_policy.pt")
+    finally:
+        logger.close()
+    print(f"[dqn-finetune] done; results in {logger.run_dir}")
+
+
 def run_experts(config, seed: int) -> None:
     set_seed(seed)
     device = resolve_device(config.experiment.device)
@@ -106,7 +136,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True)
     parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--mode", choices=["continual", "experts"],
+    parser.add_argument("--mode", choices=["continual", "experts", "finetune"],
                         default="continual")
     parser.add_argument("--results-dir", default=None)
     args = parser.parse_args()
@@ -118,6 +148,8 @@ def main() -> None:
     seed = config.experiment.seed
     if args.mode == "continual":
         run_continual(config, seed)
+    elif args.mode == "finetune":
+        run_finetune(config, seed)
     else:
         run_experts(config, seed)
 
