@@ -19,7 +19,7 @@ env:
     slip: 0.1
     gamma: 0.99
     max_steps: 160
-    goal_in_obs: false        # NO task signal (position-only observation)
+    goal_in_obs: true         # obs = current position + GOAL position (agent knows which way to go)
   tasks:
     - { goal: [4, 4] }
     - { goal: [44, 44] }
