@@ -3,6 +3,27 @@
 State of the project and what to do next, for a fresh session. Read `README.md`
 first (problem, method, math); this file is status + next steps only.
 
+## ►► AUTONOMOUS MAZE RUN IN FLIGHT (2026-07-13)
+
+A self-contained SLURM pipeline is running the **continual-maze** study (no
+interactive session needed). Driver job `crl-maze-drv` (submitted from commit
+d992d9c) does: pick maze size by learnability -> write `configs/maze_20task.yaml`
++ `configs/maze_20task_localfree.yaml` -> submit 30 workers (`crl-maze`, 10 seeds
+x {constrained, finetune, localfree}) -> submit `crl-maze-agg` (afterany) which
+runs `experiments.aggregate_theory` and commits+pushes `reports/maze_20task/`.
+
+Env: `crl/envs/maze.py` (one maze per task; recursive-backtracker + braided
+loops + dead-ends; start/goal random per episode, BFS-reachable; local 5x5 wall
+view; BFS-shortest-path shaping so shorter paths score higher; per-maze wall-hit
+penalty 0-or-random-negative; slip). One shared MLP head, no task-id, goal in obs.
+
+**When you return, check:** `squeue -u $USER` (any `crl-maze*` left?); the driver
+log `slurm-maze-drv-*.out` (which size was chosen; workers submitted OK — nested
+sbatch could fail on some clusters); and whether `reports/maze_20task/` exists and
+was pushed (the aggregator's `git push` may fail on a network-less compute node --
+if so, `git push` from the login node). If the driver failed, resubmit
+`sbatch scripts/hpc_maze_pipeline.sbatch`.
+
 ## ►► START HERE
 
 The project is now **MinAtar-only, pure REINFORCE, following the theory exactly**.
