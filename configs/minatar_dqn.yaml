@@ -1,0 +1,69 @@
+# === MinAtar continual via Double-DQN realization of the min-max method ===
+#
+# Same task sequence / shared-trunk-per-head architecture as minatar_multihead,
+# but the learner is Double-DQN instead of REINFORCE (REINFORCE underlearned the
+# games). The theory is unchanged: the LOCAL network learns the current game
+# unconstrained (full plasticity), the GLOBAL network is updated under the
+# current-task shortfall constraint (mu, dual ascent on F_G = s^2 <= eps). Each
+# value-gradient step of the derivation is realized as one DDQN step. Reported
+# metric is raw game score. See crl/dqn.py.
+experiment:
+  name: minatar_dqn
+  seed: 0
+  results_dir: results
+  device: auto
+  log_every: 500
+
+env:
+  family: minatar
+  params:
+    gamma: 0.99
+    max_steps: 300
+    sticky_action_prob: 0.1
+    difficulty_ramping: true
+  tasks:
+    # reward_scale = 1/expert so the discounted value (and the squared-value eps)
+    # are balanced across games; the reported score is the RAW (unscaled) return.
+    - { game: space_invaders, reward_scale: 0.067 }
+    - { game: breakout,       reward_scale: 0.25 }
+    - { game: asterix,        reward_scale: 1.4 }
+    - { game: seaquest,       reward_scale: 1.1 }
+
+policy:
+  kind: qnet_multihead        # shared conv trunk + one Q head per game
+  hidden_sizes: [128]
+  task_conditioned: false
+
+# estimator/trainer sections are unused by the DQN path but kept for schema.
+estimator:
+  kind: monte_carlo
+
+duals:
+  kind: projected_ascent
+  lr: 1.0
+  init: 0.0
+  max_value: 100.0
+  warm_start: true
+
+dqn:
+  lr: 0.0001
+  batch_size: 32
+  buffer_capacity: 100000
+  target_sync_every: 1000
+  warmup_transitions: 5000
+  collect_per_step: 4
+  num_envs: 8
+  grad_clip: 10.0
+  task1_steps: 25000
+  local_steps: 20000
+  global_steps: 10000
+  cycles_per_task: 1
+  eps_start: 1.0
+  eps_end: 0.05
+  eps_decay_steps: 20000
+  eps_constraint: 0.04         # squared normalized-value units (tolerated drop ~0.2)
+  value_episodes: 30
+  value_every: 500
+  past_task_sampling: sample
+  eval_episodes: 100
+  log_every: 500

@@ -135,6 +135,49 @@ class TrainerConfig:
 
 
 @dataclass
+class DQNConfig:
+    """Double-DQN continual learner (crl/dqn.py).
+
+    The min-max theory is unchanged: the LOCAL network learns the current task
+    unconstrained (full plasticity) and the GLOBAL network is updated under the
+    current-task shortfall constraint (multiplier mu, dual ascent on F_G = s^2
+    <= eps). Each value-gradient step of the derivation is realized as one
+    Double-DQN gradient step (Bellman-loss descent is a policy-improvement step
+    that raises V). Past tasks enter the global objective as omega_i-weighted
+    DDQN losses on fresh interaction with the old environments (replay-free
+    across tasks; env access assumed, as in the PG method).
+    """
+
+    lr: float = 2.5e-4                 # Adam lr for the Q-networks
+    batch_size: int = 64               # minibatch size per DDQN step
+    buffer_capacity: int = 50000       # per-task replay capacity (transitions)
+    target_sync_every: int = 500       # hard target-net sync period (grad steps)
+    warmup_transitions: int = 1000     # random transitions before learning starts
+    collect_per_step: int = 4          # env steps collected per gradient step
+    num_envs: int = 8                  # parallel envs for collection
+    grad_clip: float = 10.0            # max global grad norm (0 disables)
+
+    task1_steps: int = 20000           # DDQN grad steps on task 1 (global net)
+    local_steps: int = 15000           # unconstrained local-phase grad steps
+    global_steps: int = 8000           # constrained global-phase grad steps
+    cycles_per_task: int = 1           # local<->global alternations per task
+
+    eps_start: float = 1.0             # epsilon-greedy exploration schedule
+    eps_end: float = 0.05
+    eps_decay_steps: int = 10000
+
+    # Current-task constraint (units: squared discounted normalized value).
+    eps_constraint: float = 0.04
+    value_episodes: int = 30           # greedy rollouts for a V estimate
+    value_every: int = 500             # recompute shortfall / update mu this often
+    past_task_sampling: str = "sample"  # all | sample (one past task per step)
+    omega: list[float] | None = None   # per-task weights; None = uniform 1/k
+
+    eval_episodes: int = 100           # end-of-task reporting rollouts (raw score)
+    log_every: int = 500               # console/log cadence (grad steps)
+
+
+@dataclass
 class Config:
     """Top-level run configuration."""
 
@@ -144,6 +187,7 @@ class Config:
     estimator: EstimatorConfig = field(default_factory=EstimatorConfig)
     duals: DualConfig = field(default_factory=DualConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
+    dqn: DQNConfig = field(default_factory=DQNConfig)
 
     def to_dict(self) -> dict[str, Any]:
         """Plain-dict view (for logging alongside results)."""
@@ -168,6 +212,7 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         "estimator": EstimatorConfig,
         "duals": DualConfig,
         "trainer": TrainerConfig,
+        "dqn": DQNConfig,
     }
     unknown = set(raw) - set(sections)
     if unknown:
