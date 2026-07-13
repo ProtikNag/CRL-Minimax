@@ -26,6 +26,10 @@ sequential baseline).
 
 ## Current experiments
 
+- `gridworld_20task/` — 20 goal-relocation tasks on a large 15x15 grid (225
+  states), shared MLP trunk + per-task heads, EXACT gradients, 10 seeds. Ours
+  solves all 20 (100% success, 99% value retained); naive fine-tuning forgets
+  half (51.6% success, 36.5% retained).
 - `minatar_theory/` — four MinAtar games (SpaceInvaders → Breakout → Asterix →
   Seaquest), shared conv trunk + per-task heads, pure REINFORCE, 5 seeds.
   Compares constrained-local vs unconstrained-local vs naive fine-tuning.
