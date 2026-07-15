@@ -1,0 +1,13 @@
+method,task,final_value,final_ci,retention_pct,retention_ci
+constrained,1,1.55,197.5783,100.0,12747.0
+constrained,2,8.5,40.6592,100.0,478.3
+constrained,3,5.35,6.9883,100.0,130.6
+constrained,4,0.0,0.0,0.0,0.0
+constrained,5,207.25,15.8825,58.6,4.5
+constrained,mean,44.53,49.4263,71.7,2619.8
+finetune,1,-20.1667,1.3683,-1301.1,88.3
+finetune,2,1.6,0.4303,18.8,5.1
+finetune,3,0.3333,5.1055,6.2,95.4
+finetune,4,0.2,0.8606,100.0,430.3
+finetune,5,353.5,81.1603,100.0,23.0
+finetune,mean,67.0933,16.9967,-215.2,60.0
