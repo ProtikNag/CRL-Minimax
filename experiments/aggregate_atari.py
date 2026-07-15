@@ -12,14 +12,54 @@ curves are produced only if the runs logged probes (``ppo.eval_every > 0``).
 from __future__ import annotations
 
 import argparse
+import csv
+import json
 from pathlib import Path
 
 import numpy as np
 import yaml
 
 import analysis.aggregate as A
+from analysis import continual_metrics as CM
 
 METHODS = ("constrained", "finetune")
+
+
+def _eval_matrices(run_dirs: list[Path]) -> list[np.ndarray]:
+    """Per-seed [T, G] score matrices from eval_matrix.json (complete runs only)."""
+    mats = []
+    for d in run_dirs:
+        m = np.array(json.loads((d / "eval_matrix.json").read_text()), dtype=float)
+        if m.shape[0] == m.shape[1]:  # fully trained (rows == games)
+            mats.append(m)
+    return mats
+
+
+def _cl_metrics_table(runs, games, targets, tables_dir: Path) -> None:
+    """Write raw + normalized CL metrics (AvgPerf / Forgetting / BWT) per method."""
+    rows = []
+    for method, dirs in runs.items():
+        mats = _eval_matrices(dirs)
+        if not mats:
+            print(f"[aggregate] {method}: no COMPLETE runs yet for CL metrics")
+            continue
+        s = CM.summarize(mats, games, targets)
+        for space in ("raw", "norm"):
+            for metric, (mean, std) in s[space].items():
+                rows.append({"method": method, "space": space, "metric": metric,
+                             "mean": round(mean, 3), "std": round(std, 3),
+                             "n_seeds": len(mats)})
+    if not rows:
+        return
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    with open(tables_dir / "cl_metrics.csv", "w", newline="") as h:
+        w = csv.DictWriter(h, fieldnames=["method", "space", "metric", "mean",
+                                          "std", "n_seeds"])
+        w.writeheader(); w.writerows(rows)
+    print("[aggregate] cl_metrics.csv:")
+    for r in rows:
+        print(f"    {r['method']:12s} {r['space']:4s} {r['metric']:16s} "
+              f"{r['mean']:8.3f} ± {r['std']:.3f}  (n={r['n_seeds']})")
 
 
 def _discover(results_dir: Path, name: str, seeds: list[int]) -> dict[str, list[Path]]:
@@ -42,6 +82,11 @@ def _game_names(run_dir: Path) -> list[str]:
     return [t["game"] for t in cfg["env"]["tasks"]]
 
 
+def _targets(run_dir: Path) -> list[float]:
+    cfg = yaml.safe_load((run_dir / "config.yaml").read_text())
+    return [float(t.get("threshold", float("inf"))) for t in cfg["env"]["tasks"]]
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--name", default="atari5_ppo")
@@ -61,7 +106,12 @@ def main() -> None:
     tables = out / "tables"
     figures.mkdir(parents=True, exist_ok=True)
     tables.mkdir(parents=True, exist_ok=True)
-    game_names = _game_names(next(iter(runs.values()))[0])
+    ref_dir = next(iter(runs.values()))[0]
+    game_names = _game_names(ref_dir)
+    targets = _targets(ref_dir)
+
+    # Continual-learning metrics (raw + normalized): AvgPerf / Forgetting / BWT.
+    _cl_metrics_table(runs, game_names, targets, tables)
 
     # Core (from end-of-task eval matrices; no probes required).
     A.build_retention_table_ci(runs, figures, tables)

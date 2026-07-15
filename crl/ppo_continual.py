@@ -69,23 +69,33 @@ class PPOAlternationTrainer:
         e = self.cfg.eps
         return float(e) if isinstance(e, (int, float)) else float(e[0])
 
-    def _eval(self, policy: Policy, task, num_episodes: int) -> tuple[float, float]:
-        """Return ``(discounted_value, raw_score)`` for ``policy`` on ``task``."""
-        value, score, _ = evaluate_value_and_score(
-            policy, task, num_episodes, self.ppo.n_envs, self.device
+    def _eval_report(self, policy: Policy, task) -> tuple[float, float]:
+        """Reported (raw) game score for ``policy`` on ``task``: greedy actions,
+        many episodes, fixed seed -> low-variance, reproducible. Returns
+        ``(mean_score, score_std)``."""
+        _, score, std, _ = evaluate_value_and_score(
+            policy, task, self.ppo.eval_episodes, self.ppo.n_envs, self.device,
+            seed=self.ppo.eval_seed, greedy=self.ppo.eval_greedy,
         )
-        return value, score
+        return score, std
 
-    def _evaluate_row(self, k: int) -> list[float]:
-        """Raw-score row of the forgetting matrix after finishing task k."""
+    def _eval_value(self, policy: Policy, task) -> float:
+        """On-policy STOCHASTIC discounted value V^pi (the constraint reference)."""
+        value, _, _, _ = evaluate_value_and_score(
+            policy, task, self.ppo.constraint_episodes, self.ppo.n_envs,
+            self.device, greedy=False,
+        )
+        return value
+
+    def _evaluate_row(self, k: int) -> tuple[list[float], list[float]]:
+        """Raw-score row (+ per-game std) of the forgetting matrix after task k."""
         last = len(self.family) if self.cfg.eval_all_tasks else k
-        row = []
+        row, stds = [], []
         for i in range(last):
-            _, score = self._eval(
-                self.global_policy, self.family.tasks[i], self.ppo.eval_episodes
-            )
+            score, std = self._eval_report(self.global_policy, self.family.tasks[i])
             row.append(score)
-        return row
+            stds.append(std)
+        return row, stds
 
     def _probe(self, phase_type: str, current_task: int) -> None:
         """Record the global policy's score on every task vs cumulative iters."""
@@ -93,12 +103,8 @@ class PPOAlternationTrainer:
         every = self.ppo.eval_every
         if not every or self.cumulative_step % every != 0:
             return
-        values = []
-        for i in range(len(self.family)):
-            _, score = self._eval(
-                self.global_policy, self.family.tasks[i], self.ppo.eval_episodes
-            )
-            values.append(score)
+        values = [self._eval_report(self.global_policy, self.family.tasks[i])[0]
+                  for i in range(len(self.family))]
         self.logger.log(
             {
                 "phase": "probe",
@@ -150,9 +156,7 @@ class PPOAlternationTrainer:
                 current_task=k, phase_type="local", probe=self._probe,
             )
             frozen_local = clone_policy(local_policy, trainable=False)
-            ref_current, _ = self._eval(
-                frozen_local, task_k, self.ppo.constraint_episodes
-            )
+            ref_current = self._eval_value(frozen_local, task_k)
 
             # ---- global phase: PPO + actor-only mu constraint ---------------
             self.mu_ctrl.reset()
@@ -172,8 +176,9 @@ class PPOAlternationTrainer:
 
     def run(self) -> list[list[float]]:
         self._train_first_task()
-        self.eval_matrix.append(self._evaluate_row(1))
-        self.logger.log({"phase": "eval", "task": 1, "values": self.eval_matrix[-1]})
+        row, stds = self._evaluate_row(1)
+        self.eval_matrix.append(row)
+        self.logger.log({"phase": "eval", "task": 1, "values": row, "stds": stds})
 
         for k in range(2, len(self.family) + 1):
             if self.method == "finetune":
@@ -185,10 +190,9 @@ class PPOAlternationTrainer:
                     f"Unknown ppo.method '{self.method}'; available: "
                     "constrained, finetune"
                 )
-            self.eval_matrix.append(self._evaluate_row(k))
-            self.logger.log(
-                {"phase": "eval", "task": k, "values": self.eval_matrix[-1]}
-            )
+            row, stds = self._evaluate_row(k)
+            self.eval_matrix.append(row)
+            self.logger.log({"phase": "eval", "task": k, "values": row, "stds": stds})
 
         self.logger.save_json("eval_matrix.json", self.eval_matrix)
         torch.save(

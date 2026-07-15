@@ -53,6 +53,21 @@ class PPOTrainer:
         # Adam over the whole model: the trunk + actor + critic (standard PPO).
         return torch.optim.Adam(policy.parameters(), lr=self.ppo.lr, eps=1e-5)
 
+    def _stop_score(self, policy: Policy, task: Task, iters_done: int) -> float | None:
+        """Greedy score for the early-stop check on this iteration, or None if
+        this iteration is not a check point (or the task has no threshold)."""
+        cfg = self.ppo
+        thr = float(getattr(task, "threshold", float("inf")))
+        if thr == float("inf") or cfg.stop_eval_every <= 0:
+            return None
+        if iters_done < cfg.min_iters or iters_done % cfg.stop_eval_every != 0:
+            return None
+        _, score, _, _ = evaluate_value_and_score(
+            policy, task, cfg.stop_eval_episodes, cfg.n_envs, self.device,
+            seed=cfg.eval_seed, greedy=True,
+        )
+        return score
+
     def optimize_batches(
         self,
         policy: Policy,
@@ -150,26 +165,37 @@ class LocalTrainer(PPOTrainer):
         collector = RolloutCollector(
             task, self.ppo.n_envs, self.ppo.n_steps, self.device, seed
         )
+        thr = float(getattr(task, "threshold", float("inf")))
+        met = 0
         try:
             for it in range(num_iters):
                 batch = collector.collect(policy, self.ppo.gae_lambda)
                 stats = self.optimize_batches(policy, optimizer, [batch], [1.0])
                 if probe is not None:
                     probe(phase_type, current_task)
-                if it % self.log_every == 0:
+                gscore = self._stop_score(policy, task, it + 1)
+                if gscore is not None:
+                    met = met + 1 if gscore >= thr else 0
+                if it % self.log_every == 0 or gscore is not None:
                     ep = batch.ep_returns
                     ep_mean = sum(ep) / len(ep) if ep else float("nan")
                     self.logger.log(
                         {
                             "phase": phase_type, "task": current_task, "step": it,
-                            "ep_return_clipped": ep_mean, **stats,
+                            "ep_return_clipped": ep_mean, "greedy_score": gscore,
+                            **stats,
                         }
                     )
+                    gs = f" greedy={gscore:.1f}/{thr:.0f}" if gscore is not None else ""
                     print(
                         f"[{phase_type} k={current_task}] it={it:4d} "
                         f"epR(clip)={ep_mean:.3f} pg={stats['pg_loss']:.3f} "
-                        f"v={stats['v_loss']:.3f} ent={stats['entropy']:.3f}"
+                        f"v={stats['v_loss']:.3f} ent={stats['entropy']:.3f}{gs}"
                     )
+                if met >= self.ppo.patience:
+                    print(f"[{phase_type} k={current_task}] EARLY STOP it={it+1} "
+                          f"greedy={gscore:.1f} >= thr={thr:.0f}")
+                    break
         finally:
             collector.close()
 
@@ -216,6 +242,8 @@ class GlobalTrainer(PPOTrainer):
         shortfall = 0.0
         constraint = 0.0
         v_k_g = float("nan")
+        thr = float(getattr(task_k, "threshold", float("inf")))
+        met = 0
         try:
             for it in range(num_iters):
                 past_batches = [
@@ -225,7 +253,7 @@ class GlobalTrainer(PPOTrainer):
 
                 # Slower dual timescale: refresh V_k^G / mu every constraint_every.
                 if it % max(1, cfg.constraint_every) == 0:
-                    v_k_g, _, _ = evaluate_value_and_score(
+                    v_k_g, _, _, _ = evaluate_value_and_score(
                         global_policy, task_k, cfg.constraint_episodes,
                         cfg.n_envs, self.device,
                     )
@@ -240,20 +268,30 @@ class GlobalTrainer(PPOTrainer):
 
                 if probe is not None:
                     probe("global", current_task)
-                if it % self.log_every == 0:
+                # Early stop: the global has consolidated the current game to its
+                # greedy threshold (past tasks are maintained by the omega term).
+                gscore = self._stop_score(global_policy, task_k, it + 1)
+                if gscore is not None:
+                    met = met + 1 if gscore >= thr else 0
+                if it % self.log_every == 0 or gscore is not None:
                     self.logger.log(
                         {
                             "phase": "global", "task": current_task, "step": it,
                             "F_G": constraint, "mu": mu, "V_k_global": v_k_g,
                             "V_k_ref_local": ref_current, "coeff_k": coeff_k,
-                            **stats,
+                            "greedy_score": gscore, **stats,
                         }
                     )
+                    gs = f" greedy={gscore:.1f}/{thr:.0f}" if gscore is not None else ""
                     print(
                         f"[global k={current_task}] it={it:4d} "
                         f"Vk_G={v_k_g:.3f} refL={ref_current:.3f} "
-                        f"F_G={constraint:.5f} mu={mu:.3f} pg={stats['pg_loss']:.3f}"
+                        f"F_G={constraint:.5f} mu={mu:.3f} pg={stats['pg_loss']:.3f}{gs}"
                     )
+                if met >= self.ppo.patience:
+                    print(f"[global k={current_task}] EARLY STOP it={it+1} "
+                          f"greedy={gscore:.1f} >= thr={thr:.0f}")
+                    break
         finally:
             for c in past_collectors:
                 c.close()

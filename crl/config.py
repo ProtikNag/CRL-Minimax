@@ -167,18 +167,32 @@ class PPOConfig:
     max_grad_norm: float = 0.5  # global grad-norm clip
     lr: float = 2.5e-4  # Adam learning rate (actor+critic share the trunk)
     normalize_advantage: bool = True  # per-minibatch advantage normalization
-    # Phase budgets, counted in PPO iterations (each = collect + ppo_epochs).
-    task1_iters: int = 400  # plain PPO on task 1 (no past tasks)
-    local_iters: int = 200  # standard PPO on the current task (local phase)
-    global_iters: int = 200  # constrained PPO consolidation (global phase)
+    # Phase budgets are now MAX CAPS (each model early-stops at its per-game
+    # threshold; see below). Counted in PPO iterations (each = collect+ppo_epochs).
+    # For a fair per-MODEL comparison, local, global and finetune all use the
+    # SAME cap and the SAME per-game thresholds.
+    task1_iters: int = 2000  # cap for plain PPO on task 1
+    local_iters: int = 2000  # cap for the local phase (standard PPO on current)
+    global_iters: int = 2000  # cap for the constrained global consolidation
+    # Early stopping: stop a phase once the current game's GREEDY score is
+    # >= its threshold for `patience` consecutive checks (but at least min_iters),
+    # else run to the cap. Thresholds are per task (env.tasks[i].threshold).
+    min_iters: int = 200  # floor per phase before early-stop can trigger
+    patience: int = 3  # consecutive threshold-meeting checks required to stop
+    stop_eval_every: int = 50  # iters between early-stop score checks
+    stop_eval_episodes: int = 15  # greedy episodes per early-stop check
     # Full-episode Monte-Carlo estimates of V_k for the shortfall / references
-    # (paper-faithful: the constraint value is a return, not a critic output).
-    constraint_episodes: int = 8
+    # (paper-faithful: the constraint value is the on-policy STOCHASTIC return).
+    constraint_episodes: int = 16
     # Re-estimate V_k^G and update mu every N global iterations (slower dual
     # timescale; between updates the mu*2*shortfall coefficient is held fixed).
     constraint_every: int = 5
-    eval_episodes: int = 16  # episodes for the eval matrix / probes
-    eval_every: int = 25  # probe the global policy every N cumulative iters (0=off)
+    # Reported evaluation (eval matrix, probes): greedy (argmax) actions, many
+    # episodes, fixed seed -> low variance, reproducible, respectable scores.
+    eval_episodes: int = 50  # episodes for the eval matrix / probes
+    eval_greedy: bool = True  # argmax actions for the reported score
+    eval_seed: int = 100_000  # fixed base seed for evaluation rollouts
+    eval_every: int = 0  # probe the global policy every N cumulative iters (0=off)
 
 
 @dataclass

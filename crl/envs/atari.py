@@ -32,14 +32,27 @@ from crl.envs.base import Task, TaskFamily, TaskSpec
 # Register the ALE/* envs with Gymnasium (idempotent; needed once per process).
 gym.register_envs(ale_py)
 
-# Curated 5-game set: quick to a decent PPO score, all load with bundled ROMs.
+# Games PPO reliably learns to a respectable score with modest compute (all
+# load with bundled ROMs). Freeway was dropped (sparse-reward, exploration-hard)
+# in favour of Qbert.
 ATARI_GAMES = (
     "Pong",
     "Breakout",
     "Boxing",
     "Freeway",
     "SpaceInvaders",
+    "Qbert",
+    "Assault",
+    "Krull",
+    "Seaquest",
 )
+
+# Approx random-agent raw score per game (for normalization in analysis).
+RANDOM_SCORES = {
+    "Pong": -20.7, "Breakout": 1.7, "Boxing": 0.1, "Freeway": 0.0,
+    "SpaceInvaders": 148.0, "Qbert": 163.9, "Assault": 222.4,
+    "Krull": 1598.0, "Seaquest": 68.4,
+}
 
 # Full ALE action set shared by every game (so one actor head fits all).
 NUM_ACTIONS = 18
@@ -120,8 +133,11 @@ class AtariTask(Task):
         terminal_on_life_loss: bool,
         repeat_action_prob: float,
         clip_rewards: bool,
+        threshold: float = float("inf"),
     ) -> None:
         super().__init__(spec, gamma)
+        # Greedy-score target for early stopping (inf = train to the iter cap).
+        self.threshold = threshold
         self._game = game
         self._max_steps = max_steps
         self._frame_skip = frame_skip
@@ -213,7 +229,9 @@ class AtariFamily(TaskFamily):
         self.tasks: list[Task] = []
         for task_id, t in enumerate(tasks):
             g = t["game"]
-            spec = TaskSpec(task_id, f"atari-{g}", {"game": g})
+            threshold = float(t.get("threshold", float("inf")))
+            spec = TaskSpec(task_id, f"atari-{g}",
+                            {"game": g, "threshold": threshold})
             self.tasks.append(
                 AtariTask(
                     spec,
@@ -227,5 +245,6 @@ class AtariFamily(TaskFamily):
                     terminal_on_life_loss,
                     repeat_action_prob,
                     clip_rewards,
+                    threshold,
                 )
             )

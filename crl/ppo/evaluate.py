@@ -1,18 +1,21 @@
 """Monte-Carlo evaluation for the PPO backend.
 
-The continual-learning constraint uses a **return**-based value estimate (as in
-the document / the REINFORCE backend), not the critic. This module rolls out full
-episodes under a policy and reports, from the *same* rollout, two quantities:
+Two distinct quantities, from full-episode rollouts:
 
 * ``value``  -- mean discounted return on the *training* reward scale (sign-clipped
                 iff the task clips rewards). This is V_i^pi used for the shortfall
-                F-hat, the frozen references, and the eval matrix's constraint math.
+                F-hat, the frozen references, and the constraint. It is measured on
+                the *stochastic* policy (sampled actions), faithful to the theory's
+                V^pi. Both come from one rollout on an unclipped env; the clipped
+                value is re-derived with ``sign()`` to avoid info-plumbing.
 * ``score``  -- mean *raw* (unclipped) episode return: the reported game score.
 
-Both come from one rollout on an unclipped env, re-deriving the clipped value with
-``sign()`` -- this avoids any dependence on vectorized-env info plumbing.
-
-Actions are sampled (not greedy), matching the existing evaluation convention.
+For REPORTING (eval matrix, probes, early-stopping thresholds) we use
+``greedy=True`` (argmax actions), ``num_episodes`` large (e.g. 50), and a FIXED
+``seed`` so the measurement is low-variance and reproducible across methods,
+seeds and checkpoints. For the CONSTRAINT value we use ``greedy=False`` (the
+on-policy stochastic value). ``std`` (of the raw score across episodes) is
+returned for error bars.
 """
 
 from __future__ import annotations
@@ -31,12 +34,16 @@ def evaluate_value_and_score(
     n_envs: int,
     device: torch.device,
     seed: int | None = None,
-    max_env_steps: int = 100_000,
-) -> tuple[float, float, int]:
-    """Return ``(mean_value, mean_score, n_episodes_used)`` for ``policy`` on ``task``.
+    greedy: bool = False,
+    max_env_steps: int = 200_000,
+) -> tuple[float, float, float, int]:
+    """Return ``(mean_value, mean_score, score_std, n_episodes_used)``.
 
-    ``mean_value`` is the discounted return on the training reward scale;
-    ``mean_score`` is the mean raw undiscounted episode return (game score).
+    ``mean_value`` = discounted return on the training reward scale (stochastic
+    policy semantics regardless of ``greedy`` for the clipped-value accounting).
+    ``mean_score`` / ``score_std`` = mean and std of the raw undiscounted episode
+    return (game score). ``greedy`` selects argmax actions (for reporting);
+    otherwise actions are sampled. A fixed ``seed`` makes the rollout reproducible.
     """
     clip = bool(getattr(task, "clip_rewards", False))
     gamma = task.gamma
@@ -52,10 +59,14 @@ def evaluate_value_and_score(
         scores: list[float] = []
 
         steps = 0
-        while len(values) < num_episodes and steps < max_env_steps:
+        while len(scores) < num_episodes and steps < max_env_steps:
             steps += 1
-            dist = policy.dist(obs, tid)
-            action = dist.sample().to("cpu").numpy()
+            logits = policy.dist(obs, tid).logits
+            if greedy:
+                action = logits.argmax(dim=-1)
+            else:
+                action = torch.distributions.Categorical(logits=logits).sample()
+            action = action.to("cpu").numpy()
             obs_np, reward, term, trunc, _ = venv.step(action)
             reward_t = torch.as_tensor(reward, dtype=torch.float32)
             train_r = torch.sign(reward_t) if clip else reward_t
@@ -74,9 +85,9 @@ def evaluate_value_and_score(
     finally:
         venv.close()
 
-    if not values:  # no episode finished within the step budget
-        return 0.0, 0.0, 0
-    n = min(len(values), num_episodes)
+    if not scores:  # no episode finished within the step budget
+        return 0.0, 0.0, 0.0, 0
+    n = min(len(scores), num_episodes)
+    sc = torch.tensor(scores[:n])
     mean_value = sum(values[:n]) / n
-    mean_score = sum(scores[:n]) / n
-    return mean_value, mean_score, n
+    return mean_value, float(sc.mean()), float(sc.std(unbiased=False)), n

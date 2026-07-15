@@ -67,8 +67,9 @@ def main() -> None:
     def probe(phase_type: str, current_task: int) -> None:
         counter["it"] += 1
         if args.eval_every and counter["it"] % args.eval_every == 0:
-            _, score, n = evaluate_value_and_score(
-                policy, task, args.eval_episodes, args.n_envs, device
+            _, score, _, n = evaluate_value_and_score(
+                policy, task, args.eval_episodes, args.n_envs, device,
+                seed=100_000, greedy=True,
             )
             logger.log({"phase": "score", "iter": counter["it"], "score": score,
                         "episodes": n})
@@ -78,8 +79,9 @@ def main() -> None:
     trainer.train(policy, task, num_iters=args.iters, seed=args.seed + 1,
                   current_task=1, phase_type="pretrain", probe=probe)
 
-    value, score, n = evaluate_value_and_score(
-        policy, task, max(args.eval_episodes, 20), args.n_envs, device
+    value, score, _, n = evaluate_value_and_score(
+        policy, task, max(args.eval_episodes, 20), args.n_envs, device,
+        seed=100_000, greedy=True,
     )
     logger.log({"phase": "final", "score": score, "value": value, "episodes": n})
     logger.close()
