@@ -13,16 +13,17 @@
 set -uo pipefail
 cd /work/pnag/CRL-Minimax
 SEEDS=${1:-0}
+NAME=${2:-atari5_ppo}
 module load python3/anaconda/2023.7 2>/dev/null || true
 export PYTHONPATH=/work/pnag/CRL-Minimax
-echo "[agg] host=$(hostname) seeds=$SEEDS start $(date)"
-python -m experiments.aggregate_atari --name atari5_ppo --seeds $SEEDS
+echo "[agg] host=$(hostname) name=$NAME seeds=$SEEDS start $(date)"
+python -m experiments.aggregate_atari --name "$NAME" --seeds $SEEDS
 
 # Commit figures/tables + the small eval matrices (not the large policy blobs).
-git add -f reports/atari5_ppo results/atari5_ppo_*_seed*/eval_matrix.json 2>/dev/null || true
+git add -f "reports/$NAME" results/${NAME}_*_seed*/eval_matrix.json 2>/dev/null || true
 if ! git diff --cached --quiet; then
   git -c user.name='ProtikNag' -c user.email='protiknag08@gmail.com' \
-      commit -m "Atari5 PPO continual results: figures + tables (seeds $SEEDS)" || true
+      commit -m "$NAME PPO continual results: figures + tables (seeds $SEEDS)" || true
   git push origin HEAD:main || echo "[agg] push failed (push manually)"
 else
   echo "[agg] nothing to commit"
