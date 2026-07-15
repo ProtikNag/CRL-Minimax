@@ -70,6 +70,19 @@ class PPOTrainer:
         cfg = self.ppo
         n = streams[0].obs.shape[0]
         mb_size = max(1, n // cfg.num_minibatches)
+        # Normalize the actor coefficients so the actor-loss scale stays O(1)
+        # regardless of the dual multiplier's magnitude (PPO-Lagrangian style).
+        # The dual coefficient mu*2*shortfall is unbounded; without this, a large
+        # mu makes the actor gradient dominate the shared global grad-norm clip
+        # and STARVES the shared critic's value-loss gradient, breaking GAE
+        # advantages so the actor can no longer improve. Dividing every actor
+        # coefficient by their sum is a positive rescaling of the ascent
+        # direction -- it preserves the relative past/current weighting (and thus
+        # the primal-dual fixed point), only bounding the step magnitude. For the
+        # local phase (coeffs == [1.0]) this is a no-op.
+        coeff_sum = float(sum(actor_coeffs))
+        if coeff_sum > 0:
+            actor_coeffs = [c / coeff_sum for c in actor_coeffs]
         pg_acc = v_acc = ent_acc = kl_acc = clip_acc = 0.0
         count = 0
         for _ in range(cfg.ppo_epochs):
