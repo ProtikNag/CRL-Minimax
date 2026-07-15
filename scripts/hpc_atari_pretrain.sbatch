@@ -6,7 +6,6 @@
 #SBATCH --gres=gpu:1
 #SBATCH --output=slurm-atari-pre-%j.out
 #SBATCH --error=slurm-atari-pre-%j.err
-#SBATCH --time=3:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
