@@ -2,7 +2,7 @@
 # ── Per-game local-PPO sanity check (verify each game learns a decent score) ──
 #   sbatch scripts/hpc_atari_pretrain.sbatch <Game> [iters]
 #SBATCH --job-name=crl-atari-pre
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu,gpu-v100-16gb,gpu-v100-32gb
 #SBATCH --gres=gpu:1
 #SBATCH --output=slurm-atari-pre-%j.out
 #SBATCH --error=slurm-atari-pre-%j.err

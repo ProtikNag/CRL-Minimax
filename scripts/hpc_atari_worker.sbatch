@@ -4,7 +4,7 @@
 # The run directory name (results/<experiment.name>_seed<seed>) is taken from the
 # config's experiment.name, which encodes the method (constrained / finetune).
 #SBATCH --job-name=crl-atari
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu,gpu-v100-16gb,gpu-v100-32gb
 #SBATCH --gres=gpu:1
 #SBATCH --output=slurm-atari-%j.out
 #SBATCH --error=slurm-atari-%j.err

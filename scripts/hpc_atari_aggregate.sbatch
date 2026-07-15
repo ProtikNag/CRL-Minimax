@@ -2,7 +2,7 @@
 # ── Aggregate Atari PPO runs into figures/tables (+ commit) ──
 #   sbatch scripts/hpc_atari_aggregate.sbatch "<seed list>"   e.g. "0 1 2"
 #SBATCH --job-name=crl-atari-agg
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu,gpu-v100-16gb,gpu-v100-32gb
 #SBATCH --gres=gpu:1
 #SBATCH --output=slurm-atari-agg-%j.out
 #SBATCH --error=slurm-atari-agg-%j.err
