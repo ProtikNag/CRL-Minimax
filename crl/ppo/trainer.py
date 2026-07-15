@@ -1,0 +1,247 @@
+"""Reusable PPO core, specialized into Local and Global trainers.
+
+``PPOTrainer`` is the *entire* standard PPO optimizer: it turns a set of collected
+rollout streams into gradient steps via the clipped surrogate, a standard
+value-MSE critic loss, an entropy bonus, GAE advantages, and global grad-norm
+clipping. Nothing continual lives here.
+
+Two specializations:
+
+* :class:`LocalTrainer` -- standard PPO on the current task (one stream, actor
+  coefficient 1). No constraint, no past-task rollouts.
+* :class:`GlobalTrainer` -- the SAME PPO core, but the actor receives the
+  continual-learning term: past tasks enter with weight ``omega_i`` and the
+  current task enters with coefficient ``mu * 2 * shortfall`` (the differentiated
+  one-sided squared shortfall, eqs 30-32). It owns the replay-free fresh
+  past-task rollouts, the Monte-Carlo shortfall estimate, and the ``mu`` dual
+  update. The critic / GAE / value loss / entropy are inherited unchanged --
+  only the ACTOR is constrained.
+
+The only thing that differs between the two is the per-stream **actor
+coefficient**; the optimization routine (:meth:`PPOTrainer.optimize_batches`) is
+shared verbatim.
+"""
+
+from __future__ import annotations
+
+from typing import Callable
+
+import torch
+import torch.nn as nn
+
+from crl.config import PPOConfig
+from crl.duals.controllers import DualController
+from crl.envs.base import Task
+from crl.policies.base import Policy
+from crl.ppo.collector import RolloutBatch, RolloutCollector
+from crl.ppo.evaluate import evaluate_value_and_score
+
+# Callback invoked once per PPO iteration: (phase_type, current_task) -> None.
+ProbeHook = Callable[[str, int], None]
+
+
+class PPOTrainer:
+    """Standard clipped-PPO optimizer shared by the local and global phases."""
+
+    def __init__(self, cfg: PPOConfig, device: torch.device, logger, log_every: int) -> None:
+        self.ppo = cfg
+        self.device = device
+        self.logger = logger
+        self.log_every = max(1, log_every)
+
+    def _new_optimizer(self, policy: Policy) -> torch.optim.Optimizer:
+        # Adam over the whole model: the trunk + actor + critic (standard PPO).
+        return torch.optim.Adam(policy.parameters(), lr=self.ppo.lr, eps=1e-5)
+
+    def optimize_batches(
+        self,
+        policy: Policy,
+        optimizer: torch.optim.Optimizer,
+        streams: list[RolloutBatch],
+        actor_coeffs: list[float],
+    ) -> dict[str, float]:
+        """One PPO update (``ppo_epochs`` x minibatches) over the given streams.
+
+        Each stream contributes ``actor_coeff * clipped_surrogate`` to the actor
+        loss and a standard ``vf_coef * value_MSE`` to the critic loss, plus the
+        standard entropy bonus. All streams share the minibatch schedule (equal
+        size ``N = n_envs * n_steps``).
+        """
+        cfg = self.ppo
+        n = streams[0].obs.shape[0]
+        mb_size = max(1, n // cfg.num_minibatches)
+        pg_acc = v_acc = ent_acc = kl_acc = clip_acc = 0.0
+        count = 0
+        for _ in range(cfg.ppo_epochs):
+            perm = torch.randperm(n, device=self.device)
+            for start in range(0, n, mb_size):
+                idx = perm[start : start + mb_size]
+                total_loss = torch.zeros((), device=self.device)
+                for coeff, batch in zip(actor_coeffs, streams):
+                    dist, value = policy.dist_value(batch.obs[idx], batch.task_id)
+                    new_logp = dist.log_prob(batch.actions[idx])
+                    logratio = new_logp - batch.logprobs[idx]
+                    ratio = logratio.exp()
+                    adv = batch.advantages[idx]
+                    if cfg.normalize_advantage:
+                        adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+                    pg_loss = torch.max(
+                        -adv * ratio,
+                        -adv * torch.clamp(ratio, 1 - cfg.clip_ratio, 1 + cfg.clip_ratio),
+                    ).mean()
+                    v_loss = 0.5 * (value - batch.returns[idx]).pow(2).mean()
+                    entropy = dist.entropy().mean()
+                    total_loss = (
+                        total_loss
+                        + coeff * pg_loss
+                        + cfg.vf_coef * v_loss
+                        - cfg.ent_coef * entropy
+                    )
+                    with torch.no_grad():
+                        pg_acc += float(pg_loss)
+                        v_acc += float(v_loss)
+                        ent_acc += float(entropy)
+                        kl_acc += float((ratio - 1 - logratio).mean())
+                        clip_acc += float(
+                            ((ratio - 1.0).abs() > cfg.clip_ratio).float().mean()
+                        )
+                        count += 1
+                optimizer.zero_grad()
+                total_loss.backward()
+                nn.utils.clip_grad_norm_(policy.parameters(), cfg.max_grad_norm)
+                optimizer.step()
+        c = max(1, count)
+        return {
+            "pg_loss": pg_acc / c,
+            "v_loss": v_acc / c,
+            "entropy": ent_acc / c,
+            "approx_kl": kl_acc / c,
+            "clipfrac": clip_acc / c,
+        }
+
+
+class LocalTrainer(PPOTrainer):
+    """Standard PPO on the current task (the min-max *local* player)."""
+
+    def train(
+        self,
+        policy: Policy,
+        task: Task,
+        num_iters: int,
+        seed: int,
+        current_task: int,
+        phase_type: str = "local",
+        probe: ProbeHook | None = None,
+    ) -> None:
+        optimizer = self._new_optimizer(policy)
+        collector = RolloutCollector(
+            task, self.ppo.n_envs, self.ppo.n_steps, self.device, seed
+        )
+        try:
+            for it in range(num_iters):
+                batch = collector.collect(policy, self.ppo.gae_lambda)
+                stats = self.optimize_batches(policy, optimizer, [batch], [1.0])
+                if probe is not None:
+                    probe(phase_type, current_task)
+                if it % self.log_every == 0:
+                    ep = batch.ep_returns
+                    ep_mean = sum(ep) / len(ep) if ep else float("nan")
+                    self.logger.log(
+                        {
+                            "phase": phase_type, "task": current_task, "step": it,
+                            "ep_return_clipped": ep_mean, **stats,
+                        }
+                    )
+                    print(
+                        f"[{phase_type} k={current_task}] it={it:4d} "
+                        f"epR(clip)={ep_mean:.3f} pg={stats['pg_loss']:.3f} "
+                        f"v={stats['v_loss']:.3f} ent={stats['entropy']:.3f}"
+                    )
+        finally:
+            collector.close()
+
+
+class GlobalTrainer(PPOTrainer):
+    """PPO consolidation with the actor-only continual-learning constraint.
+
+    Maximizes the past-task objective ``sum_i omega_i V_i`` while the single
+    multiplier ``mu`` enforces the current-task floor ``V_k^G >= V_k^L`` via the
+    one-sided squared shortfall (eqs 11-14, 30-32). Fresh rollouts in every task's
+    environment each iteration (replay-free).
+    """
+
+    def train(
+        self,
+        global_policy: Policy,
+        task_k: Task,
+        past_tasks: list[Task],
+        ref_current: float,
+        mu_ctrl: DualController,
+        omega: list[float],
+        eps: float,
+        num_iters: int,
+        seed: int,
+        current_task: int,
+        probe: ProbeHook | None = None,
+    ) -> None:
+        """``omega`` is the per-stream weight list aligned to
+        ``past_tasks + [task_k]`` order is NOT used; past weights are
+        ``omega[:len(past_tasks)]`` and the current task's PG weight is the
+        constraint coefficient (computed here)."""
+        optimizer = self._new_optimizer(global_policy)
+        cfg = self.ppo
+        # One persistent collector per task (current + all past): replay-free
+        # fresh rollouts in the old environments.
+        past_collectors = [
+            RolloutCollector(t, cfg.n_envs, cfg.n_steps, self.device, seed + 101 + i)
+            for i, t in enumerate(past_tasks)
+        ]
+        cur_collector = RolloutCollector(
+            task_k, cfg.n_envs, cfg.n_steps, self.device, seed + 7
+        )
+        mu = mu_ctrl.value
+        shortfall = 0.0
+        constraint = 0.0
+        v_k_g = float("nan")
+        try:
+            for it in range(num_iters):
+                past_batches = [
+                    c.collect(global_policy, cfg.gae_lambda) for c in past_collectors
+                ]
+                cur_batch = cur_collector.collect(global_policy, cfg.gae_lambda)
+
+                # Slower dual timescale: refresh V_k^G / mu every constraint_every.
+                if it % max(1, cfg.constraint_every) == 0:
+                    v_k_g, _, _ = evaluate_value_and_score(
+                        global_policy, task_k, cfg.constraint_episodes,
+                        cfg.n_envs, self.device,
+                    )
+                    shortfall = max(0.0, ref_current - v_k_g)  # V_k^L - V_k^G
+                    constraint = shortfall * shortfall  # squared hinge (eq 32)
+                    mu = mu_ctrl.update(constraint, eps)
+                coeff_k = mu * 2.0 * shortfall  # differentiated shortfall (eq 30)
+
+                streams = past_batches + [cur_batch]
+                coeffs = list(omega[: len(past_tasks)]) + [coeff_k]
+                stats = self.optimize_batches(global_policy, optimizer, streams, coeffs)
+
+                if probe is not None:
+                    probe("global", current_task)
+                if it % self.log_every == 0:
+                    self.logger.log(
+                        {
+                            "phase": "global", "task": current_task, "step": it,
+                            "F_G": constraint, "mu": mu, "V_k_global": v_k_g,
+                            "V_k_ref_local": ref_current, "coeff_k": coeff_k,
+                            **stats,
+                        }
+                    )
+                    print(
+                        f"[global k={current_task}] it={it:4d} "
+                        f"Vk_G={v_k_g:.3f} refL={ref_current:.3f} "
+                        f"F_G={constraint:.5f} mu={mu:.3f} pg={stats['pg_loss']:.3f}"
+                    )
+        finally:
+            for c in past_collectors:
+                c.close()
+            cur_collector.close()

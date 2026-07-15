@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from crl.config import EnvConfig
 from crl.envs.base import TabularTask, Task, TaskFamily, TaskSpec
+from crl.envs.atari import AtariFamily
 from crl.envs.biggrid import BigGridFamily
 from crl.envs.gridworld import GridWorldFamily
 from crl.envs.maze import MazeFamily
@@ -14,6 +15,7 @@ FAMILY_REGISTRY: dict[str, type[TaskFamily]] = {
     "biggrid": BigGridFamily,      # large procedural gridworld, sampled REINFORCE
     "maze": MazeFamily,            # continual maze navigation (one maze per task)
     "minatar": MinAtarFamily,      # the experiment family
+    "atari": AtariFamily,          # full Atari (ALE) family for the PPO backend
 }
 
 

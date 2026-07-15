@@ -1,0 +1,58 @@
+# Tiny CPU smoke test: validates the full PPO local/global pipeline wiring end
+# to end (env -> collector -> GAE -> clipped update -> constraint -> eval matrix)
+# in seconds. NOT a real run -- budgets are minimal.
+experiment:
+  name: atari5_ppo_smoke
+  seed: 0
+  results_dir: results
+  device: cpu
+  log_every: 1
+
+env:
+  family: atari
+  params:
+    gamma: 0.99
+    max_steps: 200
+    noop_max: 0
+    repeat_action_probability: 0.0
+    clip_rewards: true
+  tasks:
+    - { game: Pong }
+    - { game: Breakout }
+
+policy:
+  kind: cnn_ac_multihead
+  hidden_sizes: [512]
+  task_conditioned: true
+
+duals:
+  kind: projected_ascent
+  lr: 1.0
+  init: 0.0
+  max_value: 100.0
+  warm_start: true
+
+trainer:
+  kind: ppo
+  cycles_per_task: 1
+  eps: 0.04
+  eval_all_tasks: true
+
+ppo:
+  method: constrained
+  n_envs: 2
+  n_steps: 16
+  ppo_epochs: 1
+  num_minibatches: 2
+  clip_ratio: 0.1
+  gae_lambda: 0.95
+  vf_coef: 0.5
+  ent_coef: 0.01
+  lr: 0.00025
+  task1_iters: 3
+  local_iters: 3
+  global_iters: 3
+  constraint_episodes: 1
+  constraint_every: 1
+  eval_episodes: 1
+  eval_every: 0

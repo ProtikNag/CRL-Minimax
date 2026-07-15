@@ -1,0 +1,69 @@
+# Constrained min-max continual RL on 5 Atari games, PPO optimizer backend.
+# PPO replaces REINFORCE as the policy-gradient optimizer; the continual-learning
+# framework (local/global alternation, one-sided squared-shortfall constraint,
+# mu dual ascent, replay-free fresh rollouts) is unchanged. Multi-head actor-critic
+# (per-task actor + critic heads) over a shared Nature-CNN trunk; the shared trunk
+# is where cross-game forgetting lives and what the constraint protects.
+experiment:
+  name: atari5_ppo_constrained
+  seed: 0
+  results_dir: results
+  device: auto
+  log_every: 20
+
+env:
+  family: atari
+  params:
+    gamma: 0.99
+    max_steps: 4000          # bounds episode length (eval / MC-value cost)
+    frame_skip: 4
+    frame_stack: 4
+    noop_max: 30
+    terminal_on_life_loss: false
+    repeat_action_probability: 0.0
+    clip_rewards: true        # sign-clip the TRAINING reward; raw score reported
+  tasks:
+    - { game: Pong }
+    - { game: Breakout }
+    - { game: Boxing }
+    - { game: Freeway }
+    - { game: SpaceInvaders }
+
+policy:
+  kind: cnn_ac_multihead      # per-task actor+critic heads, shared CNN trunk
+  hidden_sizes: [512]
+  task_conditioned: true      # append task one-hot to trunk features
+
+duals:
+  kind: projected_ascent
+  lr: 1.0
+  init: 0.0
+  max_value: 100.0
+  warm_start: true
+
+trainer:
+  kind: ppo
+  cycles_per_task: 1
+  eps: 0.04                   # squared-value slack (tolerated value gap ~0.2)
+  eval_all_tasks: true
+
+ppo:
+  method: constrained
+  n_envs: 8
+  n_steps: 128
+  ppo_epochs: 4
+  num_minibatches: 4
+  clip_ratio: 0.1
+  gae_lambda: 0.95
+  vf_coef: 0.5
+  ent_coef: 0.01
+  max_grad_norm: 0.5
+  lr: 0.00025
+  normalize_advantage: true
+  task1_iters: 600            # standard PPO on task 1 (~2.5M frames)
+  local_iters: 400            # standard PPO on the current task per cycle
+  global_iters: 300           # constrained consolidation per cycle
+  constraint_episodes: 6      # full episodes for the V_k shortfall estimate
+  constraint_every: 5         # refresh V_k^G / mu every 5 global iterations
+  eval_episodes: 10           # episodes for the eval matrix rows
+  eval_every: 0               # probes off (end-of-task eval matrix is the signal)

@@ -34,19 +34,29 @@ def run_from_config(config: Config) -> list[list[float]]:
     device = resolve_device(config.experiment.device)
     family = make_family(config.env)
     policy = make_policy(config.policy, family).to(device)
-    estimator = make_estimator(config.estimator, buffer_set=BufferSet())
     run_name = f"{config.experiment.name}_seed{config.experiment.seed}"
     logger = RunLogger(config.experiment.results_dir, run_name, config.to_dict())
 
-    # Run header (reproducibility convention: seed / env / model up front).
-    print(
-        f"[run] name={run_name} seed={config.experiment.seed} "
-        f"env={config.env.family}({len(family)} tasks) "
-        f"policy={config.policy.kind} estimator={config.estimator.kind} "
-        f"eps={config.trainer.eps} device={device}"
-    )
+    if config.trainer.kind == "ppo":
+        # PPO backend: same continual-learning framework, PPO as the optimizer.
+        from crl.ppo_continual import PPOAlternationTrainer
 
-    trainer = AlternationTrainer(config, family, policy, estimator, logger)
+        print(
+            f"[run] name={run_name} seed={config.experiment.seed} "
+            f"env={config.env.family}({len(family)} tasks) "
+            f"policy={config.policy.kind} backend=ppo method={config.ppo.method} "
+            f"eps={config.trainer.eps} device={device}"
+        )
+        trainer = PPOAlternationTrainer(config, family, policy, logger)
+    else:
+        estimator = make_estimator(config.estimator, buffer_set=BufferSet())
+        print(
+            f"[run] name={run_name} seed={config.experiment.seed} "
+            f"env={config.env.family}({len(family)} tasks) "
+            f"policy={config.policy.kind} estimator={config.estimator.kind} "
+            f"eps={config.trainer.eps} device={device}"
+        )
+        trainer = AlternationTrainer(config, family, policy, estimator, logger)
     try:
         matrix = trainer.run()
     finally:

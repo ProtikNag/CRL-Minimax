@@ -125,6 +125,12 @@ class TrainerConfig:
     # and objective still use discounted value; only reporting changes. Set for
     # environments where the paper metric is the score (e.g. MinAtar).
     report_return: bool = False
+    # Optimizer backend / trainer variant. "alternation" = the REINFORCE
+    # primal-dual trainer (crl.trainer.AlternationTrainer). "ppo" = the PPO
+    # backend (crl.ppo_continual.PPOAlternationTrainer): PPO replaces REINFORCE
+    # as the optimizer, the CL framework is unchanged, and PPO settings come from
+    # the ``ppo`` config section.
+    kind: str = "alternation"
     # Variant: drop the past-task constraint from the LOCAL phase, so the local
     # policy is a pure-plasticity learner of the current task (maximizes V_k
     # only, no lambda shortfall terms). The GLOBAL phase is unchanged -- it is
@@ -132,6 +138,47 @@ class TrainerConfig:
     # letting the local fully master the new task (then consolidating into the
     # global) fixes current-task underlearning without losing past retention.
     local_unconstrained: bool = False
+
+
+@dataclass
+class PPOConfig:
+    """PPO optimizer settings for the ``trainer.kind == "ppo"`` backend.
+
+    PPO replaces REINFORCE as the policy-gradient *optimizer* only; the
+    continual-learning framework (local/global alternation, squared-shortfall
+    constraint, lambda/mu duals, replay-free fresh rollouts) is unchanged and is
+    configured through :class:`TrainerConfig` / :class:`DualConfig`. The critic,
+    GAE, value loss and entropy bonus here are standard PPO -- only the ACTOR
+    receives the constraint (in the global phase).
+    """
+
+    # Continual method: "constrained" = full local/global min-max consolidation;
+    # "finetune" = naive sequential standard PPO on one shared net (the
+    # catastrophic-forgetting baseline; no local phase, no constraint).
+    method: str = "constrained"
+    n_envs: int = 8  # parallel vectorized envs feeding the collector
+    n_steps: int = 128  # rollout length per env per PPO iteration
+    ppo_epochs: int = 4  # optimization epochs over each collected batch
+    num_minibatches: int = 4  # minibatches per epoch (batch = n_envs*n_steps)
+    clip_ratio: float = 0.1  # PPO clip epsilon (0.1 is standard for Atari)
+    gae_lambda: float = 0.95  # GAE(lambda)
+    vf_coef: float = 0.5  # value-loss weight (standard PPO critic)
+    ent_coef: float = 0.01  # entropy bonus (standard PPO)
+    max_grad_norm: float = 0.5  # global grad-norm clip
+    lr: float = 2.5e-4  # Adam learning rate (actor+critic share the trunk)
+    normalize_advantage: bool = True  # per-minibatch advantage normalization
+    # Phase budgets, counted in PPO iterations (each = collect + ppo_epochs).
+    task1_iters: int = 400  # plain PPO on task 1 (no past tasks)
+    local_iters: int = 200  # standard PPO on the current task (local phase)
+    global_iters: int = 200  # constrained PPO consolidation (global phase)
+    # Full-episode Monte-Carlo estimates of V_k for the shortfall / references
+    # (paper-faithful: the constraint value is a return, not a critic output).
+    constraint_episodes: int = 8
+    # Re-estimate V_k^G and update mu every N global iterations (slower dual
+    # timescale; between updates the mu*2*shortfall coefficient is held fixed).
+    constraint_every: int = 5
+    eval_episodes: int = 16  # episodes for the eval matrix / probes
+    eval_every: int = 25  # probe the global policy every N cumulative iters (0=off)
 
 
 @dataclass
@@ -144,6 +191,7 @@ class Config:
     estimator: EstimatorConfig = field(default_factory=EstimatorConfig)
     duals: DualConfig = field(default_factory=DualConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
+    ppo: PPOConfig = field(default_factory=PPOConfig)
 
     def to_dict(self) -> dict[str, Any]:
         """Plain-dict view (for logging alongside results)."""
@@ -168,6 +216,7 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         "estimator": EstimatorConfig,
         "duals": DualConfig,
         "trainer": TrainerConfig,
+        "ppo": PPOConfig,
     }
     unknown = set(raw) - set(sections)
     if unknown:
