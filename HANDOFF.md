@@ -3,64 +3,54 @@
 State of the project and what to do next, for a fresh session. Read `README.md`
 first (problem, method, math); this file is status + next steps only.
 
-## ►► AUTONOMOUS MAZE RUN IN FLIGHT (2026-07-13)
+## ►► AUTONOMOUS ATARI-PPO RUN IN FLIGHT (2026-07-15)
 
-A self-contained SLURM pipeline is running the **continual-maze** study (no
-interactive session needed). Driver job `crl-maze-drv` (submitted from commit
-d992d9c) does: pick maze size by learnability -> write `configs/maze_20task.yaml`
-+ `configs/maze_20task_localfree.yaml` -> submit 30 workers (`crl-maze`, 10 seeds
-x {constrained, finetune, localfree}) -> submit `crl-maze-agg` (afterany) which
-runs `experiments.aggregate_theory` and commits+pushes `reports/maze_20task/`.
+The active study is the **PPO port on 5 Atari games** (`trainer.kind: ppo`) —
+same min-max formulation, PPO instead of REINFORCE (`docs/REINFORCE_to_PPO.md`).
+Games: **Pong → Breakout → Boxing → Qbert → SpaceInvaders** (Freeway was dropped;
+sparse-reward, never learned). Multi-head actor-critic (shared Nature-CNN trunk +
+per-task actor+critic heads), 18-action set.
 
-Env: `crl/envs/maze.py` (one maze per task; recursive-backtracker + braided
-loops + dead-ends; start/goal random per episode, BFS-reachable; local 5x5 wall
-view; BFS-shortest-path shaping so shorter paths score higher; per-maze wall-hit
-penalty 0-or-random-negative; slip). One shared MLP head, no task-id, goal in obs.
+**Headline = `atari5_ppo_v4`**, 5 seeds × {constrained, finetune}, jobs
+`21679631..21679640` + aggregator `21679641` (afterany, `--seeds 0 1 2 3 4`,
+`scripts/hpc_atari_aggregate.sbatch` → commits `reports/atari5_ppo_v4/`). Launched
+with `scripts/hpc_atari_worker.sbatch configs/atari5_ppo_v4{,_finetune}.yaml <seed>`.
+GPU partitions `gpu,gpu-v100-16gb,gpu-v100-32gb` (V100 nodes can preempt/requeue;
+`gpu`/node242 is stable).
 
-**When you return, check:** `squeue -u $USER` (any `crl-maze*` left?); the driver
-log `slurm-maze-drv-*.out` (which size was chosen; workers submitted OK — nested
-sbatch could fail on some clusters); and whether `reports/maze_20task/` exists and
-was pushed (the aggregator's `git push` may fail on a network-less compute node --
-if so, `git push` from the login node). If the driver failed, resubmit
-`sbatch scripts/hpc_maze_pipeline.sbatch`.
+**When you return, check:** `bash scripts/atari_status.sh` (v1-name only) or read
+`results/atari5_ppo_v4_*_seed*/logs.jsonl` (flushed; stdout is block-buffered).
+A run is done when `eval_matrix.json` has 5 rows. If a job was preempted (logs
+restart from task 1), resubmit it. Then verify `reports/atari5_ppo_v4/tables/`
+(`cl_metrics.csv` = AvgPerf/Forgetting/BWT raw+normalized; `retention_table.csv`;
+`score_table.csv`) got committed; if the aggregator failed, run
+`python -m experiments.aggregate_atari --name atari5_ppo_v4 --seeds 0 1 2 3 4`.
 
-## ►► START HERE
+**v4 design (reviewer-facing):** equal per-**model** budget — local, global,
+finetune each get the same iteration cap and per-game **greedy threshold**, and
+each early-stops when it clears the threshold (`ppo.patience` checks). Reported
+scores use **greedy actions, 50 episodes, fixed seed** (low variance, raw kept);
+the constraint's V stays on-policy stochastic. Thresholds live in the config
+(`env.tasks[i].threshold`): Pong 18, Breakout 50, Boxing 90, Qbert 2000,
+SpaceInvaders 600.
 
-The project is now **MinAtar-only, pure REINFORCE, following the theory exactly**.
-Gridworld/tabular/exact are retained solely as the exact-gradient **test harness**
-(the theory double-check); CartPole and the value-based (DQN) exploration were
-removed to stay within the policy-gradient derivation.
+**Critical fix baked into v4** (`crl/ppo/trainer.py::optimize_batches`): normalize
+the actor coefficients by their sum. Without it, a saturated dual μ makes the
+current-task actor gradient dominate the shared grad-norm clip and **starve the
+shared critic** → broken GAE → the global cannot consolidate (V_k stuck far below
+the local reference). Normalizing is a positive rescaling of the primal direction,
+so the KKT fixed point is unchanged. See `docs/REINFORCE_to_PPO.md` §3.
 
-**Current headline run (in flight / latest):** four MinAtar games
-(SpaceInvaders → Breakout → Asterix → Seaquest), shared conv trunk + per-task
-heads, **5 seeds**, three methods:
-
-- `constrained` — full theory, local constrained on past tasks (ours).
-- `localfree` — unconstrained-local variant (ours).
-- `finetune` — naive sequential (baseline).
-
-Launch (per seed, 3 jobs):
-```bash
-sbatch scripts/hpc_minatar.sbatch constrained <seed> configs/minatar_multihead.yaml minatar_multihead
-sbatch scripts/hpc_minatar.sbatch finetune    <seed> configs/minatar_multihead.yaml minatar_multihead
-sbatch scripts/hpc_minatar.sbatch constrained <seed> configs/minatar_localfree.yaml minatar_localfree
-```
-Aggregate all seeds into the report bundle:
-```bash
-python -m experiments.aggregate_theory --seeds 0 1 2 3 4
-# -> reports/minatar_theory/{figures,tables}
-```
-
-**Next up:** once the 5-seed bundle lands, fill the headline table in
-`README.md` (`<!-- HEADLINE_RESULTS -->`) and this file, then decide whether to
-scale games / seeds or tune `eps`/`duals.lr`.
+The REINFORCE/MinAtar path is unchanged and remains the theory double-check
+(`configs/minatar_*.yaml`, `experiments/aggregate_theory.py`).
 
 ## Where things stand
 
 Method from `docs/Objective_for_Continual_Reinforcement_Learning.pdf` fully
 implemented and **double-checked against the derivation** — including the fix to
 use `ω_i = 1/k` (current task count) per the Setup, not a fixed `1/num_tasks`.
-25/25 tests pass (`pytest -q`, ~1.5 min CPU).
+The **PPO/Atari backend** (`crl/ppo/`, `crl/ppo_continual.py`) implements the same
+formulation with PPO as the optimizer. 30/30 tests pass (`pytest -q`, ~1.7 min CPU).
 
 **Pipeline:** `experiments/multiseed_comparison.py` (one seed → N methods,
 `--methods` selectable, SLURM-array friendly) + `experiments/aggregate_theory.py`

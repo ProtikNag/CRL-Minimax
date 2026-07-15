@@ -2,9 +2,14 @@
 
 A two-policy continual RL framework with constrained min-max updates. A
 **local policy** learns the current task while a **global policy** consolidates
-the past; the two are trained in alternation by primal-dual **policy gradient
-(REINFORCE)**. The past is protected by a per-task, one-sided, *squared* value
-constraint, not a replay penalty.
+the past; the two are trained in alternation by primal-dual policy gradient. The
+past is protected by a per-task, one-sided, *squared* value constraint, not a
+replay penalty.
+
+Two optimizer backends implement the **same** formulation: **REINFORCE**
+(tabular / MinAtar) and **PPO** (Atari; `trainer.kind: ppo`). PPO replaces only
+the ∇V estimator — the constraints, Lagrangians, and dual updates are identical.
+See `docs/REINFORCE_to_PPO.md` for the equation-by-equation mapping.
 
 > **Note for Claude Code / new sessions.** Read this file and `HANDOFF.md`
 > before touching code. The math is fixed in
@@ -203,6 +208,27 @@ learning/reward curves, forgetting matrices and CI tables:
    rollouts scale with `k`; mitigated by once-per-phase frozen references,
    `past_task_sampling: sample` (unbiased O(1) past term), and batched
    `vector_rollout` per env.
+
+## 6b. PPO backend (Atari)
+
+`trainer.kind: ppo` runs the identical formulation with PPO instead of
+REINFORCE (`docs/REINFORCE_to_PPO.md`). Actor-critic Nature-CNN over 4×84×84
+frames, per-task actor+critic heads on a shared trunk (18-action set), Gymnasium
+vectorized envs. The **critic + GAE are standard PPO and never constrained** —
+only the actor carries the CL term; the actor coefficients are normalized by
+their sum so an unbounded dual multiplier cannot starve the shared critic.
+Constraint values Vᵢ stay Monte-Carlo (paper-faithful); the critic is only for
+advantages.
+
+- Code: `crl/envs/atari.py`, `crl/policies/cnn_ac.py`, `crl/ppo/` (reusable
+  `PPOTrainer` → `LocalTrainer` = standard PPO, `GlobalTrainer` = PPO + actor
+  constraint), `crl/ppo_continual.py` (orchestrator).
+- Fairness / evaluation: equal per-**model** budget via a shared iteration cap +
+  per-game **early stopping** to a greedy-score threshold; reported scores use
+  **greedy actions, 50 episodes, fixed seed** (low variance, raw kept).
+  Metrics in `analysis/continual_metrics.py` (normalized + Forgetting / BWT /
+  Average Performance). Configs: `configs/atari5_ppo_v4*.yaml`. Launch:
+  `scripts/hpc_atari_*.sbatch`.
 
 ## 7. Metrics
 

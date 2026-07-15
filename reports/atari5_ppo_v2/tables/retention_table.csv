@@ -1,7 +1,0 @@
-method,task,final_value,final_ci,retention_pct,retention_ci
-finetune,1,-20.4,0.0,-2040.0,0.0
-finetune,2,0.9,0.0,100.0,0.0
-finetune,3,3.9,0.0,100.0,0.0
-finetune,4,6.3,0.0,100.0,0.0
-finetune,5,331.0,0.0,100.0,0.0
-finetune,mean,64.34,0.0,-328.0,0.0
