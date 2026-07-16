@@ -1,0 +1,13 @@
+method,space,metric,mean,std,n_seeds
+constrained,raw,avg_performance,122.294,16.482,2
+constrained,raw,forgetting,89.312,7.712,2
+constrained,raw,bwt,-86.682,9.712,2
+constrained,norm,avg_performance,0.229,0.046,2
+constrained,norm,forgetting,0.366,0.057,2
+constrained,norm,bwt,-0.303,0.104,2
+finetune,raw,avg_performance,104.644,6.156,2
+finetune,raw,forgetting,818.15,223.07,2
+finetune,raw,bwt,-818.15,223.07,2
+finetune,norm,avg_performance,0.084,0.012,2
+finetune,norm,forgetting,1.04,0.171,2
+finetune,norm,bwt,-1.04,0.171,2
