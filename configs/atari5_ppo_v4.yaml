@@ -63,14 +63,14 @@ ppo:
   # Budget CAPS (each model early-stops at its per-game threshold; equal caps
   # + equal thresholds across local / global / finetune -> fair per-model budget).
   task1_iters: 2500
-  local_iters: 2500
-  global_iters: 2500
+  local_iters: 2000
+  global_iters: 1200
   min_iters: 300
   patience: 3
   stop_eval_every: 50
   stop_eval_episodes: 15
-  constraint_episodes: 12
-  constraint_every: 10
+  constraint_episodes: 8
+  constraint_every: 20
   # Reported evaluation: greedy, 50 episodes, fixed seed (low variance).
   eval_episodes: 50
   eval_greedy: true
