@@ -56,8 +56,8 @@ ppo:
   lr: 0.00025
   normalize_advantage: true
   task1_iters: 2500
-  local_iters: 2500
-  global_iters: 2500
+  local_iters: 2000
+  global_iters: 0
   min_iters: 300
   patience: 3
   stop_eval_every: 50
