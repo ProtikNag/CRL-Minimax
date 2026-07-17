@@ -1,0 +1,209 @@
+"""Normalized first-4-task visualizations for the Atari v4 study + training curves.
+
+Restricts the forgetting matrix / retention to tasks 1-4 (drops SpaceInvaders,
+the last/current-only task) and reports per-game NORMALIZED scores
+(norm = (raw - random) / (threshold - random); random->0, threshold->1) so games
+on wildly different scales are comparable. Also plots the per-iteration training
+reward (reward gathered per PPO iteration) and the normalized greedy learning
+curve with task boundaries.
+
+    python -m experiments.atari_v4_figures --seeds 0 4
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+from crl.envs.atari import RANDOM_SCORES
+
+GAMES4 = ["Pong", "Breakout", "Boxing", "Qbert"]
+THRESH = {"Pong": 18, "Breakout": 50, "Boxing": 90, "Qbert": 2000, "SpaceInvaders": 600}
+CCOL, FCOL = "#1b9e77", "#d95f02"  # constrained (green), finetune (orange)
+
+
+def _norm(raw, game):
+    r = RANDOM_SCORES[game]
+    return (raw - r) / (THRESH[game] - r)
+
+
+def _load(method, seed):
+    d = f"results/atari5_ppo_v4_{method}_seed{seed}"
+    return np.array(json.load(open(f"{d}/eval_matrix.json")))
+
+
+def normalized_matrices(seeds):
+    """Return {method: [S,4,4] normalized first-4-task forgetting matrices}."""
+    out = {}
+    for m in ("constrained", "finetune"):
+        mats = []
+        for s in seeds:
+            M = _load(m, s)[:4, :4]  # first 4 tasks x first 4 games
+            N = np.array([[_norm(M[i, j], GAMES4[j]) for j in range(4)] for i in range(4)])
+            mats.append(N)
+        out[m] = np.array(mats)
+    return out
+
+
+def fig_forgetting_matrices(norm, out_dir):
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.4))
+    for ax, m, title in zip(axes, ("constrained", "finetune"),
+                            ("Min-max (ours)", "Fine-tune (baseline)")):
+        M = norm[m].mean(0)  # [4,4]
+        disp = M.copy()
+        for i in range(4):
+            for j in range(4):
+                if j > i:
+                    disp[i, j] = np.nan  # future task, not trained yet
+        cmap = plt.cm.RdYlGn.copy(); cmap.set_bad("#dddddd")
+        im = ax.imshow(disp, cmap=cmap, vmin=-0.1, vmax=1.1, aspect="auto")
+        for i in range(4):
+            for j in range(4):
+                if j <= i:
+                    ax.text(j, i, f"{M[i,j]:.2f}", ha="center", va="center",
+                            fontsize=10, fontweight="bold" if i == j else "normal")
+        ax.set_xticks(range(4)); ax.set_xticklabels(GAMES4, rotation=30, ha="right")
+        ax.set_yticks(range(4)); ax.set_yticklabels([f"after T{i+1}" for i in range(4)])
+        ax.set_title(title, fontweight="600")
+        ax.set_xlabel("evaluated on game")
+    fig.suptitle("Normalized forgetting matrix, first 4 tasks (random=0, threshold=1)\n"
+                 "read DOWN a column = retention as later tasks train",
+                 fontweight="600", y=1.04)
+    fig.colorbar(im, ax=axes, fraction=0.025, pad=0.02, label="normalized score")
+    _save(fig, out_dir, "forgetting_matrix_norm_first4")
+
+
+def fig_retention_curves(norm, out_dir):
+    """Per past-game normalized score vs 'after task i', constrained vs finetune."""
+    fig, axes = plt.subplots(1, 4, figsize=(15, 3.6), sharey=True)
+    for j, (ax, g) in enumerate(zip(axes, GAMES4)):
+        xs = list(range(j + 1, 5))  # after task j+1 .. 4 (from when game learned)
+        for m, col, lab in (("constrained", CCOL, "min-max"), ("finetune", FCOL, "finetune")):
+            mean = norm[m].mean(0)[:, j]
+            sd = norm[m].std(0)[:, j]
+            ys = [mean[i] for i in range(j, 4)]
+            es = [sd[i] for i in range(j, 4)]
+            ax.errorbar(xs, ys, yerr=es, marker="o", color=col, label=lab, capsize=3)
+        ax.axhline(0, color="#999", lw=0.8, ls=":")  # random
+        ax.axhline(1, color="#999", lw=0.8, ls="--")  # threshold
+        ax.set_title(f"T{j+1}: {g}", fontweight="600")
+        ax.set_xlabel("after task i"); ax.set_xticks(range(1, 5))
+        if j == 0: ax.set_ylabel("normalized score")
+        if j == 3: ax.legend(fontsize=8)
+    fig.suptitle("Retention of each game as later tasks are learned (normalized, mean±std, seeds 0/4)\n"
+                 "dotted=random(0), dashed=threshold(1)", fontweight="600", y=1.05)
+    _save(fig, out_dir, "retention_curves_norm_first4")
+
+
+def fig_final_bars(norm, out_dir):
+    """After task 4: normalized retained score per game, constrained vs finetune."""
+    fig, ax = plt.subplots(figsize=(8, 4.2))
+    x = np.arange(4); w = 0.38
+    for k, (m, col, lab) in enumerate((("constrained", CCOL, "min-max (ours)"),
+                                       ("finetune", FCOL, "fine-tune"))):
+        mean = norm[m].mean(0)[3, :]  # after T4
+        sd = norm[m].std(0)[3, :]
+        ax.bar(x + (k - 0.5) * w, mean, w, yerr=sd, capsize=3, color=col, label=lab)
+    ax.axhline(0, color="#999", lw=0.8, ls=":"); ax.axhline(1, color="#999", lw=0.8, ls="--")
+    ax.set_xticks(x); ax.set_xticklabels(GAMES4)
+    ax.set_ylabel("normalized score after task 4"); ax.legend()
+    ax.set_title("Retention after 4 tasks (normalized; dotted=random, dashed=threshold)",
+                 fontweight="600")
+    _save(fig, out_dir, "retention_bars_norm_first4")
+
+
+def fig_training_curve(seed, out_dir):
+    """Reward-per-iteration (raw clipped return) + normalized greedy score vs
+    cumulative training iteration, with task boundaries, for one constrained run."""
+    d = f"results/atari5_ppo_v4_constrained_seed{seed}"
+    recs = [json.loads(l) for l in open(f"{d}/logs.jsonl")]
+    train = {"task1", "local", "global", "finetune"}
+    gt = {1: "Pong", 2: "Breakout", 3: "Boxing", 4: "Qbert", 5: "SpaceInvaders"}
+    cum, offset, last_key = [], 0, None
+    xs, ep, gnorm, gtask = [], [], [], []
+    bounds = {}
+    for r in recs:
+        ph = r.get("phase")
+        if ph not in train or "step" not in r:
+            continue
+        key = (r.get("task"), ph)
+        if last_key is not None and key != last_key:
+            offset += lastep + 50  # advance cumulative axis at each phase change
+        it = offset + r["step"]
+        lastep = r["step"]; last_key = key
+        t = r.get("task")
+        bounds.setdefault(t, it)
+        xs.append(it)
+        ep.append(r.get("ep_return_clipped"))
+        g = r.get("greedy_score")
+        if g is not None and t in gt and gt[t] in THRESH:
+            gnorm.append(_norm(g, gt[t])); gtask.append(it)
+
+    fig, (a1, a2) = plt.subplots(2, 1, figsize=(11, 6.5), sharex=True)
+    a1.plot(xs, ep, color="#555", lw=1)
+    a1.set_ylabel("clipped episode\nreturn (per iter)")
+    a1.set_title(f"Training reward per iteration — constrained seed {seed}", fontweight="600")
+    a2.plot(gtask, gnorm, color=CCOL, lw=1.2, marker=".", ms=3)
+    a2.axhline(1, color="#999", ls="--", lw=0.8); a2.axhline(0, color="#999", ls=":", lw=0.8)
+    a2.set_ylabel("normalized greedy\nscore (current game)")
+    a2.set_xlabel("cumulative PPO iteration")
+    for a in (a1, a2):
+        for t, x in bounds.items():
+            a.axvline(x, color="#bbb", lw=0.7, ls="-")
+        for t, x in bounds.items():
+            a1.text(x, a1.get_ylim()[1], f" T{t}:{gt.get(t,'')}", fontsize=7,
+                    va="top", color="#333", rotation=90)
+    _save(fig, out_dir, f"training_curve_constrained_seed{seed}")
+
+
+def cl_metrics_first4(norm):
+    """Forgetting/BWT/AvgPerf on the normalized 4-task matrices."""
+    def m(M):  # M: [4,4] normalized
+        T = 4; final = M[T - 1, :T]
+        fg = [max(M[j:T, j]) - M[T - 1, j] for j in range(T - 1)]
+        bw = [M[T - 1, j] - M[j, j] for j in range(T - 1)]
+        return float(np.mean(final)), float(np.mean(fg)), float(np.mean(bw))
+    res = {}
+    for meth in ("constrained", "finetune"):
+        rows = [m(M) for M in norm[meth]]
+        arr = np.array(rows)
+        res[meth] = {k: (arr[:, i].mean(), arr[:, i].std())
+                     for i, k in enumerate(("avg_perf", "forgetting", "bwt"))}
+    return res
+
+
+def _save(fig, out_dir, name):
+    for sub, ext in (("png", "png"), ("svg", "svg")):
+        p = Path(out_dir) / sub; p.mkdir(parents=True, exist_ok=True)
+        fig.savefig(p / f"{name}.{ext}", dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  saved {name}")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--seeds", type=int, nargs="+", default=[0, 4])
+    args = ap.parse_args()
+    out = Path("reports/atari5_ppo_v4/figures/normalized_first4")
+    norm = normalized_matrices(args.seeds)
+    fig_forgetting_matrices(norm, out)
+    fig_retention_curves(norm, out)
+    fig_final_bars(norm, out)
+    for s in args.seeds:
+        fig_training_curve(s, out)
+    cm = cl_metrics_first4(norm)
+    print("\n=== normalized CL metrics, first 4 tasks (mean±std) ===")
+    for meth in ("constrained", "finetune"):
+        for k, (mu, sd) in cm[meth].items():
+            print(f"  {meth:11s} {k:11s} {mu:6.3f} ± {sd:.3f}")
+    print(f"\nfigures -> {out}")
+
+
+if __name__ == "__main__":
+    main()
