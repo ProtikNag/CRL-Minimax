@@ -154,8 +154,15 @@ class PPOConfig:
 
     # Continual method: "constrained" = full local/global min-max consolidation;
     # "finetune" = naive sequential standard PPO on one shared net (the
-    # catastrophic-forgetting baseline; no local phase, no constraint).
+    # catastrophic-forgetting baseline; no local phase, no constraint);
+    # "clear" = CLEAR (Rolnick 2019 / CORA baseline): replay + behavioral-cloning
+    # + value-cloning on stored past-task data (recent replay-based SOTA baseline).
     method: str = "constrained"
+    # --- CLEAR baseline hyperparameters (CORA Table 3, Atari values) ---
+    clear_policy_clone_cost: float = 0.01  # weight on KL(behavior||current) on replay
+    clear_value_clone_cost: float = 0.005  # weight on value-cloning MSE on replay
+    clear_snapshot_batches: int = 2  # rollout batches stored per task (the replay set)
+    clear_replay_task_per_step: int = 1  # past tasks sampled for cloning per update
     n_envs: int = 8  # parallel vectorized envs feeding the collector
     n_steps: int = 128  # rollout length per env per PPO iteration
     ppo_epochs: int = 4  # optimization epochs over each collected batch

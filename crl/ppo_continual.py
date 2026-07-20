@@ -58,6 +58,11 @@ class PPOAlternationTrainer:
         self.global_trainer = GlobalTrainer(self.ppo, self.device, logger, log_every)
         self.mu_ctrl = make_dual(self.dual_cfg)
 
+        # CLEAR baseline: single replay store + trainer (created lazily on use).
+        self._clear_trainer = None
+        self._clear_replay = None
+        self._log_every = log_every
+
         self.eval_matrix: list[list[float]] = []
         self.cumulative_step = 0
 
@@ -143,6 +148,17 @@ class PPOAlternationTrainer:
             probe=self._probe,
         )
 
+    def _clear_task(self, k: int) -> None:
+        """CLEAR baseline: PPO on task k + replay/behavioral/value cloning on the
+        past, then snapshot task k's behavior into the replay store."""
+        task_k = self.family.tasks[k - 1]
+        self._clear_trainer.train(
+            self.global_policy, task_k, self._clear_replay,
+            num_iters=self.ppo.local_iters + self.ppo.global_iters,
+            seed=self.seed + 1000 * k, current_task=k, probe=self._probe,
+        )
+        self._clear_trainer.snapshot(self.global_policy, task_k, self._clear_replay)
+
     def _constrained_task(self, k: int) -> None:
         task_k = self.family.tasks[k - 1]
         past_tasks = [self.family.tasks[i] for i in range(k - 1)]
@@ -175,7 +191,16 @@ class PPOAlternationTrainer:
             )
 
     def run(self) -> list[list[float]]:
+        if self.method == "clear":
+            from crl.ppo.clear import ClearTrainer, ReplayStore
+            self._clear_trainer = ClearTrainer(self.ppo, self.device, self.logger,
+                                               self._log_every)
+            self._clear_replay = ReplayStore()
+
         self._train_first_task()
+        if self.method == "clear":  # store task-1 behavior as a cloning target
+            self._clear_trainer.snapshot(self.global_policy, self.family.tasks[0],
+                                         self._clear_replay)
         row, stds = self._evaluate_row(1)
         self.eval_matrix.append(row)
         self.logger.log({"phase": "eval", "task": 1, "values": row, "stds": stds})
@@ -183,12 +208,14 @@ class PPOAlternationTrainer:
         for k in range(2, len(self.family) + 1):
             if self.method == "finetune":
                 self._finetune_task(k)
+            elif self.method == "clear":
+                self._clear_task(k)
             elif self.method == "constrained":
                 self._constrained_task(k)
             else:
                 raise KeyError(
                     f"Unknown ppo.method '{self.method}'; available: "
-                    "constrained, finetune"
+                    "constrained, finetune, clear"
                 )
             row, stds = self._evaluate_row(k)
             self.eval_matrix.append(row)
