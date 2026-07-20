@@ -22,7 +22,7 @@ import yaml
 import analysis.aggregate as A
 from analysis import continual_metrics as CM
 
-METHODS = ("constrained", "finetune")
+METHODS = ("constrained", "finetune", "clear")
 
 
 def _eval_matrices(run_dirs: list[Path]) -> list[np.ndarray]:
