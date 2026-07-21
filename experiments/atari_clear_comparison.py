@@ -23,9 +23,10 @@ from crl.envs.atari import RANDOM_SCORES
 
 ALL_GAMES = ["Pong", "Breakout", "Boxing", "Qbert", "SpaceInvaders"]
 THRESH = {"Pong": 18, "Breakout": 50, "Boxing": 90, "Qbert": 2000, "SpaceInvaders": 600}
-METHODS = [("constrained", "Min-max (ours)", "#1b9e77"),
-           ("finetune", "Fine-tune", "#d95f02"),
-           ("clear", "CLEAR (Rolnick'19)", "#7570b3")]
+# (method_key, label, color, run-name prefix). Full-budget min-max lives in the
+# v5 runs (global_iters=3000); CLEAR is the v4 run. Fine-tune dropped per request.
+METHODS = [("constrained", "Min-max (ours), full budget", "#1b9e77", "atari5_ppo_v5"),
+           ("clear", "CLEAR (Rolnick'19)", "#7570b3", "atari5_ppo_v4")]
 
 
 def _norm(raw, game):
@@ -33,10 +34,10 @@ def _norm(raw, game):
     return (raw - r) / (THRESH[game] - r)
 
 
-def _load(method, seeds, nt, games):
+def _load(method, seeds, nt, games, prefix="atari5_ppo_v4"):
     mats = []
     for s in seeds:
-        p = Path(f"results/atari5_ppo_v4_{method}_seed{s}/eval_matrix.json")
+        p = Path(f"results/{prefix}_{method}_seed{s}/eval_matrix.json")
         if not p.exists():
             continue
         M = np.array(json.load(open(p)))
@@ -62,11 +63,11 @@ def main():
     args = ap.parse_args()
     nt = args.tasks
     games = ALL_GAMES[:nt]
-    present = [(m, lab, col) for m, lab, col in METHODS
-               if _load(m, args.seeds, nt, games) is not None]
+    present = [(m, lab, col, pre) for m, lab, col, pre in METHODS
+               if _load(m, args.seeds, nt, games, pre) is not None]
     if not present:
         raise SystemExit("no completed eval_matrices found")
-    norms = {m: _load(m, args.seeds, nt, games) for m, _, _ in present}
+    norms = {m: _load(m, args.seeds, nt, games, pre) for m, _, _, pre in present}
 
     out = Path("reports/atari5_ppo_v4/figures/clear_comparison")
 
@@ -74,7 +75,7 @@ def main():
     fig, axes = plt.subplots(1, len(present), figsize=(5.2 * len(present), 4.8))
     if len(present) == 1:
         axes = [axes]
-    for ax, (m, lab, _) in zip(axes, present):
+    for ax, (m, lab, _, _pre) in zip(axes, present):
         M = norms[m].mean(0)
         disp = M.copy()
         for i in range(nt):
@@ -102,7 +103,7 @@ def main():
     fig, ax = plt.subplots(figsize=(9, 4.6))
     x = np.arange(3); w = 0.8 / len(present)
     print(f"\n=== CL metrics, {nt} tasks (normalized, mean over seeds {args.seeds}) ===")
-    for k, (m, lab, col) in enumerate(present):
+    for k, (m, lab, col, _pre) in enumerate(present):
         rows = np.array([cl_metrics(M, nt) for M in norms[m]])
         mean = rows.mean(0); sd = rows.std(0)
         ax.bar(x + (k - (len(present)-1)/2) * w, mean, w, yerr=sd, capsize=3,
@@ -111,7 +112,7 @@ def main():
     ax.axhline(0, color="#999", lw=0.8)
     ax.set_xticks(x); ax.set_xticklabels(labels)
     ax.set_ylabel("normalized"); ax.legend()
-    ax.set_title(f"Continual-learning metrics — min-max vs fine-tune vs CLEAR "
+    ax.set_title(f"Continual-learning metrics — full-budget min-max vs CLEAR "
                  f"({nt} Atari tasks)", fontweight="600")
     _save(fig, out, "cl_metrics_3way")
     print(f"\nfigures -> {out}")
