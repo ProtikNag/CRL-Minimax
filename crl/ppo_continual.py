@@ -75,14 +75,39 @@ class PPOAlternationTrainer:
         return float(e) if isinstance(e, (int, float)) else float(e[0])
 
     def _eval_report(self, policy: Policy, task) -> tuple[float, float]:
-        """Reported (raw) game score for ``policy`` on ``task``: greedy actions,
-        many episodes, fixed seed -> low-variance, reproducible. Returns
-        ``(mean_score, score_std)``."""
-        _, score, std, _ = evaluate_value_and_score(
-            policy, task, self.ppo.eval_episodes, self.ppo.n_envs, self.device,
-            seed=self.ppo.eval_seed, greedy=self.ppo.eval_greedy,
-        )
-        return score, std
+        """Reported (raw) game score for ``policy`` on ``task``, pooled over a
+        mix of GREEDY and STOCHASTIC episodes (fixed seeds -> reproducible).
+
+        Of ``eval_episodes`` total, ``eval_greedy_episodes`` use argmax actions
+        and the rest sample; the reported score is the pooled mean over ALL
+        episodes (a blend of best-case and on-policy behaviour, not best-of).
+        Returns ``(pooled_mean_score, pooled_std)``."""
+        total = self.ppo.eval_episodes
+        n_greedy = min(self.ppo.eval_greedy_episodes, total) if self.ppo.eval_greedy else 0
+        n_stoch = total - n_greedy
+
+        groups = []  # (mean, std, n)
+        if n_greedy > 0:
+            _, m, s, n = evaluate_value_and_score(
+                policy, task, n_greedy, self.ppo.n_envs, self.device,
+                seed=self.ppo.eval_seed, greedy=True,
+            )
+            groups.append((m, s, n))
+        if n_stoch > 0:
+            _, m, s, n = evaluate_value_and_score(
+                policy, task, n_stoch, self.ppo.n_envs, self.device,
+                seed=self.ppo.eval_seed + 1, greedy=False,
+            )
+            groups.append((m, s, n))
+
+        n_tot = sum(n for _, _, n in groups)
+        if n_tot == 0:
+            return 0.0, 0.0
+        pooled_mean = sum(m * n for m, _, n in groups) / n_tot
+        # Exact pooled population variance across the (possibly two) groups.
+        pooled_var = sum(n * (s * s + (m - pooled_mean) ** 2)
+                         for m, s, n in groups) / n_tot
+        return pooled_mean, pooled_var ** 0.5
 
     def _eval_value(self, policy: Policy, task) -> float:
         """On-policy STOCHASTIC discounted value V^pi (the constraint reference)."""

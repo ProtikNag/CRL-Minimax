@@ -64,7 +64,8 @@ ppo:
   stop_eval_episodes: 15
   constraint_episodes: 8
   constraint_every: 20
-  eval_episodes: 50
+  eval_episodes: 300
   eval_greedy: true
   eval_seed: 100000
   eval_every: 0
+  eval_greedy_episodes: 200
