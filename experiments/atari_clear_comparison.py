@@ -26,7 +26,7 @@ THRESH = {"Pong": 18, "Breakout": 50, "Boxing": 90, "Qbert": 2000, "SpaceInvader
 # (method_key, label, color, run-name prefix). Full-budget min-max lives in the
 # v5 runs (global_iters=3000); CLEAR is the v4 run. Fine-tune dropped per request.
 METHODS = [("constrained", "Min-max (ours), full budget", "#1b9e77", "atari5_ppo_v5"),
-           ("clear", "CLEAR (Rolnick'19)", "#7570b3", "atari5_ppo_v4")]
+           ("clear", "CLEAR (Rolnick'19)", "#7570b3", "atari5_ppo_v5")]
 
 
 def _norm(raw, game):
