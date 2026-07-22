@@ -36,7 +36,11 @@ duals:
   lr: 0.3
   init: 0.0
   max_value: 20.0
-  warm_start: true
+  # Reset mu to init (0) at each global phase: each task's current-task
+  # constraint is a fresh problem with its own reference. warm_start=true
+  # carried mu across phases, creating a one-way ratchet to the ceiling
+  # (a hard task pins mu=20 and later phases inherit it). See mu_vs_iters.png.
+  warm_start: false
 trainer:
   kind: ppo
   cycles_per_task: 1
