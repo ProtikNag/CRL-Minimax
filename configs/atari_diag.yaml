@@ -62,11 +62,11 @@ ppo:
   stop_eval_episodes: 10
   constraint_episodes: 6
   constraint_every: 25
-  eval_episodes: 40
+  eval_episodes: 150
   eval_greedy: true
   eval_seed: 100000
   eval_every: 0
-  eval_greedy_episodes: 40
+  eval_greedy_episodes: 0
   diagnostics: true
   diag_every: 25
   diag_score_episodes: 6
