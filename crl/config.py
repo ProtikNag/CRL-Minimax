@@ -217,6 +217,14 @@ class PPOConfig:
     diagnostics: bool = False
     diag_every: int = 25  # log a full diagnostics row every N global iters
     diag_score_episodes: int = 6  # greedy episodes per task for the perf trajectory
+    # --- EXPERIMENT: head-only consolidation probe ---------------------------
+    # When true, each global phase starts from the frozen LOCAL model (so the
+    # shared trunk already carries the current-task features), then FREEZES the
+    # trunk and consolidates ONLY the per-task heads under the same constrained
+    # objective. Decisive test: if the current task is retained ~perfectly, the
+    # damage in the normal method comes from shared-representation (trunk)
+    # updates; if it still degrades, the constrained objective itself compromises.
+    global_probe_head_only: bool = False
 
 
 @dataclass

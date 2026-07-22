@@ -50,8 +50,10 @@ class PPOTrainer:
         self.log_every = max(1, log_every)
 
     def _new_optimizer(self, policy: Policy) -> torch.optim.Optimizer:
-        # Adam over the whole model: the trunk + actor + critic (standard PPO).
-        return torch.optim.Adam(policy.parameters(), lr=self.ppo.lr, eps=1e-5)
+        # Adam over the trainable params (whole model normally; only the heads
+        # when the trunk is frozen for the head-only consolidation probe).
+        params = [p for p in policy.parameters() if p.requires_grad]
+        return torch.optim.Adam(params, lr=self.ppo.lr, eps=1e-5)
 
     def _stop_score(self, policy: Policy, task: Task, iters_done: int) -> float | None:
         """Greedy score for the early-stop check on this iteration, or None if

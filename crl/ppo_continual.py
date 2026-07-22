@@ -202,6 +202,12 @@ class PPOAlternationTrainer:
             # ---- global phase: PPO + actor-only mu constraint ---------------
             self.mu_ctrl.reset()
             omega = [1.0 / k] * (k - 1)  # uniform weights omega_i = 1/k
+            if self.ppo.global_probe_head_only:
+                # EXPERIMENT: consolidate on the local's (current-task) trunk,
+                # frozen, moving only the per-task heads.
+                self.global_policy.load_state_dict(local_policy.state_dict())
+                for name, p in self.global_policy.named_parameters():
+                    p.requires_grad_(not name.startswith("trunk."))
             self.global_trainer.train(
                 self.global_policy, task_k, past_tasks,
                 ref_current=ref_current, mu_ctrl=self.mu_ctrl, omega=omega,
@@ -210,6 +216,9 @@ class PPOAlternationTrainer:
                 seed=self.seed + 1000 * k + 13 * cycle,
                 current_task=k, probe=self._probe,
             )
+            if self.ppo.global_probe_head_only:  # restore full trainability
+                for p in self.global_policy.parameters():
+                    p.requires_grad_(True)
             self.logger.log(
                 {"phase": "gaps", "task": k, "cycle": cycle,
                  "V_k_ref_local": ref_current}
