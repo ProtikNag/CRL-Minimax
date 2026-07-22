@@ -76,6 +76,7 @@ class PPOTrainer:
         optimizer: torch.optim.Optimizer,
         streams: list[RolloutBatch],
         actor_coeffs: list[float],
+        bc: tuple | None = None,
     ) -> dict[str, float]:
         """One PPO update (``ppo_epochs`` x minibatches) over the given streams.
 
@@ -107,7 +108,8 @@ class PPOTrainer:
             for start in range(0, n, mb_size):
                 idx = perm[start : start + mb_size]
                 total_loss = torch.zeros((), device=self.device)
-                for coeff, batch in zip(actor_coeffs, streams):
+                n_streams = len(streams)
+                for si, (coeff, batch) in enumerate(zip(actor_coeffs, streams)):
                     dist, value = policy.dist_value(batch.obs[idx], batch.task_id)
                     new_logp = dist.log_prob(batch.actions[idx])
                     logratio = new_logp - batch.logprobs[idx]
@@ -127,6 +129,14 @@ class PPOTrainer:
                         + cfg.vf_coef * v_loss
                         - cfg.ent_coef * entropy
                     )
+                    # EXPERIMENT 2: behavioral-cloning term on the CURRENT task
+                    # (the last stream): coef * KL(pi_local || pi_global).
+                    if bc is not None and si == n_streams - 1:
+                        local_policy, bc_coef = bc
+                        with torch.no_grad():
+                            pl = local_policy.dist(batch.obs[idx], batch.task_id)
+                        total_loss = total_loss + bc_coef * torch.distributions.kl_divergence(
+                            pl, dist).mean()
                     with torch.no_grad():
                         pg_acc += float(pg_loss)
                         v_acc += float(v_loss)
@@ -261,9 +271,20 @@ class GlobalTrainer(PPOTrainer):
 
     def _log_diagnostics(self, policy, task_k, past_tasks, ref_current, mu, shortfall,
                          constraint, eps, coeff_k, v_k_g, past_batches, cur_batch,
-                         omega, current_task, step):
+                         omega, current_task, step, local_policy=None):
         """Emit one rich 'global_diag' row (see PPOConfig.diagnostics)."""
         cfg = self.ppo
+        # EXPERIMENT 2: behavioral gap between the frozen local and the global on
+        # current-task states. If the value gap -> 0 while this KL stays large,
+        # the scalar value constraint is satisfied by a behaviorally-different
+        # policy (the value constraint is too weak).
+        kl_lg = tv_lg = float("nan")
+        if local_policy is not None:
+            with torch.no_grad():
+                pl = local_policy.dist(cur_batch.obs, cur_batch.task_id)
+                pg = policy.dist(cur_batch.obs, cur_batch.task_id)
+                kl_lg = float(torch.distributions.kl_divergence(pl, pg).mean())
+                tv_lg = float(0.5 * (pl.probs - pg.probs).abs().sum(-1).mean())
         # current-task greedy performance (trajectory point) + fresh stochastic V_k^G
         _, cur_score, _, _ = evaluate_value_and_score(
             policy, task_k, cfg.diag_score_episodes, cfg.n_envs, self.device,
@@ -294,6 +315,8 @@ class GlobalTrainer(PPOTrainer):
             "grad_norm_new": nn_new, "grad_norm_old": nn_old,
             "grad_ratio_new_over_old": ratio,       # <1 => old-task objective wins
             "grad_cos_new_old": cos,                # alignment / conflict
+            "kl_local_global": kl_lg,               # behavioral gap (value too weak?)
+            "tv_local_global": tv_lg,
             "past": past,                           # per-old-task value + score
         })
         print(f"[diag k={current_task}] it={step:4d} Vgap={ref_current-v_k_g:+.3f} "
@@ -313,6 +336,7 @@ class GlobalTrainer(PPOTrainer):
         seed: int,
         current_task: int,
         probe: ProbeHook | None = None,
+        local_policy: Policy | None = None,
     ) -> None:
         """``omega`` is the per-stream weight list aligned to
         ``past_tasks + [task_k]`` order is NOT used; past weights are
@@ -357,11 +381,13 @@ class GlobalTrainer(PPOTrainer):
                     self._log_diagnostics(
                         global_policy, task_k, past_tasks, ref_current, mu, shortfall,
                         constraint, eps, coeff_k, v_k_g, past_batches, cur_batch,
-                        omega, current_task, it)
+                        omega, current_task, it, local_policy)
 
                 streams = past_batches + [cur_batch]
                 coeffs = list(omega[: len(past_tasks)]) + [coeff_k]
-                stats = self.optimize_batches(global_policy, optimizer, streams, coeffs)
+                bc = ((local_policy, self.ppo.global_bc_coef)
+                      if local_policy is not None and self.ppo.global_bc_coef > 0 else None)
+                stats = self.optimize_batches(global_policy, optimizer, streams, coeffs, bc=bc)
 
                 if probe is not None:
                     probe("global", current_task)

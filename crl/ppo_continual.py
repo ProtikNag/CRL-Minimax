@@ -43,6 +43,7 @@ class PPOAlternationTrainer:
         global_policy: Policy,
         logger: RunLogger,
     ) -> None:
+        self._config = config
         self.cfg = config.trainer
         self.ppo = config.ppo
         self.dual_cfg = config.duals
@@ -215,6 +216,7 @@ class PPOAlternationTrainer:
                 num_iters=self.ppo.global_iters,
                 seed=self.seed + 1000 * k + 13 * cycle,
                 current_task=k, probe=self._probe,
+                local_policy=frozen_local,  # for KL-gap logging + optional BC term
             )
             if self.ppo.global_probe_head_only:  # restore full trainability
                 for p in self.global_policy.parameters():
@@ -224,7 +226,66 @@ class PPOAlternationTrainer:
                  "V_k_ref_local": ref_current}
             )
 
+    def _train_joint(self) -> None:
+        """EXPERIMENT 1 (feasibility upper bound). First train a FRESH single-task
+        model per game (standard PPO) = the per-task ceiling; then train ONE
+        shared-trunk model on ALL games with mixed batches (equal weight, no
+        constraint). Compare joint per-task performance to the ceilings: if joint
+        reaches them, a feasible shared theta EXISTS."""
+        from crl.policies import make_policy
+        from crl.ppo.collector import RolloutCollector
+
+        cfg = self.ppo
+        tasks = self.family.tasks
+        n = len(tasks)
+
+        # --- per-task ceilings (fresh model each; only its head + trunk move) ---
+        ceilings = []
+        for i, t in enumerate(tasks):
+            m = make_policy(self._config.policy, self.family).to(self.device)
+            self.local_trainer.train(
+                m, t, num_iters=cfg.joint_single_iters, seed=self.seed + 500 + i,
+                current_task=i + 1, phase_type="joint_single")
+            score, _ = self._eval_report(m, t)
+            ceilings.append(score)
+            self.logger.log({"phase": "joint_ceiling", "task": i + 1,
+                             "game": t.spec.name, "score": score})
+            print(f"[joint ceiling] {t.spec.name}: {score:.1f}")
+
+        # --- joint model: one shared trunk, all games mixed, no constraint ---
+        joint = make_policy(self._config.policy, self.family).to(self.device)
+        collectors = [RolloutCollector(t, cfg.n_envs, cfg.n_steps, self.device,
+                                       self.seed + 700 + i) for i, t in enumerate(tasks)]
+        opt = self.local_trainer._new_optimizer(joint)
+        try:
+            for it in range(cfg.joint_iters):
+                streams = [c.collect(joint, cfg.gae_lambda) for c in collectors]
+                self.local_trainer.optimize_batches(joint, opt, streams, [1.0] * n)
+                if cfg.eval_every and (it + 1) % cfg.eval_every == 0:
+                    scores = [self._eval_report(joint, t)[0] for t in tasks]
+                    self.logger.log({"phase": "joint_probe", "step": it + 1,
+                                     "scores": scores})
+                    print(f"[joint] it={it+1} scores={['%.0f'%s for s in scores]}")
+        finally:
+            for c in collectors:
+                c.close()
+
+        joint_scores = [self._eval_report(joint, t)[0] for t in tasks]
+        thresholds = [float(getattr(t, "threshold", 0.0)) for t in tasks]
+        result = {"games": [t.spec.name for t in tasks], "ceilings": ceilings,
+                  "joint": joint_scores, "thresholds": thresholds}
+        self.eval_matrix = [joint_scores]
+        self.logger.log({"phase": "joint_final", **result})
+        self.logger.save_json("eval_matrix.json", self.eval_matrix)
+        self.logger.save_json("joint_result.json", result)
+        torch.save(joint.state_dict(), self.logger.run_dir / "final_policy.pt")
+        print(f"[joint] ceilings={['%.0f'%c for c in ceilings]} "
+              f"joint={['%.0f'%s for s in joint_scores]}")
+
     def run(self) -> list[list[float]]:
+        if self.method == "joint":
+            self._train_joint()
+            return self.eval_matrix
         if self.method == "clear":
             from crl.ppo.clear import ClearTrainer, ReplayStore
             self._clear_trainer = ClearTrainer(self.ppo, self.device, self.logger,

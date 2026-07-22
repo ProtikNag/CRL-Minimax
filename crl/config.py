@@ -156,8 +156,20 @@ class PPOConfig:
     # "finetune" = naive sequential standard PPO on one shared net (the
     # catastrophic-forgetting baseline; no local phase, no constraint);
     # "clear" = CLEAR (Rolnick 2019 / CORA baseline): replay + behavioral-cloning
-    # + value-cloning on stored past-task data (recent replay-based SOTA baseline).
+    # + value-cloning on stored past-task data (recent replay-based SOTA baseline);
+    # "joint" = EXPERIMENT 1 (feasibility upper bound): first train a fresh
+    # single-task model per game (the ceiling), then train ONE shared-trunk model
+    # on ALL games with mixed batches (no continual constraint). If the joint
+    # model reaches each ceiling, a feasible theta EXISTS (rules out infeasibility
+    # / capacity); if not, capacity/feasibility is the binding constraint.
     method: str = "constrained"
+    joint_iters: int = 2000        # mixed-batch PPO iters for the joint model
+    joint_single_iters: int = 600  # per-task standard-PPO iters for each ceiling
+    # EXPERIMENT 2 (value-constraint sufficiency): add a current-task behavioral
+    # cloning term coef * KL(pi_local || pi_global) on fresh current-task states
+    # to the global actor loss. 0 = off (pure value constraint). Tests whether a
+    # scalar value constraint is too weak (needs behavior matching, not just V).
+    global_bc_coef: float = 0.0
     # --- CLEAR baseline hyperparameters (CORA Table 3, Atari values) ---
     clear_policy_clone_cost: float = 0.01  # weight on KL(behavior||current) on replay
     clear_value_clone_cost: float = 0.005  # weight on value-cloning MSE on replay
