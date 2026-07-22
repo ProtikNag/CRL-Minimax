@@ -209,6 +209,85 @@ class GlobalTrainer(PPOTrainer):
     environment each iteration (replay-free).
     """
 
+    def _actor_pg(self, policy: Policy, batch: RolloutBatch) -> torch.Tensor:
+        """Clipped-surrogate actor loss on one full stream (for grad diagnostics)."""
+        cfg = self.ppo
+        dist, _ = policy.dist_value(batch.obs, batch.task_id)
+        ratio = (dist.log_prob(batch.actions) - batch.logprobs).exp()
+        adv = batch.advantages
+        if cfg.normalize_advantage:
+            adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+        return torch.max(
+            -adv * ratio,
+            -adv * torch.clamp(ratio, 1 - cfg.clip_ratio, 1 + cfg.clip_ratio),
+        ).mean()
+
+    def _grad_decomposition(self, policy, past_batches, cur_batch, omega, coeff_k):
+        """Split the actor update into the past-task objective gradient g_old =
+        grad[sum_i omega_i * pg_i] and the current-task constraint gradient
+        g_new = grad[coeff_k * pg_k] (coeffs normalized as in the real update).
+        Returns (||g_new||, ||g_old||, ||g_new||/||g_old||, cos(g_old, g_new))."""
+        params = [p for p in policy.parameters() if p.requires_grad]
+        coeff_sum = float(sum(omega[: len(past_batches)]) + coeff_k)
+        scale = (1.0 / coeff_sum) if coeff_sum > 0 else 1.0
+
+        def flat(loss):
+            gs = torch.autograd.grad(loss, params, allow_unused=True, retain_graph=False)
+            return torch.cat([(g if g is not None else torch.zeros_like(p)).reshape(-1)
+                              for g, p in zip(gs, params)])
+
+        g_new = flat(coeff_k * scale * self._actor_pg(policy, cur_batch))
+        if past_batches:
+            loss_old = sum(w * scale * self._actor_pg(policy, b)
+                           for w, b in zip(omega, past_batches))
+            g_old = flat(loss_old)
+        else:
+            g_old = torch.zeros_like(g_new)
+        nn_new, nn_old = float(g_new.norm()), float(g_old.norm())
+        ratio = nn_new / nn_old if nn_old > 0 else float("inf")
+        denom = g_new.norm() * g_old.norm()
+        cos = float(torch.dot(g_new, g_old) / denom) if float(denom) > 0 else float("nan")
+        return nn_new, nn_old, ratio, cos
+
+    def _log_diagnostics(self, policy, task_k, past_tasks, ref_current, mu, shortfall,
+                         constraint, eps, coeff_k, v_k_g, past_batches, cur_batch,
+                         omega, current_task, step):
+        """Emit one rich 'global_diag' row (see PPOConfig.diagnostics)."""
+        cfg = self.ppo
+        # current-task greedy performance (trajectory point) + fresh stochastic V_k^G
+        _, cur_score, _, _ = evaluate_value_and_score(
+            policy, task_k, cfg.diag_score_episodes, cfg.n_envs, self.device,
+            seed=cfg.eval_seed, greedy=True)
+        # each past task individually: value V_i^G (stochastic) + greedy score
+        past = []
+        for t in past_tasks:
+            vi, _, _, _ = evaluate_value_and_score(
+                policy, t, cfg.constraint_episodes, cfg.n_envs, self.device, greedy=False)
+            _, si, _, _ = evaluate_value_and_score(
+                policy, t, cfg.diag_score_episodes, cfg.n_envs, self.device,
+                seed=cfg.eval_seed, greedy=True)
+            past.append({"name": t.spec.name, "task_id": t.spec.task_id,
+                         "V_i_global": vi, "greedy_score": si})
+        nn_new, nn_old, ratio, cos = self._grad_decomposition(
+            policy, past_batches, cur_batch, omega, coeff_k)
+        self.logger.log({
+            "phase": "global_diag", "task": current_task, "step": step,
+            "cur_name": task_k.spec.name,
+            "mu": mu, "coeff_k": coeff_k,
+            "V_k_local": ref_current, "V_k_global": v_k_g,
+            "V_gap": ref_current - v_k_g,           # V_L - V_G (oscillation)
+            "F_G": constraint, "eps": eps,
+            "constraint_active": bool(shortfall > 0.0),
+            "cur_greedy_score": cur_score,          # current-task perf trajectory
+            "grad_norm_new": nn_new, "grad_norm_old": nn_old,
+            "grad_ratio_new_over_old": ratio,       # <1 => old-task objective wins
+            "grad_cos_new_old": cos,                # alignment / conflict
+            "past": past,                           # per-old-task value + score
+        })
+        print(f"[diag k={current_task}] it={step:4d} Vgap={ref_current-v_k_g:+.3f} "
+              f"mu={mu:.2f} F_G={constraint:.4f} |g_new|/|g_old|={ratio:.3f} "
+              f"cos={cos:+.3f} cur={cur_score:.1f}")
+
     def train(
         self,
         global_policy: Policy,
@@ -261,6 +340,12 @@ class GlobalTrainer(PPOTrainer):
                     constraint = shortfall * shortfall  # squared hinge (eq 32)
                     mu = mu_ctrl.update(constraint, eps)
                 coeff_k = mu * 2.0 * shortfall  # differentiated shortfall (eq 30)
+
+                if cfg.diagnostics and it % max(1, cfg.diag_every) == 0:
+                    self._log_diagnostics(
+                        global_policy, task_k, past_tasks, ref_current, mu, shortfall,
+                        constraint, eps, coeff_k, v_k_g, past_batches, cur_batch,
+                        omega, current_task, it)
 
                 streams = past_batches + [cur_batch]
                 coeffs = list(omega[: len(past_tasks)]) + [coeff_k]

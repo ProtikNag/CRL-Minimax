@@ -206,6 +206,17 @@ class PPOConfig:
     eval_greedy_episodes: int = 100_000
     eval_seed: int = 100_000  # fixed base seed for evaluation rollouts
     eval_every: int = 0  # probe the global policy every N cumulative iters (0=off)
+    # --- Global-phase DIAGNOSTICS (heavy; off by default) --------------------
+    # When on, the global (consolidation) phase logs, every `diag_every` iters, a
+    # rich "global_diag" row: V_k^L / V_k^G and their gap (oscillation), mu, the
+    # constraint F_G vs eps (active/inactive), the current-task greedy score
+    # trajectory, EACH past task's value + greedy score (is one dominating?), and
+    # the actor-gradient decomposition ||g_new||/||g_old|| + cos(g_old, g_new)
+    # (which term drives the update). g_new = current-task constraint gradient
+    # (coeff_k * grad), g_old = past-task objective gradient (sum_i omega_i grad).
+    diagnostics: bool = False
+    diag_every: int = 25  # log a full diagnostics row every N global iters
+    diag_score_episodes: int = 6  # greedy episodes per task for the perf trajectory
 
 
 @dataclass
