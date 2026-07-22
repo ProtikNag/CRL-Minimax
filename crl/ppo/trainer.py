@@ -225,10 +225,15 @@ class GlobalTrainer(PPOTrainer):
         ).mean()
 
     def _grad_decomposition(self, policy, past_batches, cur_batch, omega, coeff_k):
-        """Split the actor update into the past-task objective gradient g_old =
-        grad[sum_i omega_i * pg_i] and the current-task constraint gradient
-        g_new = grad[coeff_k * pg_k] (coeffs normalized as in the real update).
-        Returns (||g_new||, ||g_old||, ||g_new||/||g_old||, cos(g_old, g_new))."""
+        """Decompose the actor update into the current-task constraint gradient
+        g_new = grad[coeff_k * pg_k] and EACH past-task gradient g_i =
+        grad[omega_i * pg_i] separately (coeffs normalized as in the real update).
+
+        The aggregate cos(g_new, sum_i g_i) can read ~0 while individual tasks
+        strongly align/conflict and cancel in the sum, so we return the PER-TASK
+        alignment cos(g_new, g_i) as well. Returns
+        (||g_new||, ||g_old||, ||g_new||/||g_old||, cos_aggregate, per_task) where
+        per_task[i] = {grad_norm_i, grad_cos_new_i} aligned to past_batches."""
         params = [p for p in policy.parameters() if p.requires_grad]
         coeff_sum = float(sum(omega[: len(past_batches)]) + coeff_k)
         scale = (1.0 / coeff_sum) if coeff_sum > 0 else 1.0
@@ -238,18 +243,21 @@ class GlobalTrainer(PPOTrainer):
             return torch.cat([(g if g is not None else torch.zeros_like(p)).reshape(-1)
                               for g, p in zip(gs, params)])
 
+        def cosine(a, b):
+            d = a.norm() * b.norm()
+            return float(torch.dot(a, b) / d) if float(d) > 0 else float("nan")
+
         g_new = flat(coeff_k * scale * self._actor_pg(policy, cur_batch))
-        if past_batches:
-            loss_old = sum(w * scale * self._actor_pg(policy, b)
-                           for w, b in zip(omega, past_batches))
-            g_old = flat(loss_old)
-        else:
-            g_old = torch.zeros_like(g_new)
+        per_task = []                       # aligned to past_batches order
+        g_old = torch.zeros_like(g_new)
+        for w, b in zip(omega, past_batches):
+            g_i = flat(w * scale * self._actor_pg(policy, b))
+            per_task.append({"grad_norm_i": float(g_i.norm()),
+                             "grad_cos_new_i": cosine(g_new, g_i)})
+            g_old = g_old + g_i
         nn_new, nn_old = float(g_new.norm()), float(g_old.norm())
         ratio = nn_new / nn_old if nn_old > 0 else float("inf")
-        denom = g_new.norm() * g_old.norm()
-        cos = float(torch.dot(g_new, g_old) / denom) if float(denom) > 0 else float("nan")
-        return nn_new, nn_old, ratio, cos
+        return nn_new, nn_old, ratio, cosine(g_new, g_old), per_task
 
     def _log_diagnostics(self, policy, task_k, past_tasks, ref_current, mu, shortfall,
                          constraint, eps, coeff_k, v_k_g, past_batches, cur_batch,
@@ -270,8 +278,10 @@ class GlobalTrainer(PPOTrainer):
                 seed=cfg.eval_seed, greedy=True)
             past.append({"name": t.spec.name, "task_id": t.spec.task_id,
                          "V_i_global": vi, "greedy_score": si})
-        nn_new, nn_old, ratio, cos = self._grad_decomposition(
+        nn_new, nn_old, ratio, cos, per_task = self._grad_decomposition(
             policy, past_batches, cur_batch, omega, coeff_k)
+        for pd, gd in zip(past, per_task):  # attach per-task grad alignment
+            pd.update(gd)
         self.logger.log({
             "phase": "global_diag", "task": current_task, "step": step,
             "cur_name": task_k.spec.name,

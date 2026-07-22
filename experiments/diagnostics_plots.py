@@ -192,6 +192,36 @@ def _per_old_task_value_figure(k, rows, out_dir: Path):
     print(f"  saved old_task_values_task{k}")
 
 
+def _gradient_conflict(tasks, run_name):
+    """PER-TASK cos(g_new, g_i) vs the aggregate — the decisive plot: does the
+    sum cos(g_new, sum g_i) hide individual tasks that align/conflict and cancel?
+    Goes in a SEPARATE folder: diagnostics/gradient_conflict/<run>/."""
+    out = Path("diagnostics/gradient_conflict") / run_name
+    for k, rows in tasks.items():
+        if not rows[0].get("past") or "grad_cos_new_i" not in rows[0]["past"][0]:
+            continue
+        x = _series(rows, "step")
+        names = [p["name"] for p in rows[0]["past"]]
+        fig, ax = plt.subplots(figsize=(8.5, 4.8))
+        for name in names:
+            ys = [next((p.get("grad_cos_new_i", np.nan) for p in r["past"]
+                        if p["name"] == name), np.nan) for r in rows]
+            ax.plot(x, ys, marker=".", label=f"cos(g_new, {_short(name)})")
+        agg = _series(rows, "grad_cos_new_old")
+        ax.plot(x, agg, color="k", lw=2.4, ls="--", label="cos(g_new, Σ g_i)  [aggregate]")
+        ax.axhline(0, color="#999", lw=0.8)
+        ax.set_ylim(-1.05, 1.05)
+        ax.set_title(f"task {k}: per-old-task gradient alignment — "
+                     "does the aggregate hide per-task conflict?", fontsize=10)
+        ax.set_xlabel("global iter"); ax.set_ylabel("cosine with current-task grad")
+        ax.legend(fontsize=8, loc="best")
+        for sub, ext in (("png", "png"), ("svg", "svg")):
+            d = out / sub; d.mkdir(parents=True, exist_ok=True)
+            fig.savefig(d / f"conflict_task{k}.{ext}", dpi=130, bbox_inches="tight")
+        plt.close(fig)
+        print(f"  saved gradient_conflict/conflict_task{k}")
+
+
 def _overview(tasks, out_dir: Path):
     """mu and grad-ratio across all phases on shared axes."""
     fig, ax = plt.subplots(1, 2, figsize=(13, 4.6))
@@ -231,6 +261,7 @@ def main():
             _per_old_task_value_figure(k, rows, out)
     _overview(tasks, out)
     retention_matrix(run, out)
+    _gradient_conflict(tasks, run.name)
     print(f"[diagnostics] figures -> {out}")
 
 
