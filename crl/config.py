@@ -196,8 +196,8 @@ class PPOConfig:
     constraint_every: int = 5
     # Reported evaluation (eval matrix, probes): greedy (argmax) actions, many
     # episodes, fixed seed -> low variance, reproducible, respectable scores.
-    eval_episodes: int = 50  # TOTAL episodes for the eval matrix / probes
-    eval_greedy: bool = True  # if False, all eval episodes are stochastic (sampled)
+    eval_episodes: int = 100  # TOTAL episodes for the eval matrix / probes
+    eval_greedy: bool = True  # PROJECT RULE: reported eval is ALWAYS greedy, never stochastic
     # Of the `eval_episodes` total, this many are GREEDY (argmax); the remaining
     # `eval_episodes - eval_greedy_episodes` are STOCHASTIC (sampled actions). The
     # reported score is the pooled mean over all episodes -- a blend of best-case

@@ -27,6 +27,50 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import yaml
+
+from crl.envs.atari import RANDOM_SCORES
+_THR = {"Pong": 18, "Breakout": 50, "Boxing": 90, "Qbert": 2000, "SpaceInvaders": 600}
+
+
+def retention_matrix(run_dir: Path, out_dir: Path):
+    """Normalized GREEDY retention matrix from the end-of-task eval rows."""
+    games = [t["game"] for t in yaml.safe_load((run_dir / "config.yaml").read_text())["env"]["tasks"]]
+    evals = [json.loads(l)["values"] for l in (run_dir / "logs.jsonl").read_text().splitlines()
+             if l.strip() and json.loads(l).get("phase") == "eval"]
+    if not evals:
+        return
+    nt, G = len(evals), len(games)
+    def nm(v, j):
+        r = RANDOM_SCORES[games[j]]; return (v - r) / (_THR[games[j]] - r)
+    M = np.full((nt, G), np.nan)
+    for i, row in enumerate(evals):
+        for j in range(min(len(row), G)):
+            M[i, j] = nm(row[j], j)
+    disp = M.copy()
+    for i in range(nt):
+        for j in range(G):
+            if j > i:
+                disp[i, j] = np.nan
+    fig, ax = plt.subplots(figsize=(1.5 + 1.2 * G, 1.4 + 0.9 * nt))
+    cmap = plt.cm.RdYlGn.copy(); cmap.set_bad("#dddddd")
+    im = ax.imshow(disp, cmap=cmap, vmin=-0.1, vmax=1.1, aspect="equal")
+    for i in range(nt):
+        for j in range(G):
+            if not np.isnan(disp[i, j]):
+                ax.text(j, i, f"{M[i,j]:.2f}\n({evals[i][j]:.0f})", ha="center", va="center",
+                        fontsize=8, fontweight="bold" if i == j else "normal")
+    ax.set_xticks(range(G)); ax.set_xticklabels(games, rotation=25, ha="right", fontsize=9)
+    ax.set_yticks(range(nt)); ax.set_yticklabels([f"after T{i+1}" for i in range(nt)], fontsize=9)
+    ax.set_xlabel("evaluated on game")
+    ax.set_title("Diagnostics run — normalized retention (GREEDY 100; raw in parens)\n"
+                 f"order: {'>'.join(games)} | DOWN a column = retention", fontsize=9)
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="normalized score")
+    for sub, ext in (("png", "png"), ("svg", "svg")):
+        d = out_dir / sub; d.mkdir(parents=True, exist_ok=True)
+        fig.savefig(d / f"retention_matrix_norm.{ext}", dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    print("  saved retention_matrix_norm (greedy)")
 
 
 def _rows(run_dir: Path):
@@ -186,6 +230,7 @@ def main():
         if rows[0]["past"]:
             _per_old_task_value_figure(k, rows, out)
     _overview(tasks, out)
+    retention_matrix(run, out)
     print(f"[diagnostics] figures -> {out}")
 
 

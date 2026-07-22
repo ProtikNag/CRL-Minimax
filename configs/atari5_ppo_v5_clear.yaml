@@ -64,7 +64,7 @@ ppo:
   stop_eval_episodes: 15
   constraint_episodes: 8
   constraint_every: 20
-  eval_episodes: 300
+  eval_episodes: 100
   eval_greedy: true
   eval_seed: 100000
   eval_every: 0
@@ -72,4 +72,4 @@ ppo:
   clear_value_clone_cost: 0.005
   clear_snapshot_batches: 2
   clear_replay_task_per_step: 1
-  eval_greedy_episodes: 200
+  eval_greedy_episodes: 100
