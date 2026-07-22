@@ -33,7 +33,7 @@ duals:
   kind: projected_ascent
   lr: 0.3
   init: 0.0
-  max_value: 20.0
+  max_value: 1000.0
   warm_start: false
 trainer:
   kind: ppo
