@@ -12,10 +12,12 @@ the ∇V estimator — the constraints, Lagrangians, and dual updates are identi
 See `docs/REINFORCE_to_PPO.md` for the equation-by-equation mapping.
 
 > **Note for Claude Code / new sessions.** Read this file and `HANDOFF.md`
-> before touching code. The math is fixed in
-> `docs/Objective_for_Continual_Reinforcement_Learning.pdf`; code comments cite
-> its equation numbers. Implementation choices in this README are current and
-> may evolve.
+> before touching code (`HANDOFF.md` has the current status, findings, and next
+> steps). The math is fixed in
+> `docs/Objective_for_Continual_Reinforcement_Learning (4).pdf`; code comments
+> cite its equation numbers. **Two binding rules:** reported evaluation is always
+> **greedy, 100 rollouts** (never stochastic); Atari envs use **`max_steps: 0`**
+> (no episode cap). Implementation choices here are current and may evolve.
 
 ---
 
@@ -220,15 +222,33 @@ their sum so an unbounded dual multiplier cannot starve the shared critic.
 Constraint values Vᵢ stay Monte-Carlo (paper-faithful); the critic is only for
 advantages.
 
-- Code: `crl/envs/atari.py`, `crl/policies/cnn_ac.py`, `crl/ppo/` (reusable
+- Code: `crl/envs/atari.py`, `crl/policies/cnn_ac.py` (Nature-CNN) &
+  `crl/policies/impala.py` (Impala-CNN, current), `crl/ppo/` (reusable
   `PPOTrainer` → `LocalTrainer` = standard PPO, `GlobalTrainer` = PPO + actor
   constraint), `crl/ppo_continual.py` (orchestrator).
-- Fairness / evaluation: equal per-**model** budget via a shared iteration cap +
-  per-game **early stopping** to a greedy-score threshold; reported scores use
-  **greedy actions, 50 episodes, fixed seed** (low variance, raw kept).
-  Metrics in `analysis/continual_metrics.py` (normalized + Forgetting / BWT /
-  Average Performance). Configs: `configs/atari5_ppo_v4*.yaml`. Launch:
-  `scripts/hpc_atari_*.sbatch`.
+- **Methods** (`ppo.method`): `constrained` (min-max), `finetune`, `clear`
+  (replay+cloning baseline), `joint` (feasibility upper bound). Diagnostic knobs:
+  `diagnostics`, `global_probe_head_only` (freeze-trunk probe), `global_bc_coef`
+  (behavioral cloning).
+- **Evaluation rule (binding): greedy (argmax) actions, 100 rollouts, never
+  stochastic** (`eval_episodes: 100`, `eval_greedy: true`). The constraint value
+  `V_G/V_L` stays on-policy stochastic (it's the constrained quantity, not
+  reported eval). Metrics in `analysis/continual_metrics.py` (Forgetting / BWT /
+  Average Performance, raw + normalized).
+- **No per-episode cap: `max_steps: 0`.** ALE-v5 has no internal limit, so a
+  `TimeLimit` + `done=term|trunc` bootstraps 0 value at the cap and poisons GAE on
+  long episodes (broke Breakout). Keep envs uncapped.
+- **Precomputed experts:** single-task Impala experts are trained once
+  (`experiments/train_expert.py`, `experts/<Game>/`) and reused as fixed local
+  references. See `HANDOFF.md`.
+- **Diagnostics** of why the method under-consolidates live in `diagnostics/`
+  (see `diagnostics/README.md`): head-only probe, per-task gradient conflict,
+  feasibility (joint), and value-constraint sufficiency (KL gap + BC). Headline:
+  the scalar value constraint is too weak (behavior-matching fixes it) and the
+  shared trunk interferes.
+- Configs: `configs/atari5_ppo_v5*.yaml` (headline). Launch:
+  `scripts/hpc_atari_worker.sbatch` (continual) / `scripts/hpc_expert.sbatch`
+  (experts). **Current status + next steps: `HANDOFF.md`.**
 
 ## 7. Metrics
 
