@@ -45,13 +45,14 @@ ATARI_GAMES = (
     "Assault",
     "Krull",
     "Seaquest",
+    "BeamRider",
 )
 
 # Approx random-agent raw score per game (for normalization in analysis).
 RANDOM_SCORES = {
     "Pong": -20.7, "Breakout": 1.7, "Boxing": 0.1, "Freeway": 0.0,
     "SpaceInvaders": 148.0, "Qbert": 163.9, "Assault": 222.4,
-    "Krull": 1598.0, "Seaquest": 68.4,
+    "Krull": 1598.0, "Seaquest": 68.4, "BeamRider": 363.9,
 }
 
 # Full ALE action set shared by every game (so one actor head fits all).

@@ -14,3 +14,4 @@ results_*/
 # SLURM job logs
 slurm-*.out
 slurm-*.err
+experts/

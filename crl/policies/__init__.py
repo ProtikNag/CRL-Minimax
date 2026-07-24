@@ -10,6 +10,10 @@ from crl.policies.cnn_ac import (
     AtariActorCriticPolicy,
     AtariMultiHeadActorCriticPolicy,
 )
+from crl.policies.impala import (
+    ImpalaActorCriticPolicy,
+    ImpalaMultiHeadActorCriticPolicy,
+)
 from crl.policies.mlp import MLPPolicy, MultiHeadMLPPolicy
 from crl.policies.tabular import TabularPolicy
 
@@ -49,6 +53,21 @@ def make_policy(cfg: PolicyConfig, family: TaskFamily) -> Policy:
             num_tasks=len(family),
             task_conditioned=cfg.task_conditioned,
         )
+    if cfg.kind in ("impala_ac", "impala_ac_multihead"):
+        obs_shape = getattr(family, "obs_shape", None)
+        if obs_shape is None:
+            raise ValueError(f"policy '{cfg.kind}' needs a family with obs_shape "
+                             "(e.g. atari), not a flat-vector family.")
+        hidden = list(cfg.hidden_sizes)[0] if cfg.hidden_sizes else 512
+        cls = (ImpalaMultiHeadActorCriticPolicy if cfg.kind == "impala_ac_multihead"
+               else ImpalaActorCriticPolicy)
+        return cls(
+            obs_shape=obs_shape,
+            num_actions=family.num_actions,
+            hidden_size=hidden,
+            num_tasks=len(family),
+            task_conditioned=cfg.task_conditioned,
+        )
     if cfg.kind in ("cnn", "cnn_multihead"):
         obs_shape = getattr(family, "obs_shape", None)
         if obs_shape is None:
@@ -65,7 +84,7 @@ def make_policy(cfg: PolicyConfig, family: TaskFamily) -> Policy:
         )
     raise KeyError(
         f"Unknown policy kind '{cfg.kind}'; available: tabular, mlp, multihead, "
-        "cnn, cnn_multihead, cnn_ac, cnn_ac_multihead"
+        "cnn, cnn_multihead, cnn_ac, cnn_ac_multihead, impala_ac, impala_ac_multihead"
     )
 
 
