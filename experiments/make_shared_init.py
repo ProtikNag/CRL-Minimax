@@ -17,7 +17,7 @@ from crl.envs import make_family
 from crl.policies import make_policy
 
 SEED = 12345
-ENV_PARAMS = dict(gamma=0.99, max_steps=4000, frame_skip=4, frame_stack=4,
+ENV_PARAMS = dict(gamma=0.99, max_steps=0, frame_skip=4, frame_stack=4,
                   noop_max=30, terminal_on_life_loss=False,
                   repeat_action_probability=0.0, clip_rewards=True)
 

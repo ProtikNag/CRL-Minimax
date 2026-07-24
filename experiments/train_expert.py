@@ -45,7 +45,7 @@ from crl.ppo.trainer import PPOTrainer
 HYPERS = dict(n_envs=16, n_steps=128, ppo_epochs=4, num_minibatches=4,
               clip_ratio=0.1, gae_lambda=0.95, vf_coef=0.5, ent_coef=0.01,
               max_grad_norm=0.5, lr=2.5e-4, normalize_advantage=True)
-ENV_PARAMS = dict(gamma=0.99, max_steps=4000, frame_skip=4, frame_stack=4,
+ENV_PARAMS = dict(gamma=0.99, max_steps=0, frame_skip=4, frame_stack=4,
                   noop_max=30, terminal_on_life_loss=False,
                   repeat_action_probability=0.0, clip_rewards=True)
 

@@ -48,6 +48,10 @@ def evaluate_value_and_score(
     clip = bool(getattr(task, "clip_rewards", False))
     gamma = task.gamma
     tid = task.spec.task_id
+    # With no per-episode TimeLimit, strong agents can have long episodes; give the
+    # eval enough total steps to actually finish `num_episodes` (scales with the
+    # request, ~30k agent-steps/episode budget), keeping the fixed floor.
+    max_env_steps = max(max_env_steps, num_episodes * 30_000 // max(1, n_envs))
     venv = task.make_vector_env(n_envs, clip_rewards=False)  # raw rewards
     try:
         obs, _ = venv.reset(seed=seed)
