@@ -1,0 +1,32 @@
+{
+  "game": "Breakout",
+  "seed": 0,
+  "arch": "impala_ac large (32,64,64)->512",
+  "hypers": {
+    "n_envs": 16,
+    "n_steps": 128,
+    "ppo_epochs": 4,
+    "num_minibatches": 4,
+    "clip_ratio": 0.1,
+    "gae_lambda": 0.95,
+    "vf_coef": 0.5,
+    "ent_coef": 0.01,
+    "max_grad_norm": 0.5,
+    "lr": 0.00025,
+    "normalize_advantage": true
+  },
+  "env_params": {
+    "gamma": 0.99,
+    "max_steps": 0,
+    "frame_skip": 4,
+    "frame_stack": 4,
+    "noop_max": 30,
+    "terminal_on_life_loss": false,
+    "repeat_action_probability": 0.0,
+    "clip_rewards": true
+  },
+  "eval_episodes": 100,
+  "init": "experts/_shared_init.pt",
+  "init_hash": "-6933062196189360187",
+  "n_params": 4364211
+}
