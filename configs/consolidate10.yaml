@@ -50,7 +50,7 @@ duals:
 trainer:
   kind: ppo
   cycles_per_task: 1
-  eps: 0.04
+  eps: 0.0025
   eval_all_tasks: false
 ppo:
   method: consolidate
@@ -74,8 +74,9 @@ ppo:
   max_grad_norm: 0.5
   lr: 0.00025
   normalize_advantage: true
-  global_iters: 1500
+  global_iters: 3000
   min_iters: 200
   eval_every: 0
   global_bc_coef: 0.0
   eval_noop_enumerate: true
+  constraint_relative: true

@@ -170,6 +170,12 @@ class PPOConfig:
     method: str = "constrained"
     expert_dir: str = "experts"    # dir with <Game>/best_model.pt single-task experts
     ref_fraction: float = 1.0      # constrain V_k^G >= ref_fraction * V_expert (beta lever)
+    # RELATIVE constraint: normalize the shortfall by the reference value so the
+    # constraint is V_G/V_L >= 1-delta (a per-game ratio) instead of the absolute
+    # V_G >= V_L. Makes the tolerance eps mean the same fraction on every game
+    # regardless of its (clipped, discounted) value scale. eps is then in squared
+    # RELATIVE units (delta^2): eps=0.0025 <=> a 5% shortfall tolerance.
+    constraint_relative: bool = False
     constraint_greedy: bool = False  # estimate the constraint value V with greedy rollouts
     # Evaluate greedy value/score by ENUMERATING every no-op start (1..noop_max),
     # exactly one deterministic rollout each -> exact expected greedy return in

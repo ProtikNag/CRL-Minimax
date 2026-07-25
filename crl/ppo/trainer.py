@@ -374,7 +374,11 @@ class GlobalTrainer(PPOTrainer):
                         greedy=cfg.constraint_greedy,
                         noop_enumerate=cfg.eval_noop_enumerate,
                     )
-                    shortfall = max(0.0, ref_current - v_k_g)  # V_k^L - V_k^G
+                    gap = max(0.0, ref_current - v_k_g)  # V_k^L - V_k^G
+                    # Relative constraint: normalize by the reference so the
+                    # shortfall (and eps) mean the same fraction on every game.
+                    shortfall = (gap / max(abs(ref_current), 1e-3)
+                                 if cfg.constraint_relative else gap)
                     constraint = shortfall * shortfall  # squared hinge (eq 32)
                     mu = mu_ctrl.update(constraint, eps)
                 coeff_k = mu * 2.0 * shortfall  # differentiated shortfall (eq 30)
