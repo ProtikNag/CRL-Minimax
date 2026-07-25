@@ -372,6 +372,7 @@ class GlobalTrainer(PPOTrainer):
                         global_policy, task_k, cfg.constraint_episodes,
                         cfg.n_envs, self.device, seed=cfg.eval_seed,
                         greedy=cfg.constraint_greedy,
+                        noop_enumerate=cfg.eval_noop_enumerate,
                     )
                     shortfall = max(0.0, ref_current - v_k_g)  # V_k^L - V_k^G
                     constraint = shortfall * shortfall  # squared hinge (eq 32)

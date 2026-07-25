@@ -27,6 +27,83 @@ from crl.policies.base import Policy
 
 
 @torch.no_grad()
+def evaluate_greedy_noop_enumerated(
+    policy: Policy,
+    task: Task,
+    n_envs: int,
+    device: torch.device,
+    seed: int | None = None,
+) -> tuple[float, float, float, int]:
+    """EXACT greedy value/score by ENUMERATING every no-op start.
+
+    Greedy actions on ``repeat_action_probability=0`` Atari are deterministic
+    given the initial no-op count, so the expected greedy return over the
+    standard random-start distribution (1..noop_max no-ops) is *exactly* the mean
+    of one rollout per no-op count -- no sampling, no variance. Runs those
+    ``noop_max`` rollouts in parallel across ``n_envs`` envs (built with
+    ``noop_override=0`` so we apply the no-op prefix ourselves), accumulating the
+    discounted value only AFTER the no-ops so the semantics match training
+    (episode starts post-no-op). Returns ``(mean_value, mean_score, score_std, n)``.
+    """
+    import numpy as np
+    noop_max = int(getattr(task, "_noop_max", 0))
+    if noop_max <= 0:
+        return evaluate_value_and_score(policy, task, 100, n_envs, device,
+                                        seed=seed, greedy=True)
+    clip = bool(getattr(task, "clip_rewards", False))
+    gamma = task.gamma
+    tid = task.spec.task_id
+    counts = list(range(1, noop_max + 1))          # the noop_max distinct starts
+    venv = task.make_vector_env(n_envs, clip_rewards=False, noop_override=0)
+    try:
+        obs, _ = venv.reset(seed=seed)
+        obs = torch.as_tensor(obs, device=device)
+        queue = list(counts)
+        assigned = [-1] * n_envs           # noop count this env is currently evaluating
+        noops_left = [0] * n_envs
+        disc = np.zeros(n_envs); gpow = np.ones(n_envs); raw = np.zeros(n_envs)
+        for j in range(n_envs):
+            if queue:
+                assigned[j] = queue.pop(0); noops_left[j] = assigned[j]
+        res_disc: dict[int, float] = {}; res_raw: dict[int, float] = {}
+        steps = 0
+        cap = noop_max * 200_000 // max(1, n_envs) + 10_000
+        while any(a != -1 for a in assigned) and steps < cap:
+            steps += 1
+            g_act = policy.dist(obs, tid).logits.argmax(dim=-1).to("cpu").numpy()
+            actions = np.zeros(n_envs, dtype=np.int64)
+            for j in range(n_envs):
+                if assigned[j] != -1 and noops_left[j] == 0:
+                    actions[j] = g_act[j]        # else NOOP (0): inactive or no-op prefix
+            obs_np, reward, term, trunc, _ = venv.step(actions)
+            done = term | trunc
+            for j in range(n_envs):
+                if assigned[j] == -1:
+                    continue
+                if noops_left[j] > 0:            # still applying the no-op prefix
+                    noops_left[j] -= 1
+                    continue
+                r = float(reward[j])
+                disc[j] += gpow[j] * (float(np.sign(r)) if clip else r)
+                gpow[j] *= gamma; raw[j] += r
+                if bool(done[j]):
+                    res_disc[assigned[j]] = disc[j]; res_raw[assigned[j]] = raw[j]
+                    disc[j] = 0.0; gpow[j] = 1.0; raw[j] = 0.0
+                    if queue:                   # SAME_STEP autoreset already gave fresh obs
+                        assigned[j] = queue.pop(0); noops_left[j] = assigned[j]
+                    else:
+                        assigned[j] = -1
+            obs = torch.as_tensor(obs_np, device=device)
+    finally:
+        venv.close()
+    if not res_raw:
+        return 0.0, 0.0, 0.0, 0
+    vals = np.array([res_disc[c] for c in sorted(res_disc)])
+    scs = np.array([res_raw[c] for c in sorted(res_raw)])
+    return float(vals.mean()), float(scs.mean()), float(scs.std()), len(scs)
+
+
+@torch.no_grad()
 def evaluate_value_and_score(
     policy: Policy,
     task: Task,
@@ -36,7 +113,10 @@ def evaluate_value_and_score(
     seed: int | None = None,
     greedy: bool = False,
     max_env_steps: int = 200_000,
+    noop_enumerate: bool = False,
 ) -> tuple[float, float, float, int]:
+    if noop_enumerate:
+        return evaluate_greedy_noop_enumerated(policy, task, n_envs, device, seed=seed)
     """Return ``(mean_value, mean_score, score_std, n_episodes_used)``.
 
     ``mean_value`` = discounted return on the training reward scale (stochastic

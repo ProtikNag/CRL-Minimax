@@ -78,3 +78,4 @@ ppo:
   min_iters: 200
   eval_every: 0
   global_bc_coef: 0.0
+  eval_noop_enumerate: true

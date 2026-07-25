@@ -83,6 +83,11 @@ class PPOAlternationTrainer:
         and the rest sample; the reported score is the pooled mean over ALL
         episodes (a blend of best-case and on-policy behaviour, not best-of).
         Returns ``(pooled_mean_score, pooled_std)``."""
+        if self.ppo.eval_noop_enumerate:  # exact greedy via no-op enumeration
+            _, score, std, _ = evaluate_value_and_score(
+                policy, task, 0, self.ppo.n_envs, self.device,
+                seed=self.ppo.eval_seed, noop_enumerate=True)
+            return score, std
         total = self.ppo.eval_episodes
         n_greedy = min(self.ppo.eval_greedy_episodes, total) if self.ppo.eval_greedy else 0
         n_stoch = total - n_greedy
@@ -291,7 +296,8 @@ class PPOAlternationTrainer:
         (greedy iff `constraint_greedy`), fixed seed. The constraint reference."""
         v, _, _, _ = evaluate_value_and_score(
             policy, task, self.ppo.constraint_episodes, self.ppo.n_envs,
-            self.device, seed=self.ppo.eval_seed, greedy=self.ppo.constraint_greedy)
+            self.device, seed=self.ppo.eval_seed, greedy=self.ppo.constraint_greedy,
+            noop_enumerate=self.ppo.eval_noop_enumerate)
         return v
 
     def _load_expert(self, game: str):

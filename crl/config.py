@@ -171,6 +171,11 @@ class PPOConfig:
     expert_dir: str = "experts"    # dir with <Game>/best_model.pt single-task experts
     ref_fraction: float = 1.0      # constrain V_k^G >= ref_fraction * V_expert (beta lever)
     constraint_greedy: bool = False  # estimate the constraint value V with greedy rollouts
+    # Evaluate greedy value/score by ENUMERATING every no-op start (1..noop_max),
+    # exactly one deterministic rollout each -> exact expected greedy return in
+    # noop_max rollouts (no sampling). Overrides eval_episodes/constraint_episodes
+    # for greedy eval. Correct only for deterministic envs (repeat_action_prob=0).
+    eval_noop_enumerate: bool = False
     joint_iters: int = 2000        # mixed-batch PPO iters for the joint model
     joint_single_iters: int = 600  # per-task standard-PPO iters for each ceiling
     # EXPERIMENT 2 (value-constraint sufficiency): add a current-task behavioral
