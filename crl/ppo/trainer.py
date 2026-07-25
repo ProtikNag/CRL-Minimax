@@ -373,6 +373,7 @@ class GlobalTrainer(PPOTrainer):
                         cfg.n_envs, self.device, seed=cfg.eval_seed,
                         greedy=cfg.constraint_greedy,
                         noop_enumerate=cfg.eval_noop_enumerate,
+                        max_ep_steps=cfg.eval_max_ep_steps,
                     )
                     gap = max(0.0, ref_current - v_k_g)  # V_k^L - V_k^G
                     # Relative constraint: normalize by the reference so the

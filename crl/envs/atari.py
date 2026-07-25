@@ -151,10 +151,11 @@ class AtariTask(Task):
         # evaluator can reproduce the same value scale from an unclipped rollout.
         self.clip_rewards = clip_rewards
 
-    def _make_one(self, clip_rewards: bool, noop_max: int | None = None) -> gym.Env:
+    def _make_one(self, clip_rewards: bool, noop_max: int | None = None,
+                  max_steps: int | None = None) -> gym.Env:
         return _build_env(
             self._game,
-            self._max_steps,
+            self._max_steps if max_steps is None else max_steps,
             self._frame_skip,
             self._frame_stack,
             self._screen_size,
@@ -170,7 +171,8 @@ class AtariTask(Task):
         return self._make_one(clip)
 
     def make_vector_env(self, num_envs: int, clip_rewards: bool | None = None,
-                        noop_override: int | None = None):
+                        noop_override: int | None = None,
+                        max_steps_override: int | None = None):
         """A synchronous vectorized bank of ``num_envs`` identical envs.
 
         Uses ``SAME_STEP`` autoreset so the classic PPO/GAE streaming formulation
@@ -182,7 +184,8 @@ class AtariTask(Task):
 
         clip = self.clip_rewards if clip_rewards is None else clip_rewards
         return SyncVectorEnv(
-            [lambda: self._make_one(clip, noop_override) for _ in range(int(num_envs))],
+            [lambda: self._make_one(clip, noop_override, max_steps_override)
+             for _ in range(int(num_envs))],
             autoreset_mode=AutoresetMode.SAME_STEP,
         )
 

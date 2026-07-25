@@ -86,7 +86,8 @@ class PPOAlternationTrainer:
         if self.ppo.eval_noop_enumerate:  # exact greedy via no-op enumeration
             _, score, std, _ = evaluate_value_and_score(
                 policy, task, 0, self.ppo.n_envs, self.device,
-                seed=self.ppo.eval_seed, noop_enumerate=True)
+                seed=self.ppo.eval_seed, noop_enumerate=True,
+                max_ep_steps=self.ppo.eval_max_ep_steps)
             return score, std
         total = self.ppo.eval_episodes
         n_greedy = min(self.ppo.eval_greedy_episodes, total) if self.ppo.eval_greedy else 0
@@ -297,7 +298,8 @@ class PPOAlternationTrainer:
         v, _, _, _ = evaluate_value_and_score(
             policy, task, self.ppo.constraint_episodes, self.ppo.n_envs,
             self.device, seed=self.ppo.eval_seed, greedy=self.ppo.constraint_greedy,
-            noop_enumerate=self.ppo.eval_noop_enumerate)
+            noop_enumerate=self.ppo.eval_noop_enumerate,
+            max_ep_steps=self.ppo.eval_max_ep_steps)
         return v
 
     def _load_expert(self, game: str):

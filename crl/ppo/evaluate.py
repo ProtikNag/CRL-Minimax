@@ -33,6 +33,7 @@ def evaluate_greedy_noop_enumerated(
     n_envs: int,
     device: torch.device,
     seed: int | None = None,
+    max_ep_steps: int = 0,
 ) -> tuple[float, float, float, int]:
     """EXACT greedy value/score by ENUMERATING every no-op start.
 
@@ -54,7 +55,10 @@ def evaluate_greedy_noop_enumerated(
     gamma = task.gamma
     tid = task.spec.task_id
     counts = list(range(1, noop_max + 1))          # the noop_max distinct starts
-    venv = task.make_vector_env(n_envs, clip_rewards=False, noop_override=0)
+    # Per-episode TimeLimit on the EVAL env only (safe: no GAE here). Discounted V
+    # is unchanged (gamma kills late steps); bounds cost on long-episode experts.
+    venv = task.make_vector_env(n_envs, clip_rewards=False, noop_override=0,
+                                max_steps_override=(max_ep_steps or None))
     try:
         obs, _ = venv.reset(seed=seed)
         obs = torch.as_tensor(obs, device=device)
@@ -114,9 +118,11 @@ def evaluate_value_and_score(
     greedy: bool = False,
     max_env_steps: int = 200_000,
     noop_enumerate: bool = False,
+    max_ep_steps: int = 0,
 ) -> tuple[float, float, float, int]:
     if noop_enumerate:
-        return evaluate_greedy_noop_enumerated(policy, task, n_envs, device, seed=seed)
+        return evaluate_greedy_noop_enumerated(policy, task, n_envs, device,
+                                               seed=seed, max_ep_steps=max_ep_steps)
     """Return ``(mean_value, mean_score, score_std, n_episodes_used)``.
 
     ``mean_value`` = discounted return on the training reward scale (stochastic

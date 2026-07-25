@@ -182,6 +182,11 @@ class PPOConfig:
     # noop_max rollouts (no sampling). Overrides eval_episodes/constraint_episodes
     # for greedy eval. Correct only for deterministic envs (repeat_action_prob=0).
     eval_noop_enumerate: bool = False
+    # Per-episode step cap for EVAL rollouts only (agent-steps; 0 = uncapped).
+    # Safe (eval has no GAE); with gamma<1 the discounted value is unchanged, and
+    # it bounds the cost of enumerating long-episode experts. Raw score becomes
+    # "score over the first N steps" (applied equally to global + expert).
+    eval_max_ep_steps: int = 0
     joint_iters: int = 2000        # mixed-batch PPO iters for the joint model
     joint_single_iters: int = 600  # per-task standard-PPO iters for each ceiling
     # EXPERIMENT 2 (value-constraint sufficiency): add a current-task behavioral

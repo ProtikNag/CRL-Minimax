@@ -58,7 +58,7 @@ ppo:
   ref_fraction: 1.0
   constraint_greedy: true
   constraint_episodes: 100
-  constraint_every: 50
+  constraint_every: 200
   eval_episodes: 500
   eval_greedy: true
   eval_greedy_episodes: 500
@@ -80,3 +80,4 @@ ppo:
   global_bc_coef: 0.0
   eval_noop_enumerate: true
   constraint_relative: true
+  eval_max_ep_steps: 10000
