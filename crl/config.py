@@ -176,6 +176,12 @@ class PPOConfig:
     # regardless of its (clipped, discounted) value scale. eps is then in squared
     # RELATIVE units (delta^2): eps=0.0025 <=> a 5% shortfall tolerance.
     constraint_relative: bool = False
+    # Past-task gradient collection in the global phase. "all" = roll out every
+    # past task each iteration (exact sum, O(k) cost). "sample" = roll out ONE
+    # uniformly-random past task per iteration, rescaled by the past-task count --
+    # an unbiased minibatch estimate of the same sum at O(1) cost (removes the
+    # O(k) blow-up on late tasks). Noise averages out over the iterations.
+    past_task_sampling: str = "all"
     constraint_greedy: bool = False  # estimate the constraint value V with greedy rollouts
     # Evaluate greedy value/score by ENUMERATING every no-op start (1..noop_max),
     # exactly one deterministic rollout each -> exact expected greedy return in

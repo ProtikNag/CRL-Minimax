@@ -361,9 +361,16 @@ class GlobalTrainer(PPOTrainer):
         met = 0
         try:
             for it in range(num_iters):
-                past_batches = [
-                    c.collect(global_policy, cfg.gae_lambda) for c in past_collectors
-                ]
+                if cfg.past_task_sampling == "sample" and past_collectors:
+                    # Minibatch over past tasks: one random past task per iter,
+                    # rescaled by the count -> unbiased estimate of the full sum.
+                    j = int(torch.randint(len(past_collectors), (1,)))
+                    past_batches = [past_collectors[j].collect(global_policy, cfg.gae_lambda)]
+                    past_coeffs = [omega[j] * len(past_collectors)]
+                else:
+                    past_batches = [c.collect(global_policy, cfg.gae_lambda)
+                                    for c in past_collectors]
+                    past_coeffs = list(omega[: len(past_tasks)])
                 cur_batch = cur_collector.collect(global_policy, cfg.gae_lambda)
 
                 # Slower dual timescale: refresh V_k^G / mu every constraint_every.
@@ -391,7 +398,7 @@ class GlobalTrainer(PPOTrainer):
                         omega, current_task, it, local_policy)
 
                 streams = past_batches + [cur_batch]
-                coeffs = list(omega[: len(past_tasks)]) + [coeff_k]
+                coeffs = past_coeffs + [coeff_k]
                 bc = ((local_policy, self.ppo.global_bc_coef)
                       if local_policy is not None and self.ppo.global_bc_coef > 0 else None)
                 stats = self.optimize_batches(global_policy, optimizer, streams, coeffs, bc=bc)

@@ -80,4 +80,5 @@ ppo:
   global_bc_coef: 0.0
   eval_noop_enumerate: true
   constraint_relative: true
-  eval_max_ep_steps: 10000
+  eval_max_ep_steps: 3000
+  past_task_sampling: sample
