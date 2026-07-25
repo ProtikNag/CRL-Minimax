@@ -370,7 +370,8 @@ class GlobalTrainer(PPOTrainer):
                 if it % max(1, cfg.constraint_every) == 0:
                     v_k_g, _, _, _ = evaluate_value_and_score(
                         global_policy, task_k, cfg.constraint_episodes,
-                        cfg.n_envs, self.device,
+                        cfg.n_envs, self.device, seed=cfg.eval_seed,
+                        greedy=cfg.constraint_greedy,
                     )
                     shortfall = max(0.0, ref_current - v_k_g)  # V_k^L - V_k^G
                     constraint = shortfall * shortfall  # squared hinge (eq 32)

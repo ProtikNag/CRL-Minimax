@@ -282,7 +282,112 @@ class PPOAlternationTrainer:
         print(f"[joint] ceilings={['%.0f'%c for c in ceilings]} "
               f"joint={['%.0f'%s for s in joint_scores]}")
 
+    # ------------------------------------------------------------------ #
+    # consolidation with precomputed experts as fixed references
+    # ------------------------------------------------------------------ #
+
+    def _eval_value_greedy(self, policy, task) -> float:
+        """Discounted value V estimated with `constraint_episodes` rollouts
+        (greedy iff `constraint_greedy`), fixed seed. The constraint reference."""
+        v, _, _, _ = evaluate_value_and_score(
+            policy, task, self.ppo.constraint_episodes, self.ppo.n_envs,
+            self.device, seed=self.ppo.eval_seed, greedy=self.ppo.constraint_greedy)
+        return v
+
+    def _load_expert(self, game: str):
+        """Load a frozen single-task Impala expert (`<expert_dir>/<game>/best_model.pt`)
+        and a matching single-game task to roll it out in."""
+        from crl.config import EnvConfig, PolicyConfig
+        from crl.envs import make_family
+        from crl.policies import make_policy
+        env = EnvConfig(family="atari", params=dict(self._config.env.params),
+                        tasks=[{"game": game, "threshold": 0.0}])
+        fam = make_family(env)
+        pol = make_policy(PolicyConfig(kind="impala_ac", hidden_sizes=[512],
+                                       task_conditioned=False), fam).to(self.device)
+        sd = torch.load(f"{self.ppo.expert_dir}/{game}/best_model.pt",
+                        map_location=self.device)
+        pol.load_state_dict(sd)
+        for p in pol.parameters():
+            p.requires_grad_(False)
+        pol.eval()
+        return pol, fam.tasks[0]
+
+    def _init_global_from_expert(self, expert) -> None:
+        """Global (multi-head, task_conditioned=False) inits from the task-1
+        expert: identical trunk + expert's head into head 0."""
+        g = self.global_policy
+        g.trunk.load_state_dict(expert.trunk.state_dict())
+        g.actors[0].load_state_dict(expert.actor.state_dict())
+        g.critics[0].load_state_dict(expert.critic.state_dict())
+
+    def _save_ckpt(self, k: int) -> None:
+        torch.save(self.global_policy.state_dict(),
+                   self.logger.run_dir / f"global_after_task{k}.pt")
+
+    def _log_retention(self, k: int, games: list[str]) -> None:
+        """After consolidating task k: global raw score on every SEEN game
+        (greedy), logged with the fixed expert scores + ratio. Read on demand."""
+        gscores = [self._eval_report(self.global_policy, self.family.tasks[i])[0]
+                   for i in range(k)]
+        self.eval_matrix.append(gscores)
+        self.logger.log({"phase": "retention", "task": k, "games": games[:k],
+                         "global_scores": gscores,
+                         "expert_scores": self._expert_scores[:k],
+                         "ratio": [gscores[i] / self._expert_scores[i]
+                                   if self._expert_scores[i] else float("nan")
+                                   for i in range(k)]})
+        self.logger.save_json("eval_matrix.json", self.eval_matrix)
+        print(f"[consolidate] after T{k}: global={[round(s,1) for s in gscores]} "
+              f"expert={[round(s,1) for s in self._expert_scores[:k]]}")
+
+    def _consolidate(self) -> None:
+        games = [t.spec.name.replace("atari-", "") for t in self.family.tasks]
+        K = len(self.family)
+
+        # 1) load experts; fixed reference value V_L (greedy) + raw score per game
+        self._experts, self._expert_values, self._expert_scores = [], [], []
+        for g in games:
+            epol, etask = self._load_expert(g)
+            v = self._eval_value_greedy(epol, etask)
+            s, _ = self._eval_report(epol, etask)
+            self._experts.append(epol)
+            self._expert_values.append(v)
+            self._expert_scores.append(s)
+            self.logger.log({"phase": "expert_ref", "game": g, "V_L": v, "score": s})
+            print(f"[expert ref] {g}: V_L={v:.3f} score={s:.1f}")
+        self.logger.save_json("expert_refs.json",
+                              {"games": games, "expert_values": self._expert_values,
+                               "expert_scores": self._expert_scores})
+
+        # 2) global inits from task-1 expert; retention after T1
+        self._init_global_from_expert(self._experts[0])
+        self._log_retention(1, games)
+        self._save_ckpt(1)
+
+        # 3) consolidate tasks 2..K (min-max; expert_k is the fixed local ref)
+        for k in range(2, K + 1):
+            task_k = self.family.tasks[k - 1]
+            past_tasks = [self.family.tasks[i] for i in range(k - 1)]
+            ref_current = self.ppo.ref_fraction * self._expert_values[k - 1]
+            self.mu_ctrl.reset()
+            omega = [1.0 / k] * (k - 1)
+            self.global_trainer.train(
+                self.global_policy, task_k, past_tasks, ref_current=ref_current,
+                mu_ctrl=self.mu_ctrl, omega=omega, eps=self._eps(),
+                num_iters=self.ppo.global_iters, seed=self.seed + 1000 * k,
+                current_task=k, probe=self._probe, local_policy=self._experts[k - 1])
+            self.logger.log({"phase": "gaps", "task": k, "V_k_ref_local": ref_current})
+            self._log_retention(k, games)
+            self._save_ckpt(k)
+
+        torch.save(self.global_policy.state_dict(),
+                   self.logger.run_dir / "final_policy.pt")
+
     def run(self) -> list[list[float]]:
+        if self.method == "consolidate":
+            self._consolidate()
+            return self.eval_matrix
         if self.method == "joint":
             self._train_joint()
             return self.eval_matrix

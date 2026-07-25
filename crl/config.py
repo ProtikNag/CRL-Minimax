@@ -162,7 +162,15 @@ class PPOConfig:
     # on ALL games with mixed batches (no continual constraint). If the joint
     # model reaches each ceiling, a feasible theta EXISTS (rules out infeasibility
     # / capacity); if not, capacity/feasibility is the binding constraint.
+    # "consolidate" = min-max consolidation of ALL games into one global using the
+    # PRECOMPUTED experts as fixed local references (no local phase): the global
+    # inits from the task-1 expert; for task k the constraint reference V_k^L is
+    # expert_k's value; a checkpoint + retention row is saved after each task so
+    # the retention matrix is available on demand mid-run.
     method: str = "constrained"
+    expert_dir: str = "experts"    # dir with <Game>/best_model.pt single-task experts
+    ref_fraction: float = 1.0      # constrain V_k^G >= ref_fraction * V_expert (beta lever)
+    constraint_greedy: bool = False  # estimate the constraint value V with greedy rollouts
     joint_iters: int = 2000        # mixed-batch PPO iters for the joint model
     joint_single_iters: int = 600  # per-task standard-PPO iters for each ceiling
     # EXPERIMENT 2 (value-constraint sufficiency): add a current-task behavioral
