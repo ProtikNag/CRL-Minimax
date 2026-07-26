@@ -353,17 +353,32 @@ class PPOAlternationTrainer:
         games = [t.spec.name.replace("atari-", "") for t in self.family.tasks]
         K = len(self.family)
 
-        # 1) load experts; fixed reference value V_L (greedy) + raw score per game
+        # 1) load experts; fixed reference value V_L (greedy) + raw score per game.
+        # Reuse a cached expert_refs.json if provided (refs are deterministic, so
+        # identical across variants) -- skips the expensive enumeration setup.
+        import json as _json
+        import os as _os
+        cache = None
+        if self.ppo.expert_refs_path and _os.path.exists(self.ppo.expert_refs_path):
+            c = _json.load(open(self.ppo.expert_refs_path))
+            if c.get("games") == games:
+                cache = c
+                print(f"[expert ref] reusing cached refs from {self.ppo.expert_refs_path}")
         self._experts, self._expert_values, self._expert_scores = [], [], []
-        for g in games:
-            epol, etask = self._load_expert(g)
-            v = self._eval_value_greedy(epol, etask)
-            s, _ = self._eval_report(epol, etask)
+        for i, g in enumerate(games):
+            epol, etask = self._load_expert(g)   # policy always needed (init/warm-start/BC)
+            if cache is not None:
+                v, s = cache["expert_values"][i], cache["expert_scores"][i]
+            else:
+                v = self._eval_value_greedy(epol, etask)
+                s = self._eval_report(epol, etask)[0]
             self._experts.append(epol)
             self._expert_values.append(v)
             self._expert_scores.append(s)
-            self.logger.log({"phase": "expert_ref", "game": g, "V_L": v, "score": s})
-            print(f"[expert ref] {g}: V_L={v:.3f} score={s:.1f}")
+            self.logger.log({"phase": "expert_ref", "game": g, "V_L": v, "score": s,
+                             "cached": cache is not None})
+            print(f"[expert ref] {g}: V_L={v:.3f} score={s:.1f}"
+                  f"{' (cached)' if cache is not None else ''}")
         self.logger.save_json("expert_refs.json",
                               {"games": games, "expert_values": self._expert_values,
                                "expert_scores": self._expert_scores})

@@ -169,6 +169,11 @@ class PPOConfig:
     # the retention matrix is available on demand mid-run.
     method: str = "constrained"
     expert_dir: str = "experts"    # dir with <Game>/best_model.pt single-task experts
+    # Reuse precomputed expert references (V_L + score) from a prior run's
+    # expert_refs.json instead of recomputing them (deterministic, so identical
+    # across variants) -- skips the ~40 min enumeration setup. Expert POLICIES are
+    # still loaded (needed for init/warm-start/BC); only the eval is skipped.
+    expert_refs_path: str = ""
     ref_fraction: float = 1.0      # constrain V_k^G >= ref_fraction * V_expert (beta lever)
     # RELATIVE constraint: normalize the shortfall by the reference value so the
     # constraint is V_G/V_L >= 1-delta (a per-game ratio) instead of the absolute
