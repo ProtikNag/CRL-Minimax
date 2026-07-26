@@ -183,6 +183,13 @@ class PPOConfig:
     # O(k) blow-up on late tasks). Noise averages out over the iterations.
     past_task_sampling: str = "all"
     constraint_greedy: bool = False  # estimate the constraint value V with greedy rollouts
+    # Consolidation: give the current task a dedicated learning step before the
+    # constrained consolidation, so the global actually LEARNS the new game (not
+    # only via the mu constraint from a random head). `adapt_iters` > 0 runs that
+    # many UNCONSTRAINED PPO iters on the current task first; `warmstart_head_from
+    # _expert` inits the current task's head from its expert instead of random.
+    adapt_iters: int = 0
+    warmstart_head_from_expert: bool = False
     # Evaluate greedy value/score by ENUMERATING every no-op start (1..noop_max),
     # exactly one deterministic rollout each -> exact expected greedy return in
     # noop_max rollouts (no sampling). Overrides eval_episodes/constraint_episodes

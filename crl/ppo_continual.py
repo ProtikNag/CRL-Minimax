@@ -378,6 +378,18 @@ class PPOAlternationTrainer:
             task_k = self.family.tasks[k - 1]
             past_tasks = [self.family.tasks[i] for i in range(k - 1)]
             ref_current = self.ppo.ref_fraction * self._expert_values[k - 1]
+            # (B) warm-start the current task's head from its expert (vs random)
+            if self.ppo.warmstart_head_from_expert:
+                ek = self._experts[k - 1]
+                self.global_policy.actors[k - 1].load_state_dict(ek.actor.state_dict())
+                self.global_policy.critics[k - 1].load_state_dict(ek.critic.state_dict())
+            # (A) dedicated UNCONSTRAINED learning of the current task first, so the
+            # global actually masters it before the constrained consolidation.
+            if self.ppo.adapt_iters > 0:
+                self.local_trainer.train(
+                    self.global_policy, task_k, num_iters=self.ppo.adapt_iters,
+                    seed=self.seed + 500 * k, current_task=k, phase_type="adapt",
+                    probe=self._probe)
             self.mu_ctrl.reset()
             omega = [1.0 / k] * (k - 1)
             self.global_trainer.train(
