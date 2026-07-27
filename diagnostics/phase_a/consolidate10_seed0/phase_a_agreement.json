@@ -1,0 +1,120 @@
+{
+  "Breakout": {
+    "n_states_kept": 12903,
+    "n_states_total": 14546,
+    "mean_ep_len": 1818.25,
+    "checkpoints": {
+      "just_learned": {
+        "early": {
+          "n": 4848,
+          "action_agree": 0.0655940594059406,
+          "prob_on_expert_action": 0.060227371752262115,
+          "mean_global_value": 2.2853286266326904,
+          "mean_expert_rtg": 3.2998874094870385,
+          "median_value_ratio": 0.7393002354696996
+        },
+        "mid": {
+          "n": 4338,
+          "action_agree": 0.05325034578146611,
+          "prob_on_expert_action": 0.0603770948946476,
+          "mean_global_value": 1.6697518825531006,
+          "mean_expert_rtg": 4.355506933993229,
+          "median_value_ratio": 0.41447942834738394
+        },
+        "late": {
+          "n": 3717,
+          "action_agree": 0.05569007263922518,
+          "prob_on_expert_action": 0.061907414346933365,
+          "mean_global_value": 0.7719969749450684,
+          "mean_expert_rtg": 6.86014460136314,
+          "median_value_ratio": 0.14172155145509494
+        }
+      },
+      "final": {
+        "early": {
+          "n": 4848,
+          "action_agree": 0.0823019801980198,
+          "prob_on_expert_action": 0.07262357324361801,
+          "mean_global_value": 2.376598596572876,
+          "mean_expert_rtg": 3.2998874094870385,
+          "median_value_ratio": 0.7704613082512664
+        },
+        "mid": {
+          "n": 4338,
+          "action_agree": 0.09451360073766712,
+          "prob_on_expert_action": 0.07918581366539001,
+          "mean_global_value": 2.0032858848571777,
+          "mean_expert_rtg": 4.355506933993229,
+          "median_value_ratio": 0.5066707117268426
+        },
+        "late": {
+          "n": 3717,
+          "action_agree": 0.06914178100618779,
+          "prob_on_expert_action": 0.07092630118131638,
+          "mean_global_value": 1.4306353330612183,
+          "mean_expert_rtg": 6.86014460136314,
+          "median_value_ratio": 0.24973330791734236
+        }
+      }
+    }
+  },
+  "Qbert": {
+    "n_states_kept": 10668,
+    "n_states_total": 10758,
+    "mean_ep_len": 1344.75,
+    "checkpoints": {
+      "just_learned": {
+        "early": {
+          "n": 3587,
+          "action_agree": 0.061053805408419294,
+          "prob_on_expert_action": 0.05910062789916992,
+          "mean_global_value": 4.647752285003662,
+          "mean_expert_rtg": 19.297352886103035,
+          "median_value_ratio": 0.13788524723063328
+        },
+        "mid": {
+          "n": 3584,
+          "action_agree": 0.05412946428571429,
+          "prob_on_expert_action": 0.054380353540182114,
+          "mean_global_value": 5.817727088928223,
+          "mean_expert_rtg": 20.88986292704224,
+          "median_value_ratio": 0.17004077086717162
+        },
+        "late": {
+          "n": 3497,
+          "action_agree": 0.241635687732342,
+          "prob_on_expert_action": 0.07824376970529556,
+          "mean_global_value": 5.938464641571045,
+          "mean_expert_rtg": 12.046489153602877,
+          "median_value_ratio": 0.5173386912517683
+        }
+      },
+      "final": {
+        "early": {
+          "n": 3587,
+          "action_agree": 0.032339001951491496,
+          "prob_on_expert_action": 0.035506442189216614,
+          "mean_global_value": 1.870861530303955,
+          "mean_expert_rtg": 19.297352886103035,
+          "median_value_ratio": 0.06476923290245762
+        },
+        "mid": {
+          "n": 3584,
+          "action_agree": 0.035435267857142856,
+          "prob_on_expert_action": 0.03878229856491089,
+          "mean_global_value": 1.1697083711624146,
+          "mean_expert_rtg": 20.88986292704224,
+          "median_value_ratio": 0.030610527707923246
+        },
+        "late": {
+          "n": 3497,
+          "action_agree": 0.044895624821275376,
+          "prob_on_expert_action": 0.04369917884469032,
+          "mean_global_value": 1.777469277381897,
+          "mean_expert_rtg": 12.046489153602877,
+          "median_value_ratio": 0.10532620667388994
+        }
+      }
+    }
+  }
+}
