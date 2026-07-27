@@ -337,6 +337,7 @@ class GlobalTrainer(PPOTrainer):
         current_task: int,
         probe: ProbeHook | None = None,
         local_policy: Policy | None = None,
+        ref_score: float = float("nan"),
     ) -> None:
         """``omega`` is the per-stream weight list aligned to
         ``past_tasks + [task_k]`` order is NOT used; past weights are
@@ -357,6 +358,7 @@ class GlobalTrainer(PPOTrainer):
         shortfall = 0.0
         constraint = 0.0
         v_k_g = float("nan")
+        s_k_g = float("nan")  # global's raw (undiscounted) score, same rollouts as V_k_g
         thr = float(getattr(task_k, "threshold", float("inf")))
         met = 0
         try:
@@ -375,7 +377,10 @@ class GlobalTrainer(PPOTrainer):
 
                 # Slower dual timescale: refresh V_k^G / mu every constraint_every.
                 if it % max(1, cfg.constraint_every) == 0:
-                    v_k_g, _, _, _ = evaluate_value_and_score(
+                    # Same enumeration returns BOTH the discounted value (used in
+                    # the constraint) and the raw game score (logged only, so we
+                    # can check whether the V-constraint tracks the actual score).
+                    v_k_g, s_k_g, _, _ = evaluate_value_and_score(
                         global_policy, task_k, cfg.constraint_episodes,
                         cfg.n_envs, self.device, seed=cfg.eval_seed,
                         greedy=cfg.constraint_greedy,
@@ -416,6 +421,7 @@ class GlobalTrainer(PPOTrainer):
                             "phase": "global", "task": current_task, "step": it,
                             "F_G": constraint, "mu": mu, "V_k_global": v_k_g,
                             "V_k_ref_local": ref_current, "coeff_k": coeff_k,
+                            "score_k_global": s_k_g, "score_k_ref": ref_score,
                             "greedy_score": gscore, **stats,
                         }
                     )

@@ -411,7 +411,8 @@ class PPOAlternationTrainer:
                 self.global_policy, task_k, past_tasks, ref_current=ref_current,
                 mu_ctrl=self.mu_ctrl, omega=omega, eps=self._eps(),
                 num_iters=self.ppo.global_iters, seed=self.seed + 1000 * k,
-                current_task=k, probe=self._probe, local_policy=self._experts[k - 1])
+                current_task=k, probe=self._probe, local_policy=self._experts[k - 1],
+                ref_score=self._expert_scores[k - 1])
             self.logger.log({"phase": "gaps", "task": k, "V_k_ref_local": ref_current})
             self._log_retention(k, games)
             self._save_ckpt(k)
