@@ -165,6 +165,38 @@ Phase A value ratios `V_global / expert-rtg` (median):
 - **Note:** BC/KL deliberately deferred; the current thread is fixing the mismatch **inside the
   value formulation** first (γ, score reference).
 
+### F14. ★ Actual-rollout confirmation (Phase B) + ratio instability shows up in *measurement*
+- **Finding:** Using the global's **true discounted return** from random intermediate states
+  (reached by exact deterministic re-simulation to s_t; replay self-check **bit-exact**), the
+  early→late decay is confirmed on **partially-retained** games:
+  Pong **0.33 → −0.20 → −0.50** (goes *negative* — the global loses points the expert wins),
+  Breakout **0.63 → 0.58 → 0.26**. **Fully-forgotten Qbert** is uniformly low (global return
+  ~2–8 vs expert ~9–24 everywhere); its late-bucket ratio (0.31) is **inflated by the smaller
+  expert return-to-go at the tail**, not real skill — an empirical instance of F11: **ratios
+  destabilize even as a measurement** when the denominator shrinks.
+- **Experiment:** Phase B (`experiments/phase_b_rollout.py`), 45 random intermediate starts per
+  game, global's actual rollout return vs expert return-to-go, bucketed early/mid/late, rtg>0.
+- **Measure:** median per-state ratio **and** mean absolute returns per bucket — prefer the
+  **absolute means**; per-state ratios are noisy/skewed.
+- **Implication:** (a) the retention gap is genuinely concentrated mid/late where a game is
+  *partially* held (uniform collapse once fully forgotten); (b) report **absolute** per-bucket
+  returns, not ratios; (c) independently reinforces F15's switch away from ratio constraints.
+
+### F15. Ratio constraint is numerically unstable → floored additive hinge
+- **Finding:** The normalized-shortfall constraint `(V_L−V_G)/max(|V_L|, ε)` carries **1/|V_L|
+  in the gradient**, so near-zero-value tasks explode: with Pong's `V_L = 0.031` the constraint
+  gradient coefficient is **34×** a unit-value game (→ 1000× if `|V_L|` hits the 10⁻³ floor).
+  Replacing it with an **additive floored hinge**
+  `loss = (max(0, (V_L−V_G) − δ·max(|V_L|, τ)))²` keeps the **same feasibility boundary**
+  (allow a δ fractional drop) but puts the gradient coefficient in **raw value units — no
+  division**, so it is stable. Trade-off: gradient magnitude now scales with raw value
+  (Qbert coeff 12× Pong), i.e. bounded scale-dependence instead of unbounded explosion.
+- **Experiment:** analytic + numeric check of the coefficient at the measured `V_L` values;
+  identified `V_L(Pong)=0.031` as the live failure case.
+- **Measure:** gradient coefficient `μ·2·shortfall` under both forms.
+- **Implication:** default constraint switched to `constraint_form="floored"` (δ=0.05, τ=0.5);
+  ε/relative fields become legacy. Prompted by supervisor feedback.
+
 ### F13. Shared-critic starvation (PPO port detail)
 - **Finding:** An unbounded dual coefficient can starve the shared critic; normalizing the
   actor coefficients by their sum stabilizes it.
