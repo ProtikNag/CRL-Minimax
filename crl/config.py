@@ -181,6 +181,15 @@ class PPOConfig:
     # regardless of its (clipped, discounted) value scale. eps is then in squared
     # RELATIVE units (delta^2): eps=0.0025 <=> a 5% shortfall tolerance.
     constraint_relative: bool = False
+    # Constraint shortfall form. "ratio": normalized shortfall (V_L-V_G)/max(|V_L|,tau)
+    # squared -- carries 1/|V_L| in the gradient, which explodes for near-zero-value
+    # tasks (Pong V_L=0.03). "floored" (default): additive floored hinge
+    #   loss = (max(0, (V_L-V_G) - delta*max(|V_L|, tau)))^2
+    # -- SAME feasibility boundary (allow a delta fractional drop) but the gradient
+    # coefficient is in raw value units (no division), so it is numerically stable.
+    constraint_form: str = "floored"
+    constraint_delta: float = 0.05   # fractional drop tolerated before the constraint bites
+    constraint_tau: float = 0.5      # floor on |V_L| so tiny-value tasks keep a min slack
     # Past-task gradient collection in the global phase. "all" = roll out every
     # past task each iteration (exact sum, O(k) cost). "sample" = roll out ONE
     # uniformly-random past task per iteration, rescaled by the past-task count --

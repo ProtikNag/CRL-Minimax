@@ -388,12 +388,21 @@ class GlobalTrainer(PPOTrainer):
                         max_ep_steps=cfg.eval_max_ep_steps,
                     )
                     gap = max(0.0, ref_current - v_k_g)  # V_k^L - V_k^G
-                    # Relative constraint: normalize by the reference so the
-                    # shortfall (and eps) mean the same fraction on every game.
-                    shortfall = (gap / max(abs(ref_current), 1e-3)
-                                 if cfg.constraint_relative else gap)
-                    constraint = shortfall * shortfall  # squared hinge (eq 32)
-                    mu = mu_ctrl.update(constraint, eps)
+                    if cfg.constraint_form == "floored":
+                        # Additive floored hinge (numerically stable: NO 1/|V_L| in
+                        # the gradient). Dead-band = delta*max(|V_L|, tau); the slack
+                        # lives in the hinge, so the dual threshold is 0. Same
+                        # feasibility boundary as the ratio (allow a delta frac drop).
+                        slack = cfg.constraint_delta * max(abs(ref_current), cfg.constraint_tau)
+                        shortfall = max(0.0, (ref_current - v_k_g) - slack)  # raw value units
+                        constraint = shortfall * shortfall
+                        mu = mu_ctrl.update(constraint, 0.0)
+                    else:
+                        # Legacy ratio/normalized shortfall (carries 1/|V_L|).
+                        shortfall = (gap / max(abs(ref_current), 1e-3)
+                                     if cfg.constraint_relative else gap)
+                        constraint = shortfall * shortfall  # squared hinge (eq 32)
+                        mu = mu_ctrl.update(constraint, eps)
                 coeff_k = mu * 2.0 * shortfall  # differentiated shortfall (eq 30)
 
                 if cfg.diagnostics and it % max(1, cfg.diag_every) == 0:

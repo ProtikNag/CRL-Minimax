@@ -79,7 +79,10 @@ ppo:
   eval_every: 0
   global_bc_coef: 0.0
   eval_noop_enumerate: true
-  constraint_relative: true
+  constraint_relative: true      # (legacy; ignored when constraint_form=floored)
+  constraint_form: floored       # numerically stable additive hinge (no 1/|V_L|)
+  constraint_delta: 0.05         # tolerate a 5% drop before the constraint bites
+  constraint_tau: 0.5            # floor on |V_L| so near-zero-value tasks keep min slack
   eval_max_ep_steps: 3000
   past_task_sampling: sample
   adapt_iters: 0         # (2) NO unconstrained phase; constraint applies throughout
