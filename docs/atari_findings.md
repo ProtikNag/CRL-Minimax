@@ -197,6 +197,28 @@ Phase A value ratios `V_global / expert-rtg` (median):
 - **Implication:** default constraint switched to `constraint_form="floored"` (δ=0.05, τ=0.5);
   ε/relative fields become legacy. Prompted by supervisor feedback.
 
+### F16. ★★ Past-task starvation — the current-task constraint erases old tasks
+- **Finding (the pivotal one):** During task k the global actor loss is
+  `Σ_{i<k} ω_i·L_i^CLIP + μ·2·shortfall·L_k^CLIP` — past tasks on a **fixed** ω_i=1/k,
+  only the **current** task carrying the V-shortfall (+ intermediate states). This
+  breaks retention **two ways**: (a) past-task retention has **no adaptive shortfall
+  and no intermediate states** — just a blind fixed-weight push; (b) worse, `coeff_k =
+  μ·2·shortfall` is **unbounded** (μ up to 1000, shortfall O(30)), and after we
+  normalize the actor coefficients by their sum (the F13 critic-starvation fix), a large
+  `coeff_k` drives the past-task weight to **~0**. Measured live on the interm run: at
+  task-2 step 400, `coeff_k = 18,750`, μ climbing (223→297→447), so **Pong received
+  0.003% of the actor gradient — actively forgotten while Breakout was learned**
+  (and `V_k_global` oscillated 18.4→3.7, unstable). Almost certainly the mechanism behind
+  the baseline's early-task collapse (F1), compounding across 10 tasks.
+- **Experiment:** the `consolidate10_strict_g999_interm` run; read `coeff_k`, μ, and the
+  implied gradient split `ω / (ω + coeff_k)` live at steps 0/200/400.
+- **Measure:** `coeff_k`, μ, normalized past/current gradient share.
+- **Implication:** retention cannot work while the current-task constraint can starve
+  past tasks. Proposed fix — put the floored shortfall (incl. intermediate states) on
+  **all** tasks and weight by **relative** shortfall `w_i = shortfall_i / Σ_j shortfall_j`
+  (bounded, sums to 1 → true min-max, worst-retained task pushed hardest, **no
+  starvation**). Fixed ω and the unbounded `coeff_k` both go away. Redesign under review.
+
 ### F13. Shared-critic starvation (PPO port detail)
 - **Finding:** An unbounded dual coefficient can starve the shared critic; normalizing the
   actor coefficients by their sum stabilizes it.
@@ -211,25 +233,38 @@ Staying **inside the value formulation** (BC/KL deferred):
 2. **Score / near-undiscounted reference** — constrain the quantity we actually report.
 3. **More constrained optimization, no unconstrained phase** — never leave the trunk unprotected
    (from F6); ε back to 5% (from F6/F7).
-4. **Intermediate-state evaluation** (Phase B) — restore mid/late states (ALE `cloneState` +
-   frame-stack buffer) and measure the global's *true* return there vs the expert; diagnostic
-   first, per-bucket, rtg>0 (from F10/F11).
+4. **Intermediate-state constraint** (from Phase B, F10) — hold the current task at 50
+   re-simulated mid/late states (true rollout returns; per-state floored shortfall). Built and
+   vectorized (`evaluate_intermediate_values_vec`, exact to 2e-14).
+5. **Relative-shortfall min-max over ALL tasks (the F16 fix, under review)** — per-task floored
+   shortfall incl. intermediate states for every task (past + current); weight each task's
+   surrogate by `w_i = shortfall_i / Σ_j shortfall_j` (bounded, sums to 1). Makes retention
+   adaptive + mid/late-aware AND removes the unbounded-`coeff_k` starvation.
 
-**Currently pending run:** `consolidate10_strict_g999` combines fixes 1+3 (γ=0.999, ε=5%,
-`adapt_iters=0`, keep head warm-start, `global_iters=5000`) and logs **both** V and raw score
-at every constraint eval so we can directly test whether the V-constraint tracks the score.
+**Run history:**
+- `consolidate10_strict_g999_interm` (γ=0.999, floored constraint, 50 no-op + 50 intermediate
+  states, vectorized eval, live past-task probe) was launched and **stopped at task-2 step 400**
+  after F16 was diagnosed live (past-task starvation: `coeff_k`=18,750 → Pong at 0.003% of the
+  gradient). γ=0.999 expert refs + intermediate-state caches are precomputed
+  (`results/expert_refs_g999.json`, `results/intermediate_states_g999.json`) and reusable.
+- **Next:** redesign per fix 5 (relative-shortfall min-max on all tasks) — pending decision.
 
 ---
 
 ## Artifacts (for reproducibility / figures)
 
 - Configs: `configs/consolidate10.yaml` (baseline), `configs/consolidate10_adapt.yaml`,
-  `configs/consolidate10_strict_g999.yaml`.
+  `configs/consolidate10_strict_g999.yaml`, `configs/consolidate10_strict_g999_interm.yaml`.
 - Consolidation figures + retention table: `diagnostics/consolidation/consolidate10_seed0/`
   (`retention_matrix`, `retention_curves`, `final_retention_bars`, `consolidation_dynamics`,
   `mu_constraint`, `ppo_health`, `retention_triangular.md`).
 - Phase A: `experiments/phase_a_agreement.py`, `diagnostics/phase_a/consolidate10_seed0/`.
+- Phase B: `experiments/phase_b_rollout.py`, `diagnostics/phase_b/consolidate10_seed0/`.
+- Precompute: `experiments/compute_expert_values.py` (γ=0.999 refs),
+  `experiments/compute_intermediate_states.py` (per-game mid/late states).
 - Report generators: `experiments/baseline_report.py`, `experiments/consolidation_retention.py`.
-- Eval core: `crl/ppo/evaluate.py` (`evaluate_greedy_noop_enumerated`).
-- Trainer / orchestrator: `crl/ppo/trainer.py` (GlobalTrainer), `crl/ppo_continual.py`.
+- Eval core: `crl/ppo/evaluate.py` — `evaluate_greedy_noop_enumerated`,
+  `evaluate_intermediate_values` / `_vec` (per-state true-return from re-simulated states).
+- Trainer / orchestrator: `crl/ppo/trainer.py` (GlobalTrainer, floored + intermediate
+  constraint), `crl/ppo_continual.py` (live past-task probe).
 - Paper-side changes to reflect: `docs/paper_updates_needed.md`.

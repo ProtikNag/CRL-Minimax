@@ -47,3 +47,30 @@ evaluation/estimator section (replaces the `1/N Σ G(τ)` MC estimator for greed
 Atari envs use `max_steps=0` (no `TimeLimit`); episodes end only on true
 termination, so `done = terminated` and GAE bootstrapping is exact. (A `TimeLimit`
 + `done=term|trunc` biases the value on long episodes.)
+
+## 5. Constraint form: floored additive hinge (not a ratio)
+
+The relative constraint `V_G/V_L ≥ 1−δ` / normalized shortfall carries `1/|V_L|`
+in the gradient and blows up for near-zero-value tasks (Pong `V_L=0.031` → 34×).
+We use the **floored additive hinge** `loss = (max(0, (V_L−V_G) − δ·max(|V_L|,τ)))²`
+— same feasibility boundary, gradient in raw value units (numerically stable).
+
+## 6. Retention must constrain ALL tasks (past + current), by relative shortfall
+
+Key correction to the min-max realization: constraining only the *current* task
+(fixed weight ω on past tasks) breaks retention two ways — past tasks get no
+adaptive shortfall/mid-late protection, and an unbounded current-task coefficient
+`μ·2·shortfall` (normalized against ω) starves the past tasks to ~0 gradient
+(measured: `coeff_k=18,750` → past task 0.003% of the update). The fix is a true
+min-max: per-task floored shortfall (incl. intermediate mid/late states) for every
+task, weighted by the **relative** shortfall `w_i = shortfall_i/Σ_j shortfall_j`
+(bounded, sums to 1) so the worst-retained task is pushed hardest without starving
+the others. See F16 in atari_findings.md.
+
+## 7. Mid/late-game retention + intermediate-state constraint
+
+Retention failure is concentrated in the **mid/late game** (Phase B: Breakout
+global/expert return decays 0.63→0.58→0.26 early→mid→late). The 50 no-op-*start*
+evaluation only samples the opening and misses this. We add N mid/late states
+(sampled from expert trajectories, reached by exact deterministic re-simulation)
+to the constraint, with a per-state floored shortfall.
