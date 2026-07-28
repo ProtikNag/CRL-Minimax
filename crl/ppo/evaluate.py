@@ -162,6 +162,87 @@ def evaluate_intermediate_values(
 
 
 @torch.no_grad()
+def evaluate_intermediate_values_vec(
+    policy: Policy,
+    task: Task,
+    task_id: int,
+    cache_game: dict,
+    device: torch.device,
+    n_envs: int = 16,
+    max_ep_steps: int = 3000,
+) -> tuple[list[float], list[float]]:
+    """Vectorized ``evaluate_intermediate_values``: identical semantics, but runs
+    the intermediate-state rollouts in banks of ``n_envs`` with BATCHED forward
+    passes instead of one state at a time.
+
+    Per-env seeding (a list of the trajectory seeds) makes each sub-env reach the
+    same deterministic state, and one unified loop drives every env: while
+    ``s < t_i`` the env replays its recorded prefix action (return not
+    accumulated); at ``s >= t_i`` it takes the global's greedy action and
+    accumulates the discounted reward until ``done``. Because prefix+rollout is
+    capped at ``max_ep_steps``, all envs finish by step ``max_ep_steps``. Returns
+    ``(v_globals, v_experts)`` for the kept starts (a state whose prefix hits
+    ``done`` is dropped, matching the scalar version).
+    """
+    gamma = task.gamma
+    clip = bool(getattr(task, "clip_rewards", False))
+    trajs = cache_game["trajs"]
+    starts = cache_game["starts"]
+    v_g: list[float] = []
+    v_e: list[float] = []
+    for c0 in range(0, len(starts), n_envs):
+        chunk = starts[c0:c0 + n_envs]
+        B = len(chunk)
+        seeds = [int(trajs[st["traj"]]["seed"]) for st in chunk]
+        prefixes = [trajs[st["traj"]]["actions"] for st in chunk]
+        tlens = [int(st["t"]) for st in chunk]
+        venv = task.make_vector_env(B, clip_rewards=True)
+        try:
+            obs, _ = venv.reset(seed=seeds)          # per-env seeds -> same s_t
+            obs = np.asarray(obs)
+            disc = np.zeros(B); gpow = np.ones(B)
+            finished = np.zeros(B, dtype=bool); invalid = np.zeros(B, dtype=bool)
+            result = np.zeros(B)
+            for s in range(max_ep_steps):
+                if (finished | invalid).all():
+                    break
+                gact = policy.dist(torch.as_tensor(obs, device=device),
+                                   task_id).logits.argmax(-1).cpu().numpy()
+                actions = np.zeros(B, dtype=np.int64)
+                in_prefix = np.zeros(B, dtype=bool)
+                for i in range(B):
+                    if finished[i] or invalid[i]:
+                        continue
+                    if s < tlens[i]:
+                        actions[i] = prefixes[i][s]; in_prefix[i] = True
+                    else:
+                        actions[i] = gact[i]
+                obs_np, reward, term, trunc, _ = venv.step(actions)
+                done = term | trunc
+                for i in range(B):
+                    if finished[i] or invalid[i]:
+                        continue
+                    if in_prefix[i]:
+                        if bool(done[i]):            # ended during prefix -> drop
+                            invalid[i] = True
+                        continue
+                    r = float(reward[i])
+                    disc[i] += gpow[i] * (float(np.sign(r)) if clip else r)
+                    gpow[i] *= gamma
+                    if bool(done[i]):
+                        result[i] = disc[i]; finished[i] = True
+                obs = np.asarray(obs_np)
+            for i in range(B):
+                if invalid[i]:
+                    continue
+                v_g.append(float(result[i] if finished[i] else disc[i]))
+                v_e.append(float(chunk[i]["expert_rtg"]))
+        finally:
+            venv.close()
+    return v_g, v_e
+
+
+@torch.no_grad()
 def evaluate_value_and_score(
     policy: Policy,
     task: Task,

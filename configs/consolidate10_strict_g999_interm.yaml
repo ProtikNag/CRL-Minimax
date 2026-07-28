@@ -84,7 +84,7 @@ ppo:
   constraint_delta: 0.05         # tolerate a 5% drop before the constraint bites
   constraint_tau: 0.5            # floor on |V_L| so near-zero-value tasks keep min slack
   expert_refs_path: results/expert_refs_g999.json
-  constraint_intermediate_states: 30
+  constraint_intermediate_states: 50
   constraint_intermediate_path: results/intermediate_states_g999.json
   eval_max_ep_steps: 3000
   past_task_sampling: sample

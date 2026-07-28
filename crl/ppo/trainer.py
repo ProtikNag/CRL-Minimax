@@ -34,7 +34,7 @@ from crl.duals.controllers import DualController
 from crl.envs.base import Task
 from crl.policies.base import Policy
 from crl.ppo.collector import RolloutBatch, RolloutCollector
-from crl.ppo.evaluate import evaluate_intermediate_values, evaluate_value_and_score
+from crl.ppo.evaluate import evaluate_intermediate_values_vec, evaluate_value_and_score
 
 # Callback invoked once per PPO iteration: (phase_type, current_task) -> None.
 ProbeHook = Callable[[str, int], None]
@@ -406,9 +406,9 @@ class GlobalTrainer(PPOTrainer):
                             # PER-STATE floored shortfall (Run B). Two equal groups --
                             # start states and intermediate states -- so mid/late game
                             # is not drowned by the (homogeneous) start-state term.
-                            vg_i, ve_i = evaluate_intermediate_values(
+                            vg_i, ve_i = evaluate_intermediate_values_vec(
                                 global_policy, task_k, task_k.spec.task_id,
-                                intermediate_cache, self.device,
+                                intermediate_cache, self.device, n_envs=cfg.n_envs,
                                 max_ep_steps=cfg.eval_max_ep_steps)
                             sfs = [_sf(ve, vg) for vg, ve in zip(vg_i, ve_i)]
                             sf_int = (sum(sfs) / len(sfs)) if sfs else 0.0
