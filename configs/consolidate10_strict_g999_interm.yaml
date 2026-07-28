@@ -76,7 +76,7 @@ ppo:
   normalize_advantage: true
   global_iters: 5000     # (4) more constrained optimization
   min_iters: 200
-  eval_every: 0
+  eval_every: 2000    # live past-task retention probe (seen tasks only, ~2-3x per task)
   global_bc_coef: 0.0
   eval_noop_enumerate: true
   constraint_relative: true      # (legacy; ignored when constraint_form=floored)

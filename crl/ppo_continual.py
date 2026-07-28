@@ -140,15 +140,23 @@ class PPOAlternationTrainer:
         every = self.ppo.eval_every
         if not every or self.cumulative_step % every != 0:
             return
+        # Live retention probe: greedy score on the SEEN tasks only (past + current;
+        # future tasks aren't learned yet, so evaluating them wastes eval time).
+        # current_task is 1-based, so range(current_task) = tasks 0..k-1 = all seen.
+        seen = range(current_task)
         values = [self._eval_report(self.global_policy, self.family.tasks[i])[0]
-                  for i in range(len(self.family))]
+                  for i in seen]
+        exp = [self._expert_scores[i] for i in seen] if self._expert_scores else [0.0] * current_task
+        ratio = [values[i] / exp[i] if exp[i] else float("nan") for i in seen]
         self.logger.log(
             {
                 "phase": "probe",
                 "cumulative_step": self.cumulative_step,
                 "current_task": current_task,
                 "phase_type": phase_type,
-                "values": values,
+                "values": values,             # greedy scores, seen tasks (past + current)
+                "expert_scores": exp,
+                "ratio": ratio,               # global/expert per seen task = live retention
             }
         )
 
