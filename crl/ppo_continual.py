@@ -388,6 +388,14 @@ class PPOAlternationTrainer:
         self._log_retention(1, games)
         self._save_ckpt(1)
 
+        # Intermediate-state cache (Run B): per-game mid/late states the constraint
+        # also holds. Loaded once; the current game's slice is passed per task.
+        interm = None
+        if self.ppo.constraint_intermediate_states > 0 and self.ppo.constraint_intermediate_path:
+            interm = _json.load(open(self.ppo.constraint_intermediate_path))
+            print(f"[interm] loaded {len(interm['games'])} games from "
+                  f"{self.ppo.constraint_intermediate_path}")
+
         # 3) consolidate tasks 2..K (min-max; expert_k is the fixed local ref)
         for k in range(2, K + 1):
             task_k = self.family.tasks[k - 1]
@@ -412,7 +420,8 @@ class PPOAlternationTrainer:
                 mu_ctrl=self.mu_ctrl, omega=omega, eps=self._eps(),
                 num_iters=self.ppo.global_iters, seed=self.seed + 1000 * k,
                 current_task=k, probe=self._probe, local_policy=self._experts[k - 1],
-                ref_score=self._expert_scores[k - 1])
+                ref_score=self._expert_scores[k - 1],
+                intermediate_cache=(interm["games"][games[k - 1]] if interm else None))
             self.logger.log({"phase": "gaps", "task": k, "V_k_ref_local": ref_current})
             self._log_retention(k, games)
             self._save_ckpt(k)

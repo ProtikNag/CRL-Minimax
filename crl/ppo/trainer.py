@@ -34,7 +34,7 @@ from crl.duals.controllers import DualController
 from crl.envs.base import Task
 from crl.policies.base import Policy
 from crl.ppo.collector import RolloutBatch, RolloutCollector
-from crl.ppo.evaluate import evaluate_value_and_score
+from crl.ppo.evaluate import evaluate_intermediate_values, evaluate_value_and_score
 
 # Callback invoked once per PPO iteration: (phase_type, current_task) -> None.
 ProbeHook = Callable[[str, int], None]
@@ -338,6 +338,7 @@ class GlobalTrainer(PPOTrainer):
         probe: ProbeHook | None = None,
         local_policy: Policy | None = None,
         ref_score: float = float("nan"),
+        intermediate_cache: dict | None = None,
     ) -> None:
         """``omega`` is the per-stream weight list aligned to
         ``past_tasks + [task_k]`` order is NOT used; past weights are
@@ -359,6 +360,8 @@ class GlobalTrainer(PPOTrainer):
         constraint = 0.0
         v_k_g = float("nan")
         s_k_g = float("nan")  # global's raw (undiscounted) score, same rollouts as V_k_g
+        sf_int = 0.0          # mean per-state intermediate shortfall (Run B)
+        int_vg = float("nan")  # mean global value over intermediate states
         thr = float(getattr(task_k, "threshold", float("inf")))
         met = 0
         try:
@@ -393,9 +396,30 @@ class GlobalTrainer(PPOTrainer):
                         # the gradient). Dead-band = delta*max(|V_L|, tau); the slack
                         # lives in the hinge, so the dual threshold is 0. Same
                         # feasibility boundary as the ratio (allow a delta frac drop).
-                        slack = cfg.constraint_delta * max(abs(ref_current), cfg.constraint_tau)
-                        shortfall = max(0.0, (ref_current - v_k_g) - slack)  # raw value units
-                        constraint = shortfall * shortfall
+                        def _sf(vl, vg):
+                            return max(0.0, (vl - vg)
+                                       - cfg.constraint_delta * max(abs(vl), cfg.constraint_tau))
+                        sf_start = _sf(ref_current, v_k_g)
+                        if (intermediate_cache is not None
+                                and cfg.constraint_intermediate_states > 0):
+                            # ALSO hold the current task at N mid/late-game states:
+                            # PER-STATE floored shortfall (Run B). Two equal groups --
+                            # start states and intermediate states -- so mid/late game
+                            # is not drowned by the (homogeneous) start-state term.
+                            vg_i, ve_i = evaluate_intermediate_values(
+                                global_policy, task_k, task_k.spec.task_id,
+                                intermediate_cache, self.device,
+                                max_ep_steps=cfg.eval_max_ep_steps)
+                            sfs = [_sf(ve, vg) for vg, ve in zip(vg_i, ve_i)]
+                            sf_int = (sum(sfs) / len(sfs)) if sfs else 0.0
+                            int_sq = (sum(s * s for s in sfs) / len(sfs)) if sfs else 0.0
+                            int_vg = (sum(vg_i) / len(vg_i)) if vg_i else float("nan")
+                            shortfall = 0.5 * sf_start + 0.5 * sf_int
+                            constraint = 0.5 * sf_start * sf_start + 0.5 * int_sq
+                        else:
+                            shortfall = sf_start
+                            constraint = sf_start * sf_start
+                            sf_int = 0.0; int_vg = float("nan")
                         mu = mu_ctrl.update(constraint, 0.0)
                     else:
                         # Legacy ratio/normalized shortfall (carries 1/|V_L|).
@@ -431,6 +455,7 @@ class GlobalTrainer(PPOTrainer):
                             "F_G": constraint, "mu": mu, "V_k_global": v_k_g,
                             "V_k_ref_local": ref_current, "coeff_k": coeff_k,
                             "score_k_global": s_k_g, "score_k_ref": ref_score,
+                            "sf_intermediate": sf_int, "V_k_intermediate": int_vg,
                             "greedy_score": gscore, **stats,
                         }
                     )

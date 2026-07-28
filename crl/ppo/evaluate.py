@@ -20,6 +20,7 @@ returned for error bars.
 
 from __future__ import annotations
 
+import numpy as np
 import torch
 
 from crl.envs.base import Task
@@ -105,6 +106,59 @@ def evaluate_greedy_noop_enumerated(
     vals = np.array([res_disc[c] for c in sorted(res_disc)])
     scs = np.array([res_raw[c] for c in sorted(res_raw)])
     return float(vals.mean()), float(scs.mean()), float(scs.std()), len(scs)
+
+
+@torch.no_grad()
+def evaluate_intermediate_values(
+    policy: Policy,
+    task: Task,
+    task_id: int,
+    cache_game: dict,
+    device: torch.device,
+    max_ep_steps: int = 3000,
+) -> tuple[list[float], list[float]]:
+    """Per-state true rollout return of ``policy`` from cached intermediate states.
+
+    Each cached start is reached by EXACT deterministic re-simulation: reset with
+    the trajectory's seed and replay the expert's recorded actions ``0..t-1`` to
+    land on ``s_t`` (frame-stack buffers correctly primed), then roll ``policy``
+    greedily to the episode end for its discounted return-to-go. Returns
+    ``(v_globals, v_experts)`` aligned to the kept ``cache_game['starts']`` -- a
+    start whose re-simulation ends during the prefix is dropped from both lists.
+    """
+    gamma = task.gamma
+    clip = bool(getattr(task, "clip_rewards", False))
+    trajs = cache_game["trajs"]
+    v_g: list[float] = []
+    v_e: list[float] = []
+    for st in cache_game["starts"]:
+        tr = trajs[st["traj"]]
+        acts = tr["actions"]
+        t = int(st["t"])
+        env = task.make_env(clip_rewards=True)
+        obs, _ = env.reset(seed=int(tr["seed"]))
+        broke = False
+        for a in acts[:t]:                       # deterministic re-simulation to s_t
+            obs, _, term, trunc, _ = env.step(int(a))
+            if term or trunc:
+                broke = True
+                break
+        if broke:
+            env.close()
+            continue
+        disc = 0.0; g = 1.0
+        for _ in range(max(1, max_ep_steps - t)):
+            ot = torch.as_tensor(np.asarray(obs), device=device).unsqueeze(0)
+            act = int(policy.dist(ot, task_id).logits.argmax(-1).item())
+            obs, r, term, trunc, _ = env.step(act)
+            rr = float(np.sign(r)) if clip else float(r)
+            disc += g * rr; g *= gamma
+            if term or trunc:
+                break
+        env.close()
+        v_g.append(disc)
+        v_e.append(float(st["expert_rtg"]))
+    return v_g, v_e
 
 
 @torch.no_grad()

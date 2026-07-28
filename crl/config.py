@@ -190,6 +190,15 @@ class PPOConfig:
     constraint_form: str = "floored"
     constraint_delta: float = 0.05   # fractional drop tolerated before the constraint bites
     constraint_tau: float = 0.5      # floor on |V_L| so tiny-value tasks keep a min slack
+    # Intermediate-state constraint (Run B): in addition to the 50 no-op START
+    # states, also hold the current task at N re-simulated mid/late-game states
+    # (from the expert's own trajectory). The PER-STATE floored shortfall
+    #   sf(s) = max(0, (V_L(s) - V_G(s)) - delta*max(|V_L(s)|, tau))
+    # is computed for each intermediate state (V_L(s)=expert return-to-go from s;
+    # V_G(s)=global's true rollout return from s, reached by exact re-simulation)
+    # and combined with the start-state shortfall. 0 = start states only (Run A).
+    constraint_intermediate_states: int = 0
+    constraint_intermediate_path: str = ""   # cache of per-game intermediate states
     # Past-task gradient collection in the global phase. "all" = roll out every
     # past task each iteration (exact sum, O(k) cost). "sample" = roll out ONE
     # uniformly-random past task per iteration, rescaled by the past-task count --
