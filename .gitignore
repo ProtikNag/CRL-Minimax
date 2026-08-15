@@ -16,3 +16,4 @@ slurm-*.out
 slurm-*.err
 experts/
 results_*.log
+.claude/gate-status.json

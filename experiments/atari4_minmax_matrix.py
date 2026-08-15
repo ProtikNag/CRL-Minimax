@@ -26,7 +26,8 @@ import yaml
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
+from matplotlib.colors import TwoSlopeNorm
+from matplotlib.patches import Rectangle
 
 from analysis.continual_metrics import cl_metrics, normalize_matrix
 from crl.envs.atari import RANDOM_SCORES
@@ -64,10 +65,18 @@ def main() -> None:
     tri = np.tri(T, dtype=bool)                     # lower triangle incl. diagonal = seen
     disp = np.ma.masked_where(~tri | ~np.isfinite(Mn), Mn)
 
-    fig, ax = plt.subplots(figsize=(1.6 * T + 2.2, 1.4 * T + 1.6))
-    cmap = plt.get_cmap("RdYlGn").copy()
+    fig, ax = plt.subplots(figsize=(1.7 * T + 2.6, 1.45 * T + 1.8))
+    # Diverging, colorblind-safe map (RdBu is CVD-safe) centered at the RANDOM
+    # baseline (normalized 0). vmin/vmax span the ACTUAL data range so nothing is
+    # silently clipped: below-random (Boxing -27 vs -5.6) and above-target (Pong)
+    # cells stay distinguishable.
+    finite = Mn[tri & np.isfinite(Mn)]
+    lo = float(min(finite.min(), 0.0)) - 0.05
+    hi = float(max(finite.max(), 1.0)) + 0.05
+    norm = TwoSlopeNorm(vmin=lo, vcenter=0.0, vmax=hi)
+    cmap = plt.get_cmap("RdBu_r").copy()
     cmap.set_bad(color="#e9e9e9")                   # masked (future) cells -> light grey
-    im = ax.imshow(disp, cmap=cmap, norm=Normalize(vmin=0.0, vmax=1.0), aspect="auto")
+    im = ax.imshow(disp, cmap=cmap, norm=norm, aspect="auto")
 
     for i in range(T):
         for j in range(T):
@@ -76,12 +85,16 @@ def main() -> None:
             raw = M[i, j]
             nv = Mn[i, j]
             txt = f"{raw:.1f}"
-            # black text on light cells, white on dark-red for readability
-            color = "white" if (np.isfinite(nv) and nv < 0.22) else "black"
+            # contrast: white text on dark cells, black on light (per-cell luminance)
+            r, g, b, _ = cmap(norm(nv)) if np.isfinite(nv) else (1.0, 1.0, 1.0, 1.0)
+            lum = 0.299 * r + 0.587 * g + 0.114 * b
+            color = "white" if lum < 0.5 else "black"
             ax.text(j, i, txt, ha="center", va="center", color=color, fontsize=11,
                     fontweight="bold")
 
-    ax.set_xticks(range(T)); ax.set_xticklabels(games, rotation=0, fontsize=10)
+    xlabels = [f"{g}\n({RANDOM_SCORES.get(g, 0.0):g}→{t:.0f})"
+               for g, t in zip(games, targets)]
+    ax.set_xticks(range(T)); ax.set_xticklabels(xlabels, rotation=0, fontsize=9)
     ax.set_yticks(range(T))
     ax.set_yticklabels([f"after learning\nT{i+1}: {games[i]}" for i in range(T)], fontsize=9)
     ax.set_xlabel("evaluated game", fontsize=11)
@@ -96,9 +109,20 @@ def main() -> None:
            f"F={norm_m['forgetting']:.2f}  BWT={norm_m['bwt']:+.2f}")
     ax.set_title(f"{args.title}\n{sub}", fontsize=11)
 
-    cbar = fig.colorbar(im, ax=ax, shrink=0.85)
-    cbar.set_label("normalized score  (0 = random,  1 = per-game target)", fontsize=9)
-    fig.tight_layout()
+    # outline the "just-learned" diagonal (what forgetting/BWT are measured against)
+    for i in range(T):
+        ax.add_patch(Rectangle((i - 0.5, i - 0.5), 1, 1, fill=False,
+                               edgecolor="black", lw=2.2))
+
+    cbar = fig.colorbar(im, ax=ax, shrink=0.85, ticks=[lo, 0.0, 1.0, hi])
+    cbar.set_label("normalized score: 0 = random baseline, 1 = per-game target\n"
+                   "(diverging at random; full data range shown, no clipping)",
+                   fontsize=8)
+    fig.text(0.5, 0.005,
+             "Single seed. 'Forgetting=0' means no game dropped below its running max "
+             "in this run — not proof of an anti-forgetting mechanism.",
+             ha="center", fontsize=7.5, style="italic", color="#444444")
+    fig.tight_layout(rect=[0, 0.03, 1, 1])
 
     png = out / "score_matrix.png"
     fig.savefig(png, dpi=160, bbox_inches="tight")
