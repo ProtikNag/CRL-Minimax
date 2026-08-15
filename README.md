@@ -14,8 +14,11 @@ See `docs/REINFORCE_to_PPO.md` for the equation-by-equation mapping.
 > **Note for Claude Code / new sessions.** Read this file and `HANDOFF.md`
 > before touching code (`HANDOFF.md` has the current status, findings, and next
 > steps). The math is fixed in
-> `docs/Objective_for_Continual_Reinforcement_Learning (4).pdf`; code comments
-> cite its equation numbers. **Two binding rules:** reported evaluation is always
+> `docs/Objective_for_Continual_Reinforcement_Learning.pdf`, which now defines
+> **two formulations**: the **min-max** (pp. 1–4, `ppo.method: constrained`) and
+> the **stored-expert** consolidation (pp. 5–7 "When we have the expert models
+> stored", eqs 34–46, `ppo.method: stored_expert` — no `μ`, no min-max). Code
+> comments cite its equation numbers. **Two binding rules:** reported evaluation is always
 > **greedy, 100 rollouts** (never stochastic); Atari envs use **`max_steps: 0`**
 > (no episode cap). Implementation choices here are current and may evolve.
 
@@ -226,10 +229,20 @@ advantages.
   `crl/policies/impala.py` (Impala-CNN, current), `crl/ppo/` (reusable
   `PPOTrainer` → `LocalTrainer` = standard PPO, `GlobalTrainer` = PPO + actor
   constraint), `crl/ppo_continual.py` (orchestrator).
-- **Methods** (`ppo.method`): `constrained` (min-max), `finetune`, `clear`
-  (replay+cloning baseline), `joint` (feasibility upper bound). Diagnostic knobs:
-  `diagnostics`, `global_probe_head_only` (freeze-trunk probe), `global_bc_coef`
-  (behavioral cloning).
+- **Methods** (`ppo.method`): `constrained` (**min-max**, dual `μ`, no experts),
+  `stored_expert` (**Formulation B**, `crl/ppo/stored_expert.py`: no `μ`, no
+  min-max — gap-weighted regression `ω_i·2·max(0, V*_i − V_i^G)` toward each
+  frozen expert ceiling, past+current symmetric; both values from the same MC
+  evaluator, fixing the critic-drift/scale bugs), `finetune`, `clear`
+  (replay+cloning baseline), `joint` (feasibility upper bound). **`consolidate`
+  is DEPRECATED** — the buggy min-max/stored-expert hybrid that kept `μ` while
+  using stored experts (μ vacuous against an upper-bound reference). Diagnostic
+  knobs: `diagnostics`, `global_probe_head_only` (freeze-trunk probe),
+  `global_bc_coef` (behavioral cloning).
+- **4-game min-max result** (`reports/atari4_minmax/`, 1 seed, trimmed first
+  look): `experiments/atari4_minmax_matrix.py` renders a lower-triangular,
+  color-coded score matrix; `experiments/atari4_confusion.py` compares two runs
+  (min-max vs stored-expert) side by side. See `HANDOFF.md` for status.
 - **Evaluation rule (binding): greedy (argmax) actions, 100 rollouts, never
   stochastic** (`eval_episodes: 100`, `eval_greedy: true`). The constraint value
   `V_G/V_L` stays on-policy stochastic (it's the constrained quantity, not

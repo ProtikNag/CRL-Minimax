@@ -5,7 +5,74 @@ first (problem, method, math); this file is status + next steps only.
 
 ---
 
-## ►► CURRENT STATE (2026-07-23)
+## ►► CURRENT STATE (2026-08-15)
+
+**The two formulations are now SEPARATED into distinct PPO methods.** The repo
+previously conflated the min-max with stored experts; the updated objective doc
+`docs/Objective_for_Continual_Reinforcement_Learning.pdf` makes the split
+explicit (min-max = pp. 1–4; stored-expert = pp. 5–7 "When we have the expert
+models stored", eqs 34–46; the Q&A explains why they must not be mixed).
+
+- **A = `ppo.method: constrained`** — the TRUE min-max (dual `μ`, replay-free,
+  local trained from `θ⁰=φ`; **no stored experts**). Formulation unchanged; its
+  constraint values are Monte-Carlo (never read off a critic head).
+- **B = `ppo.method: stored_expert`** — NEW (`crl/ppo/stored_expert.py`).
+  Formulation B: **NO `μ`, NO min-max.** A plain one-sided gap-weighted
+  regression toward each frozen expert ceiling `V*_i`, past + current tasks
+  treated symmetrically: `coeff_i = ω_i·2·max(0, V*_i − V_i^G)`. Both `V*_i` and
+  `V_i^G` come from the SAME MC evaluator — this fixes the **critic-drift bug
+  (doc Q1)** (no value read off a trunk the actor is updating) and the
+  **value-scale bug (Q4)**.
+- **`ppo.method: consolidate` is DEPRECATED** — the buggy hybrid that kept `μ`
+  while using stored experts (the constraint reference is already an upper bound,
+  so `μ` is vacuous, Q2). Kept only to reproduce prior results.
+
+**4-game first-look run** (Pong→Boxing→Freeway→Breakout, `impala_ac_multihead`,
+1 seed, **trimmed budgets** for speed — greedy-30 eval, 700 local / 500–600 global
+iters):
+- **A (min-max): COMPLETE.** Perfect Pong retention, **Forgetting=0, BWT +9.4**,
+  but the hard games are under-learned (Boxing −27, Freeway/Breakout partial) —
+  the honest retention-vs-plasticity trade, amplified by the tiny local budget.
+  Figure + tables: **`reports/atari4_minmax/`** (`score_matrix.png` =
+  lower-triangular color-coded score matrix; also `.csv/.md/.json`).
+- **B (stored_expert): INCOMPLETE** — died after task 1 (only
+  `global_after_task1.pt`, `eval_matrix=[[20.0]]`). It was a `nohup` on a shared,
+  preemptible interactive V100 node. **RERUN via `sbatch` on a stable partition.**
+
+**Code:** on branch **`feature/stored-expert-separation`** (commit `c8c97cc`,
+pushed). New/changed: `crl/ppo/stored_expert.py`, `crl/ppo_continual.py`
+(`_stored_expert` + shared `_load_all_experts`), `crl/config.py` (method doc),
+configs `atari4_minmax.yaml` / `atari4_stored_expert.yaml`, viz
+`experiments/atari4_minmax_matrix.py` (single-run matrix) +
+`atari4_confusion.py` (two-run comparison). Not yet merged to `main`.
+
+### Next steps (in order)
+1. **Rerun B** on a STABLE partition (not a nohup on the interactive node):
+   `sbatch --partition=AI_Center_L40S --cpus-per-task=8 \
+   scripts/hpc_atari_worker.sbatch configs/atari4_stored_expert.yaml 0`.
+2. **A-vs-B comparison figure** once B finishes:
+   `python -m experiments.atari4_confusion --runs \
+   results/atari4_stored_expert_seed0 results/atari4_minmax_seed0 \
+   --labels "Stored-expert (B)" "Min-max (A)" --out reports/atari4_confusion`.
+3. **For final (not first-look) numbers:** raise local/global iters and restore
+   the binding **greedy-100** eval (`eval_episodes: 100`, `eval_all_tasks: true`);
+   the first look used greedy-30 + `eval_all_tasks: false` purely for speed.
+4. Optionally build the **per-state `V*_i(s)`** variant of B (doc eqs 35–46 on the
+   50 no-op + 50 intermediate states) — that is where the "chop the value head off
+   a frozen expert copy" trick (Q1) becomes relevant. Current B uses the robust
+   whole-game scalar gap instead.
+
+### Infra notes (bit us during the first-look run)
+- Allocation had only **1 usable GPU** (the node's other GPU was another user's
+  job). Running both methods on one contended GPU caused OOM + eval starvation —
+  prefer one `sbatch` job per GPU on separate nodes.
+- The interactive partition is **`gpu-v100-*` = preemptible** (it migrated
+  node395→node391 mid-run). Use `sbatch` on stable partitions
+  (`AI_Center_L40S`, `dgx_aic`) for anything that must survive.
+
+---
+
+## ►► PRIOR STATE (2026-07-23)
 
 The project has moved from "does the min-max method work on Atari?" (yes, ~ties
 CLEAR on forgetting) to **"why does it under-consolidate, and what's the fix?"**
