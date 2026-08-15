@@ -1,0 +1,82 @@
+# Formulation A -- MIN-MAX (the true two-policy saddle point, NO stored experts).
+#   Per task k: a LOCAL phase (standard PPO from theta^0 = phi, learns game k from
+#   scratch) produces the frozen reference V_k^L; a GLOBAL phase (PPO + the
+#   actor-only mu constraint) maximizes past-task value while keeping V_k^G >= V_k^L
+#   via the one-sided squared shortfall with a dual multiplier mu (eqs 7-32).
+#   The two policies are each other's MOVING reference; replay-free fresh rollouts.
+#   Same 4 games / architecture as atari4_stored_expert.yaml for a fair comparison.
+experiment:
+  name: atari4_minmax
+  seed: 0
+  results_dir: results
+  device: auto
+  log_every: 25
+env:
+  family: atari
+  params:
+    gamma: 0.99
+    max_steps: 0           # binding rule: no per-episode cap
+    frame_skip: 4
+    frame_stack: 4
+    noop_max: 50
+    terminal_on_life_loss: false
+    repeat_action_probability: 0.0
+    clip_rewards: true
+  tasks:
+  - game: Pong
+    threshold: 18
+  - game: Boxing
+    threshold: 90
+  - game: Freeway
+    threshold: 30
+  - game: Breakout
+    threshold: 50
+policy:
+  kind: impala_ac_multihead
+  hidden_sizes:
+  - 512
+  task_conditioned: false
+duals:
+  kind: projected_ascent
+  lr: 0.3
+  init: 0.0
+  max_value: 1000.0
+  warm_start: false
+trainer:
+  kind: ppo
+  cycles_per_task: 1
+  eps: 0.04                 # squared-value tolerance (g^2, g ~ 0.2)
+  eval_all_tasks: false     # seen tasks only (lower-triangular matrix) -> far cheaper eval
+ppo:
+  method: constrained
+  async_envs: true
+  n_envs: 16
+  n_steps: 128
+  ppo_epochs: 4
+  num_minibatches: 4
+  clip_ratio: 0.1
+  gae_lambda: 0.95
+  vf_coef: 0.5
+  ent_coef: 0.01
+  max_grad_norm: 0.5
+  lr: 0.00025
+  normalize_advantage: true
+  # trimmed 1-seed budgets for a fast first look (each phase early-stops at threshold)
+  task1_iters: 600
+  local_iters: 700
+  global_iters: 500
+  min_iters: 200
+  patience: 3
+  stop_eval_every: 50
+  stop_eval_episodes: 15
+  past_task_sampling: sample   # one random past task per global iter (O(1) vs O(k)) -> faster
+  constraint_episodes: 8    # stochastic MC value for the shortfall (paper-faithful)
+  constraint_every: 20
+  eval_max_ep_steps: 2000
+  eval_noop_enumerate: false
+  # reported eval matrix: greedy (trimmed to 30 for the fast first look; rerun at 100 for final)
+  eval_episodes: 30
+  eval_greedy: true
+  eval_greedy_episodes: 30
+  eval_seed: 100000
+  eval_every: 0

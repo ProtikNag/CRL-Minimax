@@ -243,6 +243,70 @@ def evaluate_intermediate_values_vec(
 
 
 @torch.no_grad()
+def cache_eval_obs(
+    task: Task,
+    task_id: int,
+    cache_game: dict | None,
+    device: torch.device,
+    noop_max: int,
+    seed: int | None = None,
+) -> dict:
+    """Reach and cache the OBSERVATION tensors for the 50 no-op starts and the 50
+    intermediate states, ONCE, so the constraint value V_G can be read from the
+    CRITIC (one forward pass on these cached obs) every iteration instead of a
+    full Monte-Carlo rollout. Deterministic envs (repeat_action_probability=0)
+    make the cached states exact. Returns
+    ``{noop_obs: [Nn,C,H,W], interm_obs: [Ni,C,H,W], interm_rtg: [Ni]}`` (tensors
+    on ``device``; a group is ``None`` if empty)."""
+    noop_obs = []
+    env = task.make_env(clip_rewards=True)
+    for n in range(1, max(1, noop_max) + 1):
+        obs, _ = env.reset(seed=(None if seed is None else seed + n))
+        for _ in range(n):                              # apply n no-ops (action 0)
+            obs, _, term, trunc, _ = env.step(0)
+            if term or trunc:
+                break
+        noop_obs.append(np.asarray(obs))
+    env.close()
+
+    interm_obs, interm_rtg = [], []
+    if cache_game is not None:
+        trajs = cache_game["trajs"]
+        for st in cache_game["starts"]:
+            tr = trajs[st["traj"]]
+            acts = tr["actions"]
+            t = int(st["t"])
+            env = task.make_env(clip_rewards=True)
+            obs, _ = env.reset(seed=int(tr["seed"]))
+            broke = False
+            for a in acts[:t]:                          # re-simulate expert prefix to s_t
+                obs, _, term, trunc, _ = env.step(int(a))
+                if term or trunc:
+                    broke = True
+                    break
+            env.close()
+            if broke:                                   # prefix ended -> drop this start
+                continue
+            interm_obs.append(np.asarray(obs))
+            interm_rtg.append(float(st["expert_rtg"]))
+
+    def _stack(lst):
+        return torch.as_tensor(np.stack(lst), device=device) if lst else None
+    return {"noop_obs": _stack(noop_obs),
+            "interm_obs": _stack(interm_obs),
+            "interm_rtg": interm_rtg}
+
+
+@torch.no_grad()
+def critic_values(policy: Policy, obs: torch.Tensor | None, task_id: int) -> list[float]:
+    """Per-state critic value V_phi(s) for a batch of cached observations, in ONE
+    forward pass (no environment rollout). Empty -> []."""
+    if obs is None:
+        return []
+    return policy.value(obs, task_id).detach().cpu().tolist()
+
+
+@torch.no_grad()
 def evaluate_value_and_score(
     policy: Policy,
     task: Task,

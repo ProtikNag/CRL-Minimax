@@ -1,0 +1,82 @@
+# Formulation B -- STORED-EXPERT consolidation (NO min-max, NO multiplier).
+#   Every game's frozen expert value V*_i is a fixed ceiling; the global regresses
+#   toward all ceilings via the gap-weighted PG  coeff_i = omega_i*2*max(0,V*_i-V_i^G)
+#   (objective doc, "When we have the expert models stored", eqs 34-46).
+#   V*_i and V_i^G both come from the SAME greedy MC evaluator (same reward scale)
+#   -- V_i^G is a fresh rollout value, never read off the drifting critic head.
+#   4 easiest/shortest games; global inits from the task-1 expert, consolidated
+#   incrementally with a retention row saved after each task (the confusion matrix).
+experiment:
+  name: atari4_stored_expert
+  seed: 0
+  results_dir: results
+  device: auto
+  log_every: 10
+env:
+  family: atari
+  params:
+    gamma: 0.99            # match the experts' training discount
+    max_steps: 0           # binding rule: no per-episode cap (TimeLimit poisons GAE)
+    frame_skip: 4
+    frame_stack: 4
+    noop_max: 50
+    terminal_on_life_loss: false
+    repeat_action_probability: 0.0
+    clip_rewards: true
+  tasks:
+  - game: Pong
+    threshold: 18
+  - game: Boxing
+    threshold: 90
+  - game: Freeway
+    threshold: 30
+  - game: Breakout
+    threshold: 50
+policy:
+  kind: impala_ac_multihead
+  hidden_sizes:
+  - 512
+  task_conditioned: false
+duals:                      # unused by stored_expert (no dual mu), but the block is required
+  kind: projected_ascent
+  lr: 0.3
+  init: 0.0
+  max_value: 1000.0
+  warm_start: false
+trainer:
+  kind: ppo
+  cycles_per_task: 1
+  eps: 0.0                  # unused (no constraint / no mu)
+  eval_all_tasks: false     # lower-triangular forgetting matrix (seen tasks only)
+ppo:
+  method: stored_expert
+  expert_dir: experts
+  expert_refs_path: results/atari4_expert_refs.json   # reuse cached V*/scores (skip ~30min setup)
+  ref_fraction: 1.0
+  warmstart_head_from_expert: true   # seed each new head from its expert -> small initial gap
+  # gap-coefficient value estimation (fresh greedy MC of the global, same as V*):
+  constraint_greedy: true
+  constraint_episodes: 8             # rollouts per task per refresh for V_i^G (trimmed)
+  constraint_every: 150              # refresh all gaps rarely (eval scales with k -> keep cheap)
+  eval_max_ep_steps: 2000
+  eval_noop_enumerate: false
+  async_envs: true
+  n_envs: 16
+  n_steps: 128
+  ppo_epochs: 4
+  num_minibatches: 4
+  clip_ratio: 0.1
+  gae_lambda: 0.95
+  vf_coef: 0.5
+  ent_coef: 0.01
+  max_grad_norm: 0.5
+  lr: 0.00025
+  normalize_advantage: true
+  global_iters: 250                  # consolidation iters per task (hard-trimmed; GPU-shared)
+  min_iters: 100
+  # reported eval matrix: greedy (trimmed to 30 for the fast first look; rerun at 100 for final)
+  eval_episodes: 30
+  eval_greedy: true
+  eval_greedy_episodes: 30
+  eval_seed: 100000
+  eval_every: 0

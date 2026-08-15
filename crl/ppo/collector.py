@@ -81,13 +81,14 @@ class RolloutCollector:
         n_steps: int,
         device: torch.device,
         seed: int,
+        async_mode: bool = False,
     ) -> None:
         self.task_id = task.spec.task_id
         self.gamma = task.gamma
         self.n_envs = int(n_envs)
         self.n_steps = int(n_steps)
         self.device = device
-        self.venv = task.make_vector_env(self.n_envs)
+        self.venv = task.make_vector_env(self.n_envs, async_mode=async_mode)
         obs, _ = self.venv.reset(seed=seed)
         self.next_obs = torch.as_tensor(obs, device=device)  # uint8 [n_envs,C,H,W]
         self.next_done = torch.zeros(self.n_envs, device=device)

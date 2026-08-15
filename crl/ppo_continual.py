@@ -29,7 +29,8 @@ from crl.duals import make_dual
 from crl.envs.base import TaskFamily
 from crl.logging_utils import RunLogger
 from crl.policies.base import Policy, clone_policy
-from crl.ppo.evaluate import evaluate_value_and_score
+from crl.ppo.evaluate import cache_eval_obs, evaluate_value_and_score
+from crl.ppo.stored_expert import StoredExpertTrainer
 from crl.ppo.trainer import GlobalTrainer, LocalTrainer
 
 
@@ -66,6 +67,9 @@ class PPOAlternationTrainer:
 
         self.eval_matrix: list[list[float]] = []
         self.cumulative_step = 0
+        # Expert references (populated by the stored-expert / consolidate paths;
+        # left empty otherwise -- _probe treats an empty list as "no experts").
+        self._expert_scores: list[float] = []
 
     # ------------------------------------------------------------------ #
     # helpers
@@ -331,11 +335,13 @@ class PPOAlternationTrainer:
 
     def _init_global_from_expert(self, expert) -> None:
         """Global (multi-head, task_conditioned=False) inits from the task-1
-        expert: identical trunk + expert's head into head 0."""
+        expert: identical trunk + expert's ACTOR head into head 0. The critic head
+        is NOT seeded -- it is not part of the actor min-max (eq 29) and a copied
+        critic head is invalid on the shared trunk anyway; PPO's value loss trains
+        it from scratch on the shared representation."""
         g = self.global_policy
         g.trunk.load_state_dict(expert.trunk.state_dict())
         g.actors[0].load_state_dict(expert.actor.state_dict())
-        g.critics[0].load_state_dict(expert.critic.state_dict())
 
     def _save_ckpt(self, k: int) -> None:
         torch.save(self.global_policy.state_dict(),
@@ -357,13 +363,13 @@ class PPOAlternationTrainer:
         print(f"[consolidate] after T{k}: global={[round(s,1) for s in gscores]} "
               f"expert={[round(s,1) for s in self._expert_scores[:k]]}")
 
-    def _consolidate(self) -> None:
-        games = [t.spec.name.replace("atari-", "") for t in self.family.tasks]
-        K = len(self.family)
-
-        # 1) load experts; fixed reference value V_L (greedy) + raw score per game.
-        # Reuse a cached expert_refs.json if provided (refs are deterministic, so
-        # identical across variants) -- skips the expensive enumeration setup.
+    def _load_all_experts(self, games: list[str]) -> None:
+        """Load every game's frozen single-task expert and its fixed reference
+        value ``V*`` (greedy) + raw score. Populates ``self._experts /
+        _expert_values / _expert_scores``. Reuses a cached ``expert_refs.json`` if
+        provided (refs are deterministic -> identical across variants), skipping
+        the expensive enumeration setup; the expert POLICIES are always loaded
+        (needed for the global init / current-head warm-start)."""
         import json as _json
         import os as _os
         cache = None
@@ -385,11 +391,63 @@ class PPOAlternationTrainer:
             self._expert_scores.append(s)
             self.logger.log({"phase": "expert_ref", "game": g, "V_L": v, "score": s,
                              "cached": cache is not None})
-            print(f"[expert ref] {g}: V_L={v:.3f} score={s:.1f}"
+            print(f"[expert ref] {g}: V*={v:.3f} score={s:.1f}"
                   f"{' (cached)' if cache is not None else ''}")
         self.logger.save_json("expert_refs.json",
                               {"games": games, "expert_values": self._expert_values,
                                "expert_scores": self._expert_scores})
+
+    def _stored_expert(self) -> None:
+        """Formulation B: stored-expert consolidation, NO min-max (objective doc,
+        'When we have the expert models stored', eqs 34-46).
+
+        Each task's expert value ``V*_i`` is a frozen ceiling; the global regresses
+        toward every ceiling at once via the gap-weighted policy gradient
+        ``coeff_i = omega_i * 2 * max(0, V*_i - V_i^G)`` -- no multiplier, no
+        adversary, past and current tasks symmetric. The global inits from the
+        task-1 expert and is consolidated incrementally over tasks 2..K, saving a
+        retention row + checkpoint after each phase so the confusion matrix is
+        available on demand. See :class:`crl.ppo.stored_expert.StoredExpertTrainer`."""
+        games = [t.spec.name.replace("atari-", "") for t in self.family.tasks]
+        K = len(self.family)
+
+        self._load_all_experts(games)
+
+        # Global inits from the task-1 expert; retention after T1.
+        self._init_global_from_expert(self._experts[0])
+        self._log_retention(1, games)
+        self._save_ckpt(1)
+
+        trainer = StoredExpertTrainer(self.ppo, self.device, self.logger, self._log_every)
+        for k in range(2, K + 1):
+            tasks_k = [self.family.tasks[i] for i in range(k)]      # all seen tasks
+            expert_vals = [self._expert_values[i] for i in range(k)]
+            omega = [1.0 / k] * k                                   # uniform, ALL tasks
+            if self.ppo.warmstart_head_from_expert:
+                # Seed the new task's ACTOR head from its expert so the gap starts
+                # small and consolidation preserves rather than re-learns. The
+                # critic head is left to PPO's value loss (a copied critic is
+                # invalid on the shared trunk).
+                ek = self._experts[k - 1]
+                self.global_policy.actors[k - 1].load_state_dict(ek.actor.state_dict())
+            trainer.train(
+                self.global_policy, tasks_k, expert_vals, omega,
+                num_iters=self.ppo.global_iters, seed=self.seed + 1000 * k,
+                current_task=k, expert_scores=self._expert_scores[:k], probe=self._probe)
+            self.logger.log({"phase": "gaps", "task": k,
+                             "V_expert": expert_vals})
+            self._log_retention(k, games)
+            self._save_ckpt(k)
+
+        torch.save(self.global_policy.state_dict(),
+                   self.logger.run_dir / "final_policy.pt")
+
+    def _consolidate(self) -> None:
+        games = [t.spec.name.replace("atari-", "") for t in self.family.tasks]
+        K = len(self.family)
+
+        # 1) load experts; fixed reference value V_L (greedy) + raw score per game.
+        self._load_all_experts(games)
 
         # 2) global inits from task-1 expert; retention after T1
         self._init_global_from_expert(self._experts[0])
@@ -404,6 +462,22 @@ class PPOAlternationTrainer:
             print(f"[interm] loaded {len(interm['games'])} games from "
                   f"{self.ppo.constraint_intermediate_path}")
 
+        # Critic-eval cache: reach the 50 no-op + 50 intermediate states ONCE per
+        # game and store their observation tensors, so the constraint value V_G can
+        # be read from the critic (one forward pass) every iteration.
+        self._eval_cache = {}
+        if self.ppo.constraint_use_critic:
+            for i, g in enumerate(games):
+                task_i = self.family.tasks[i]
+                cg = interm["games"][g] if interm else None
+                noop_max = int(getattr(task_i, "_noop_max", 50))
+                self._eval_cache[g] = cache_eval_obs(
+                    task_i, task_i.spec.task_id, cg, self.device, noop_max,
+                    seed=self.ppo.eval_seed)
+                n_no = 0 if self._eval_cache[g]["noop_obs"] is None else len(self._eval_cache[g]["noop_obs"])
+                n_in = 0 if self._eval_cache[g]["interm_obs"] is None else len(self._eval_cache[g]["interm_obs"])
+                print(f"[eval-cache] {g}: {n_no} no-op + {n_in} intermediate states cached")
+
         # 3) consolidate tasks 2..K (min-max; expert_k is the fixed local ref)
         for k in range(2, K + 1):
             task_k = self.family.tasks[k - 1]
@@ -411,9 +485,11 @@ class PPOAlternationTrainer:
             ref_current = self.ppo.ref_fraction * self._expert_values[k - 1]
             # (B) warm-start the current task's head from its expert (vs random)
             if self.ppo.warmstart_head_from_expert:
+                # Seed ONLY the current task's ACTOR head (useful behavior the
+                # constraint acts on). The critic head is left to PPO's value loss:
+                # a copied critic is invalid on the shared trunk and isn't in eq 29.
                 ek = self._experts[k - 1]
                 self.global_policy.actors[k - 1].load_state_dict(ek.actor.state_dict())
-                self.global_policy.critics[k - 1].load_state_dict(ek.critic.state_dict())
             # (A) dedicated UNCONSTRAINED learning of the current task first, so the
             # global actually masters it before the constrained consolidation.
             if self.ppo.adapt_iters > 0:
@@ -423,13 +499,26 @@ class PPOAlternationTrainer:
                     probe=self._probe)
             self.mu_ctrl.reset()
             omega = [1.0 / k] * (k - 1)
+            # Brute-force retention monitor: each past task's intermediate-state
+            # cache + fixed expert value, so the global's V_i^G can be re-checked
+            # over no-op + intermediate states every `past_monitor_every` iters.
+            past_caches = ([interm["games"][games[i]] for i in range(k - 1)]
+                           if interm else None)
+            past_expert_values = [self._expert_values[i] for i in range(k - 1)]
+            eval_cache = self._eval_cache.get(games[k - 1])
+            past_eval_caches = ([self._eval_cache.get(games[i]) for i in range(k - 1)]
+                                if self._eval_cache else None)
             self.global_trainer.train(
                 self.global_policy, task_k, past_tasks, ref_current=ref_current,
                 mu_ctrl=self.mu_ctrl, omega=omega, eps=self._eps(),
                 num_iters=self.ppo.global_iters, seed=self.seed + 1000 * k,
                 current_task=k, probe=self._probe, local_policy=self._experts[k - 1],
                 ref_score=self._expert_scores[k - 1],
-                intermediate_cache=(interm["games"][games[k - 1]] if interm else None))
+                intermediate_cache=(interm["games"][games[k - 1]] if interm else None),
+                past_intermediate_caches=past_caches,
+                past_expert_values=past_expert_values,
+                monitor_every=self.ppo.past_monitor_every,
+                eval_cache=eval_cache, past_eval_caches=past_eval_caches)
             self.logger.log({"phase": "gaps", "task": k, "V_k_ref_local": ref_current})
             self._log_retention(k, games)
             self._save_ckpt(k)
@@ -438,6 +527,9 @@ class PPOAlternationTrainer:
                    self.logger.run_dir / "final_policy.pt")
 
     def run(self) -> list[list[float]]:
+        if self.method == "stored_expert":
+            self._stored_expert()
+            return self.eval_matrix
         if self.method == "consolidate":
             self._consolidate()
             return self.eval_matrix
@@ -468,7 +560,7 @@ class PPOAlternationTrainer:
             else:
                 raise KeyError(
                     f"Unknown ppo.method '{self.method}'; available: "
-                    "constrained, finetune, clear"
+                    "constrained, finetune, clear, joint, consolidate, stored_expert"
                 )
             row, stds = self._evaluate_row(k)
             self.eval_matrix.append(row)

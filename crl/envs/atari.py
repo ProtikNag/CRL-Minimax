@@ -172,22 +172,30 @@ class AtariTask(Task):
 
     def make_vector_env(self, num_envs: int, clip_rewards: bool | None = None,
                         noop_override: int | None = None,
-                        max_steps_override: int | None = None):
-        """A synchronous vectorized bank of ``num_envs`` identical envs.
+                        max_steps_override: int | None = None,
+                        async_mode: bool = False):
+        """A vectorized bank of ``num_envs`` identical envs.
 
         Uses ``SAME_STEP`` autoreset so the classic PPO/GAE streaming formulation
         (mask bootstrap on done) is exact -- no dummy autoreset transitions.
         ``clip_rewards`` overrides the task default (the evaluator passes ``False``
         to read raw scores and re-derives the clipped value itself).
+
+        ``async_mode`` uses ``AsyncVectorEnv`` (each env in its own subprocess) so
+        the ALE stepping runs in parallel -- a large speedup for the training
+        collectors on multi-CPU nodes. Eval keeps the default synchronous mode so
+        it doesn't pay subprocess-startup cost on its many short-lived vec envs.
         """
-        from gymnasium.vector import AutoresetMode, SyncVectorEnv
+        from gymnasium.vector import AsyncVectorEnv, AutoresetMode, SyncVectorEnv
 
         clip = self.clip_rewards if clip_rewards is None else clip_rewards
-        return SyncVectorEnv(
-            [lambda: self._make_one(clip, noop_override, max_steps_override)
-             for _ in range(int(num_envs))],
-            autoreset_mode=AutoresetMode.SAME_STEP,
-        )
+        # Bind loop vars via default args so each factory is independent (and
+        # picklable for the async subprocess workers).
+        fns = [(lambda c=clip, n=noop_override, m=max_steps_override:
+                self._make_one(c, n, m)) for _ in range(int(num_envs))]
+        if async_mode:
+            return AsyncVectorEnv(fns, autoreset_mode=AutoresetMode.SAME_STEP)
+        return SyncVectorEnv(fns, autoreset_mode=AutoresetMode.SAME_STEP)
 
 
 class AtariFamily(TaskFamily):

@@ -162,11 +162,15 @@ class PPOConfig:
     # on ALL games with mixed batches (no continual constraint). If the joint
     # model reaches each ceiling, a feasible theta EXISTS (rules out infeasibility
     # / capacity); if not, capacity/feasibility is the binding constraint.
-    # "consolidate" = min-max consolidation of ALL games into one global using the
-    # PRECOMPUTED experts as fixed local references (no local phase): the global
-    # inits from the task-1 expert; for task k the constraint reference V_k^L is
-    # expert_k's value; a checkpoint + retention row is saved after each task so
-    # the retention matrix is available on demand mid-run.
+    # "consolidate" = (LEGACY, inconsistent) min-max consolidation that ALSO uses
+    # the precomputed experts as fixed local references -- keeping the mu multiplier
+    # while the reference is already an upper bound makes the constraint vacuous
+    # (objective doc, Q2). Kept only to reproduce prior results; prefer stored_expert.
+    # "stored_expert" = Formulation B ("When we have the expert models stored"): a
+    # plain gap-weighted REGRESSION toward each frozen expert ceiling V*_i, with
+    # NO multiplier / NO min-max, past and current tasks symmetric (eqs 34-46). The
+    # global inits from the task-1 expert and is consolidated incrementally; a
+    # checkpoint + retention row is saved after each task.
     method: str = "constrained"
     expert_dir: str = "experts"    # dir with <Game>/best_model.pt single-task experts
     # Reuse precomputed expert references (V_L + score) from a prior run's
@@ -199,12 +203,29 @@ class PPOConfig:
     # and combined with the start-state shortfall. 0 = start states only (Run A).
     constraint_intermediate_states: int = 0
     constraint_intermediate_path: str = ""   # cache of per-game intermediate states
+    # CRITIC-based constraint value. When true, the per-iteration constraint value
+    # V_G on the 50 no-op + 50 intermediate states is read from the trained CRITIC
+    # (one forward pass on cached observations) instead of a full Monte-Carlo
+    # rollout -- ~ms vs ~145s, so "update the value every iteration" is affordable.
+    # The critic is trained every iteration by PPO's value loss, so V_phi ~ V^pi
+    # up to function-approx error; `constraint_calibrate_every` periodically runs
+    # the true MC eval to log critic-vs-MC drift.
+    constraint_use_critic: bool = False
+    constraint_calibrate_every: int = 0   # 0=off; else run MC calibration every N iters
     # Past-task gradient collection in the global phase. "all" = roll out every
     # past task each iteration (exact sum, O(k) cost). "sample" = roll out ONE
     # uniformly-random past task per iteration, rescaled by the past-task count --
     # an unbiased minibatch estimate of the same sum at O(1) cost (removes the
     # O(k) blow-up on late tasks). Noise averages out over the iterations.
     past_task_sampling: str = "all"
+    # BRUTE-FORCE past-task retention monitor. Every N global iters, evaluate EACH
+    # past task's discounted value V_i^G with the current global policy over the
+    # same 50 no-op + 50 intermediate states used for the current-task shortfall,
+    # and log a "past_monitor" row (V_noop, V_interm, score, ratio vs expert). This
+    # is DIAGNOSTIC only -- it does not enter Eq 29's update (past tasks enter via
+    # their gradient omega_i * grad V_i, not a scalar value). 0 = off. 1 = every
+    # iteration (expensive: ~100 full-episode rollouts per past task per iter).
+    past_monitor_every: int = 0
     constraint_greedy: bool = False  # estimate the constraint value V with greedy rollouts
     # Consolidation: give the current task a dedicated learning step before the
     # constrained consolidation, so the global actually LEARNS the new game (not
@@ -235,6 +256,10 @@ class PPOConfig:
     clear_value_clone_cost: float = 0.005  # weight on value-cloning MSE on replay
     clear_snapshot_batches: int = 2  # rollout batches stored per task (the replay set)
     clear_replay_task_per_step: int = 1  # past tasks sampled for cloning per update
+    # Use AsyncVectorEnv (subprocess-parallel ALE stepping) for the TRAINING
+    # collectors -- a large speedup for rollout collection on multi-CPU nodes
+    # (env-stepping is ~60% of an iteration). Eval stays synchronous.
+    async_envs: bool = False
     n_envs: int = 8  # parallel vectorized envs feeding the collector
     n_steps: int = 128  # rollout length per env per PPO iteration
     ppo_epochs: int = 4  # optimization epochs over each collected batch

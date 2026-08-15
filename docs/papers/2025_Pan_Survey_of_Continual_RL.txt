@@ -1,0 +1,3683 @@
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+1
+
+A Survey of Continual Reinforcement Learning
+Chaofan Pan , Xin Yang
+
+∗,
+
+Member, IEEE, Yanhua Li , Wei Wei , Member, IEEE, Tianrui Li , Senior
+
+arXiv:2506.21872v2 [cs.LG] 7 Apr 2026
+
+Member, IEEE, Bo An , Senior Member, IEEE, Jiye Liang , Fellow, IEEE
+
+Abstract—Reinforcement Learning (RL) is an important machine learning paradigm for solving sequential decision-making
+problems. Recent years have witnessed remarkable progress in
+this field due to the rapid development of deep neural networks.
+However, the success of RL currently relies on extensive
+training data and computational resources. In addition, RL’s
+limited ability to generalize across tasks restricts its applicability
+in dynamic and real-world environments. With the arisen of
+Continual Learning (CL), Continual Reinforcement Learning
+(CRL) has emerged as a promising research direction to address
+these limitations by enabling agents to learn continuously, adapt
+to new tasks, and retain previously acquired knowledge.
+In this survey, we provide a comprehensive examination of
+CRL, focusing on its core concepts, challenges, and methodologies. Firstly, we conduct a detailed review of existing works,
+organizing and analyzing their metrics, tasks, benchmarks, and
+scenario settings. Secondly, we propose a new taxonomy of
+CRL methods, categorizing them into four types from the
+perspective of knowledge storage and/or transfer. Finally, our
+analysis highlights the unique challenges of CRL and provides
+practical insights into future directions.
+Index Terms—Continual reinforcement learning, deep reinforcement learning, continual learning, transfer learning.
+
+I. INTRODUCTION
+ONTINUAL Reinforcement Learning (CRL, a.k.a. Lifelong Reinforcement Learning, LRL) studies how an
+agent maintains and extends decision-making competence as
+it encounters a stream of related, non-stationary tasks without
+restarting from scratch [1], [2]. Real deployments across
+robotics, autonomy, and agentic software cannot afford to
+repeatedly reset and retrain. Instead, they demand a persistent
+agent that balances three coupled objectives: acquiring new
+behavior (plasticity), retaining previously learned skills (stability), and staying within compute/memory budgets as the
+task stream grows (scalability).
+Modern Deep Reinforcement Learning (Deep RL) has
+achieved striking performance in single-task settings, yet practical deployments remain constrained by sample demands,
+brittle generalization, and the tendency to re-optimize from
+
+C
+
+* Xin Yang is corresponding author.
+Chaofan Pan, Xin Yang, and Yanhua Li are with the School of Computing and Artificial Intelligence, Southwestern University of Finance and
+Economics, Chengdu, 611130, China. E-mail: pan.chaofan@foxmail.com,
+yangxin@swufe.edu.cn, yyhhliyanhua@163.com.
+Wei Wei and Jiye Liang are with the Key Laboratory of Computational
+Intelligence and Chinese Information Processing of Ministry of Education,
+School of Computer and Information Technology, Shanxi University, Taiyuan,
+Shanxi, 030006, China. E-mail: {weiwei, ljy}@sxu.edu.cn.
+Tianrui Li is with the School of Computing and Artificial Intelligence, Southwest Jiaotong University, Chengdu, 611756, China. E-mail:
+trli@swjtu.edu.cn.
+Bo An is with the College of Data Science and Computing, Nanyang
+Technological University, 639798, Singapore. E-mail: boan@ntu.edu.sg.
+
+Task 1
+
+Task 2
+
+Task N
+
+Train
+
+Train
+
+Train
+
+CRL Agent
+
+CRL Agent
+
+CRL Agent
+
+Test Task
+
+Test Tasks
+
+Test Tasks
+
+Fig. 1. The setting of CRL. Different types of tasks arrive sequentially,
+and the agent is required to learn to solve the new task incrementally. After
+learning each task, the agent is evaluated on all previously learned tasks.
+
+scratch when the environment or goal specification changes
+[3], [4]. In contrast, humans routinely reuse and refine prior
+experience while avoiding catastrophic forgetting [5]. This gap
+motivates continual learning (CL): learning systems that adapt
+to new tasks while preserving prior knowledge, navigating the
+well-known stability–plasticity dilemma [6]–[8].
+CRL sits at the intersection of RL and CL [1], [2]. Beyond
+the supervised CL template, the sequential decision-making
+context introduces additional failure modes and resource pressures: the agent must act under partial observability and
+delayed rewards, while its data distribution shifts as both the
+policy and the environment evolve. Fig. 1 illustrates the CRL
+workflow: tasks arrive sequentially, every new lesson risks
+catastrophic forgetting, and success is judged on performance
+over the entire task history rather than only the final task.
+It is worth noting that the terms “lifelong” and “continual”
+are often used interchangeably in the RL literature, but their
+usage can vary significantly across studies, potentially leading
+to confusion [9]. In general, most LRL research emphasizes
+rapid adaptation to new tasks, while CRL research prioritizes
+avoiding catastrophic forgetting. In this survey, we unify the
+two terms under the umbrella of CRL, reflecting the broader
+trend in CL research to address both aspects simultaneously.
+A CRL agent is expected to achieve two key objectives:
+1) minimizing the forgetting of knowledge from previously
+learned tasks and 2) leveraging prior experiences to learn
+new tasks more efficiently. By fulfilling these objectives, CRL
+holds the promise of addressing the current limitations of
+DRL, paving the way for RL techniques to be applied in
+broader and more complex domains.
+Currently, a limited number of works have reviewed the
+field of CRL. Some surveys [8], [10] provide a comprehensive
+overview of CL in general, including both supervised learning
+and RL. Most notably, Khetarpal et al. [2] published a survey
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+on CRL from the perspective of non-stationary RL. The survey
+first formulates the definition of the general CRL problem and
+provides a taxonomy of different CRL formulations by mathematically characterizing two key properties of non-stationarity.
+However, it lacks detailed comparison and discussion of some
+important parts in CRL, such as the scalability and scenario
+settings, which are essential for guiding practical research.
+Furthermore, the number of CRL methods has been growing
+rapidly in recent years. Therefore, it is necessary to provide a
+new review of the most recent research in CRL.
+In this survey, we provide a comprehensive examination
+of CRL, focusing on its foundational concepts, challenges,
+and methodologies. We explore the intricacies of CRL and
+identify the key challenges and benchmarks that define the
+field. To achieve this, we systematically review the current
+state of CRL research and propose a taxonomy that organizes
+existing methods into distinct categories. Our analysis also
+extends to novel research areas that push the boundaries of
+CRL, offering insights into how these innovations can be
+harnessed to develop more sophisticated Artificial Intelligence
+(AI) systems.
+Table I shows the structure of this survey. The primary
+contributions of this survey are as follows:
+1) Challenges: We highlight the unique challenges faced
+by CRL, emphasizing the need for a triangular balance
+among plasticity, stability, and scalability.
+2) Scenario Settings: We categorize CRL scenarios into
+lifelong adaptation, non-stationarity learning, task incremental learning, and task-agnostic learning.
+3) Taxonomy: We present a new taxonomy of CRL methods, categorizing them based on the type of knowledge
+stored and/or transferred.
+4) Method Review: We provide the most recent literature review of CRL methods, including detailed discussions of
+seminal works, recently published articles, and promising preprints.
+5) Open Challenges: We discuss open challenges and future
+research directions in CRL.
+II. BACKGROUND
+A. Reinforcement Learning
+RL is a fundamental paradigm in machine learning, where
+an agent interacts with an environment to learn optimal behaviors through trial and error. A common framework used to
+model the interaction is the Markov Decision Process (MDP)
+[11]. In many real deployments, however, the interaction process is not strictly stationary, and understanding which forms
+of drift can be handled (or detected) is central to continual
+formulations [12]. An MDP comprises a tuple of shared components: state space S, action space A, transition distribution
+T (s′ |s, a) ∈ [0, 1], reward function R : S×A → R, and initialstate distribution ρ0 . Because RL tasks differ in whether they
+terminate, we distinguish two standard formulations.
+Episodic (finite-horizon) MDP. An episodic MDP is defined as MH = ⟨S, A, R, T, ρ0 , H⟩, where the horizon H ∈ N
+bounds the maximum number of steps per episode. The agent
+
+2
+
+TABLE I
+T HE STRUCTURE OF THIS SURVEY.
+§ I: Introduction
+§ II-A: Reinforcement Learning
+
+§ II
+Background
+
+§ II-B: Continual Learning
+§ III-A: Definition
+
+§ III
+Overview
+
+§ III-B: Challenges
+§ III-C: Metrics
+§ III-D: Benchmarks
+§ III-E: Scenario Settings
+§ IV-A: Taxonomy Methodology
+
+§ IV
+Methods Review
+
+§ IV-B: Policy-Focused Methods
+§ IV-C: Experience-Focused Methods
+§ IV-D: Dynamic-Focused Methods
+§ IV-E: Reward-Focused Methods
+§ V-A: Task-Free CRL
+
+§V
+Future Works
+
+§ V-B: Large-Scale Pre-Trained Model
+§ V-C: Adjacent Directions
+§ VI: Conclusion
+
+generates a trajectory τ = (s0 , a0 , s1 , · · · , sH−1 , aH−1 , sH )
+with probability [13]:
+H−1
+Y
+Pπ (τ ) := ρ0
+π (at |st ) T (st+1 |st , at ) ,
+(1)
+t=0
+
+where π : S → ∆(A) maps states to action distributions. The
+value of a policy is the expected undiscounted return over the
+episode:
+"H−1
+#
+X
+H
+Vπ := Eτ ∼Pπ
+R (st , at ) .
+(2)
+t=0
+
+Continuing (infinite-horizon) MDP. A continuing MDP
+is defined as Mγ = ⟨S, A, R, T, ρ0 , γ⟩, where γ ∈ (0, 1) is a
+discount factor that ensures convergence of the infinite sum. In
+this setting, the interaction does not terminate, and the policy
+value is [14]:
+"∞
+#
+X
+γ
+t
+Vπ := Eπ
+γ R (st , at ) .
+(3)
+t=0
+
+This survey adopts whichever formulation matches the CRL
+setting at hand: MH when task sequences are episodic and Mγ
+when the agent interacts in a continuing loop without enforced
+termination. For episodic tasks that additionally employ discounting, one may replace R by γ t R in Eq. 2. However, we
+keep the two base cases separate for clarity. In both settings,
+the objective of standard RL is to find an optimal policy π ∗ that
+maximizes the expected return (i.e., VπH or Vπγ , respectively):
+π ⋆ := argmax Vπ .
+
+(4)
+
+π
+
+B. Continual Learning
+CL is an emerging paradigm in machine learning that
+focuses on incrementally updating models to adapt to new
+tasks while maintaining performance on previous tasks. In CL,
+the learner accumulates knowledge over time to enhance the
+model’s effectiveness while saving computational resources
+and time through incremental modeling, providing a viable
+solution for a series of tasks under resource constraints [15].
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+The learning process in CL can be mathematically represented
+as follows [16], This formulation abstracts any continual update as a mapping from the prior model, auxiliary knowledge,
+and incoming task data to the refreshed model and knowledge:
+⟨hk−1 , Uk−1 , Dk ⟩ → ⟨hk , Uk ⟩ ,
+
+3
+
+one agent learns from one task
+one agent solves one task
+
+one agent learns from n tasks
+one agnet solves n tasks
+
+(5)
+
+where hk−1 and hk are the CL models for tasks k − 1 and
+k, respectively; Uk−1 and Uk are the auxiliary information
+extracted from tasks k−1 and k; Dk is the incremental data for
+task k. This equation emphasizes that CL centers on iteratively
+updating the working hypothesis and any auxiliary components
+as new task data arrives, laying out a concise abstraction for
+the subsequent CRL specialization. As the distribution of data
+changes, the variety of tasks increases, and the complexity of
+models deepens, CL faces multiple challenges.
+Two of the most pressing challenges are catastrophic forgetting and knowledge transfer [6], which have garnered significant attention. Catastrophic forgetting refers to the degradation
+of model performance on previous tasks upon learning new
+ones, a phenomenon attributed to the inherent limitations of
+current neural network technologies, which diverge from the
+continuous learning mode of the human brain [5]. Knowledge
+transfer, on the other hand, involves leveraging knowledge
+from previous tasks to facilitate learning on new tasks. To
+mitigate catastrophic forgetting and facilitate knowledge transfer, CL approaches strive for a balance between stability, to
+protect acquired knowledge, and plasticity, to adapt to new
+tasks efficiently. This balance, often referred to as the stabilityplasticity dilemma, is critical for the success of CL systems.
+The diversity of tasks, ranging from classification to robot
+control, introduces variability in goals, data distributions, and
+input formats, further complicating the CL landscape [8], [17],
+[18]. In embodied and robotic settings, continual adaptation
+further intertwines perception, semantics, and safety requirements, making the stability–plasticity trade-off especially consequential [19]. CRL is a special instance within this diversity,
+focusing on RL tasks and providing a unique perspective on
+the challenges and solutions in the CL field. For broader CRL
+perspectives and terminology alignment across RL and CL,
+we refer to recent CRL surveys [20].
+III. OVERVIEW
+This section provides an overview of the research on CRL
+[21], [22], focusing on its definition, evaluation, and relevant
+scenario settings. The existing tasks within CRL are described
+in Appendix C.
+A. Definition
+The term “Continual Reinforcement Learning” can be broken down into two main components: “continual” and “reinforcement learning”. While “reinforcement learning” remains
+the core subject of study, the term “continual” emphasizes
+the extension of traditional RL to a dynamic, multi-task
+framework, where agents continuously learn, adapt, and retain
+knowledge across various tasks. Recent discussions further
+revisit how to formalize “continuality” in RL, including
+
+Agent 1
+
+one agent learns from current task
+one agent solves one task
+
+Transfer
+
+Agent
+
+Agent
+(b) Multi-Task RL
+
+Agent 2
+Agent N
+(a) Traditional RL
+
+one agent learns from current task
+one agnet solves n tasks
+
+Transfer
+
+Agent
+
+Transfer
+
+Agent
+
+Agent
+
+Transfer
+
+Agent
+
+Time
+
+(c) Transfer RL
+Fig. 2. A comparison of four RL paradigms.
+
+Agent
+Time
+
+(d) Continual RL
+
+the implicit assumptions behind task boundaries and nonstationarity abstractions and how these choices affect what
+should be counted as CRL [23].
+In CRL, the learning process is typically modeled using
+MDPs, similar to traditional RL. The general structure includes
+a state space S, an action space A, an observation space O,
+a reward function R : S × A → R, a transition function
+T : S × A → S, and an observation function Ω : S → O.
+The most general form of CRL can be defined as [2]: Eq. 5
+in Sec. II-B frames CL as an abstract update step: prior
+hypothesis/auxiliary knowledge plus incoming task data produce an updated hypothesis and knowledge. CRL specializes
+this abstraction by treating each update step as an RL task
+(often instantiated as an MDP or POMDP) and interpreting
+the task data Dk as interaction experience, such as transitions
+or trajectories collected for that task, depending on whether
+the setting is online, offline, or a mixture.
+MCRL := ⟨St , At , Rt , Tt , Ωt , Ot ⟩.
+
+(6)
+
+Eq. 6 expresses the most general time-indexed CRL environment abstraction, where every component may depend on the
+current interaction index t, capturing arbitrary non-stationarity
+through time-varying spaces and functions. In practical CRL
+benchmarks, this abstraction is often restricted to piecewisestationary task sequences: the interaction stream is segmented
+into tasks indexed by k, only a subset of tuple elements varies
+across tasks (often the reward and transition dynamics (R, T ),
+and sometimes the observation components (Ω, O)), and the
+remaining components (states, actions) stay fixed. This task
+segmentation provides the concrete RL instantiation of Eq. 5:
+for the k-th task (environment segment), Dk corresponds to
+the experience used for learning (collected online or provided
+offline), and Uk can represent any carried-over auxiliary state
+such as replay buffers, learned representations, or models.
+Several related learning paradigms, such as Multi-Task
+Reinforcement Learning (MTRL) and Transfer Reinforcement
+Learning (TRL) , also aim to address multiple RL tasks. A
+comparison between traditional RL, MTRL, TRL, and CRL
+is presented in Fig. 2. The goal of MTRL is to train an
+agent that can handle multiple tasks simultaneously, where
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+both source and target tasks belong to a fixed and known
+set [24]. TRL focuses on transferring knowledge from source
+tasks to target tasks, facilitating faster learning on the target
+tasks [25]. In contrast, CRL is designed for environments that
+change continuously, with tasks often arriving sequentially
+over time. The primary objective is to enable an agent to
+accumulate knowledge over extended periods and quickly
+adapt to new tasks as they arise. CRL shares similarities with
+both MTRL and TRL. MTRL typically employs a cross-task
+shared structure that allows the agent to handle multiple tasks
+simultaneously and can be viewed as a timeless version of
+CRL. TRL, which focuses on knowledge transfer between
+tasks, can be regarded as a subset of CRL, where forgetting
+is not considered. Thus, CRL can be considered a more
+generalized learning paradigm that encompasses the domains
+of MTRL and TRL. Even Continual Supervised Learning
+(CSL) and traditional RL can be viewed as special cases within
+the broader framework of CRL [21].
+B. Challenges
+
+gu
+Re
+
+ne
+
+Stability
+
+etu
+
+lar
+
+Fin
+
+iza
+t
+
+ion
+
+Scalability
+
+Architecture Expansion
+
+Plasticity
+
+Meet resource limitation requirements
+Not meet resource limitation requirements
+
+Fig. 3. The triangular balance of plasticity, stability, and scalability in CRL.
+Scalability determines the usability of CRL methods, while low scalability
+fails to meet resource constraints.
+
+Research on CRL faces several challenges that distinguish
+it from traditional RL. Inspired by the CL challenges in
+supervised learning [8], the primary challenge in CRL can be
+described as achieving a triangular balance among three key
+aspects: plasticity, stability, and scalability. Fig. 3 illustrates
+the relationship between these three aspects:
+1) Stability refers to an agent’s ability to maintain performance on previously learned tasks while simultaneously
+learning new tasks. Stability is closely related to the
+problem of catastrophic forgetting, where learning new
+tasks causes a significant decline in performance on previously learned tasks. Addressing catastrophic forgetting
+is a key focus in CRL research to ensure that the agent
+retains knowledge over time.
+2) Plasticity refers to an agent’s ability to learn new
+tasks after being trained on previous tasks. A critical
+component of plasticity is the agent’s transfer ability,
+which enables it to leverage knowledge from previously
+
+4
+
+learned tasks to enhance performance on new tasks
+(forward transfer) or on earlier tasks (backward transfer).
+3) Scalability refers to the ability of an agent to learn
+many tasks using limited resources. This aspect involves
+the efficient use of memory and computation, as well
+as the agent’s capacity to handle increasingly complex
+and diverse task distributions. Scalability is particularly
+critical in real-world applications, where agents must
+efficiently adapt to a wide range of tasks.
+The balance between these three aspects is crucial for the
+success of CRL algorithms. In the early stages of CL research,
+the primary focus was on stability, with significant efforts
+directed toward mitigating catastrophic forgetting [26], [27]. In
+recent years, more CL studies have recognized the importance
+of plasticity, emphasizing the need for effective knowledge
+transfer and adaptation to new tasks [22], [28]. Currently, the
+issue of plasticity loss has even become a crucial concern in
+DRL research [29], [30].
+In the broader CL literature, the interplay between plasticity
+and stability is often referred to as the stability-plasticity
+dilemma [8], which underscores the inherent trade-off between
+these two aspects. Moreover, in the context of CRL, scalability
+emerges as an equally critical factor. Unlike supervised learning, RL algorithms typically require substantial computational
+resources and memory to learn complex tasks. In addition,
+if resource constraints are ignored, agents could theoretically
+store all data and train a separate model for each task. However, such an approach contradicts the principles of continual
+learning, which aim to develop resource-efficient algorithms
+that generalize across tasks [8]. Therefore, CRL must address
+the challenge of balancing plasticity, stability, and scalability
+to enable agents to learn effectively in dynamic environments.
+C. Metrics
+The longstanding tradition in RL is to evaluate a policy on each task by episodic return, success rate, or other
+reward-based signals. In CRL benchmarks, these per-task
+scores remain the base measurement, but their aggregation
+and interpretation are defined by the benchmark protocol (task
+order, evaluation frequency, normalization, and whether task
+boundaries are observable), which makes results comparable
+across methods [31]. Following benchmark-native protocols
+(e.g., , Continual World and later suites), we summarize a task
+sequence by a small set of standardized statistics that capture
+performance, retention, transfer, and resource constraints [32]–
+[34]. To that end, pi,j ∈ [0, 1] denotes the normalized episodic
+return or success rate on task j after the agent has trained
+sequentially through tasks 1 to i.
+Performance (average performance): A common benchmark summary is the mean performance over the tasks that
+have been encountered so far [32]–[35]:
+i
+1X
+pi,j .
+(7)
+Ai :=
+i j=1
+The final value AN is widely reported as an overall performance summary for a length-N task sequence.
+Forgetting and retention: To quantify stability, benchmarks typically report how much performance on an earlier
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+task decays after training on later tasks [26], [32], [34], [36].
+A benchmark-native choice is to compare the score on task
+i at the end of training on that task with its final score after
+completing the full task stream:
+F Gi := max (pi,i − pN,i , 0) .
+
+(8)
+
+The average of F Gi over i = 1, . . . , N − 1 yields the
+forgetting metric F G. Related variants: The specific choice of
+reference point is benchmark-dependent [32], [34]. Examples
+include the best-so-far performance, results from intermediate
+checkpoints, performance at the end of training on task i, pretraining baselines, or signed differences without a non-negative
+floor.
+Transfer (forward and backward): Transfer metrics describe how learning some tasks changes learning speed or
+asymptotic performance on others [32], [33], [35]. We start
+from the benchmark-native definition used in common CRL
+suites, which treats forward transfer as learning efficiency during each task and measures it via an AUC-based comparison to
+a single-task baseline [32]–[34]. Forward transfer (FT): Let
+pi (t) ∈ [0, 1] denote the (periodically evaluated) normalized
+return or success rate on task i at training step
+R i∆ t. For a per-task
+1
+p (t) dt and
+budget of ∆ steps, define AUCi := ∆
+(i−1)∆ i
+AUCbi as the corresponding AUC from a reference single-task
+run. The per-task forward transfer is
+N
+AUCi − AUCbi
+1 X
+F Ti :=
+,
+F
+T
+:=
+F Ti . (9)
+N − 1 i=2
+1 − AUCbi
+Positive F T indicates faster learning than training from scratch
+on each task, while negative values indicate slowed learning.
+Related variants: Some works report zero-shot transfer, which
+measures performance on task i before any training on it
+[34], and some CL-derived formulations compute pre-post
+differences such as pi,i −pi−1,i from checkpointed evaluations.
+These variants are useful diagnostics, but they should not be
+conflated with the AUC-based benchmark metric. Backward
+transfer (BWT): As a related, auxiliary notion, backward
+transfer compares the final performance on earlier tasks with
+their performance when they were first learned [35]:
+N −1
+1 X
+BW T :=
+(pN,i − pi,i ) .
+(10)
+N − 1 i=1
+Positive BW T means later training improves earlier tasks.
+This is sometimes described as negative forgetting when
+forgetting is defined as a signed difference (without a nonnegative floor). In contrast, our F G in Eq. 8 is explicitly
+floored at zero, so BW T should be treated as a complementary
+diagnostic rather than a universally co-equal primary metric.
+Efficiency and scalability: Beyond outcome metrics, CRL
+benchmarks increasingly report resource-related numbers to
+approximate scalability. Importantly, scalability evaluation in
+CRL still lacks a single standardized quantitative metric, so
+existing papers usually present practical quantitative proxies
+that each capture one evaluation dimension rather than serving
+as a universal standard. Common proxies include model size
+after learning a full task stream [37], memory footprint
+(e.g., replay buffer size or auxiliary models stored for retention) [32], [34], training and inference cost (environment
+
+5
+
+interactions, wall-clock compute, or per-step overhead) [31],
+and sample efficiency (interactions needed to reach a target
+return or success threshold) [38]. While none of these proxies alone defines scalability, together they help contextualize
+performance and retention claims under realistic compute and
+memory constraints.
+Additional Metrics: The above metrics provide a
+benchmark-first evaluation lens and are widely used in CRL
+suites. Furthermore, some benchmarks introduce task-specific
+summaries such as generalization improvement score [39] or
+performance relative to a single-task expert [40] to capture
+aspects that are not well-reflected by a single sequence-level
+statistic.
+D. Benchmarks
+Although CRL has gained increasing attention in recent
+years, its growth has been relatively slow compared to CSL.
+One of the reasons for this slow development is the difficulty
+of reproduction and the large amount of computation required
+for experiments. Another reason is the lack of standardized
+benchmarks and metrics for evaluation [34].
+Recently, several benchmarks have been proposed for CRL,
+including dedicated suites that focus on standardized task
+streams and reproducible protocols [43], [44]. Table II provides a comparison of these benchmarks [33]. These benchmarks vary in characteristics such as the number of tasks, the
+length of task sequences, and the type of observations. Below,
+we briefly describe the notable features of these benchmarks:
+1
+• CRL Maze [41] : A 3D environment based on ViZDoom, featuring non-stationary object-picking tasks with
+modified attributes such as light, textures, and objects.
+2
+• Lifelong Hanabi [39] : A partially observable multiagent environment based on the card game Hanabi [45].
+It challenges agents to cooperate and adapt in a dynamic,
+multi-agent setting.
+3
+• Continual World [32] : This benchmark comprises a
+set of robotic manipulation tasks derived from MetaWorld [46], evaluating agents across a diverse set of these
+operations.
+4
+• L2Explorer [40] : A 3D Procedural Content Generation
+(PCG) world that includes five tasks within a single
+environment, providing a highly configurable and diverse
+set of challenges for CRL algorithms.
+5
+• CORA [34] : Based on four different environments,
+each with unique features, CORA offers a comprehensive
+evaluation platform for CRL algorithms.
+• Lifelong Manipulation [42]: This benchmark includes
+ten manipulation tasks designed to evaluate agents at
+different levels of difficulty. It is easier to train compared
+to the Continual World.
+6
+• COOM [33] : Another benchmark based on various
+ViZDoom environments, COOM focuses on embodied
+1 https://github.com/Pervasive-AI-Lab/crlmaze
+2 https://github.com/chandar-lab/Lifelong-Hanabi
+3 https://github.com/awarelab/continual_world
+4 https://github.com/lifelong-learning-systems/l2explorer
+5 https://github.com/AGI-Labs/continual_rl
+6 https://github.com/hyintell/COOM
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+6
+
+TABLE II
+C OMPARISON OF CONTINUAL REINFORCEMENT LEARNING BENCHMARKS .
+Benchmark
+
+3D
+
+Number of
+Sequences
+4
+
+Length of
+Sequences
+3
+
+Partially
+Observable
+
+Multi-Agent
+
+Image
+Observation
+
+Metrics1
+
+%
+AN
+"
+"
+"
+"
+AN , F G, F T, GIS
+%
+%
+%
+"
+%
+2
+10,20
+%
+AN , F G, F T
+"
+%
+%
+%
+F G, F T, BT, P R, SE
+"
+%
+%
+"
+"
+4
+4,6,15
+%
+AN , F G, F T
+CORA [34]2
+"& %
+"& %
+"& %
+Lifelong Manipulation [42]
+10
+%
+AN
+"
+%
+%
+%
+7
+4,8,16
+%
+AN , F G, F T
+COOM [33]
+"
+"
+"
+1 “A ” stands for the average performance. “F G” stands for the forgetting. “F T ” stands for the forward transfer. “BT ” stands for the backward
+N
+transfer. “GIS” stands for the generalization improvement score. “P R” stands for the performance relative to a single-task expert. “SE” stands for
+the sample efficiency.
+2 CORA is based on four environments with different features.
+CRL Maze [41]
+Lifelong Hanabi [39]
+Continual World [32]
+L2Explorer [40]
+
+TABLE III
+A FORMAL COMPARISON OF TYPICAL CONTINUAL REINFORCEMENT LEARNING SCENARIOS .
+Scenario
+Lifelong Adaptation
+Non-Stationarity Learning
+Task Incremental Learning
+Task-Agnostic Learning
+1
+
+Learning1
+{Mk }K
+k=1
+{Mk }K
+,
+R
+=
+̸
+Rj or Ti ̸= Tj for i ̸= j
+i
+k=1
+{Mk }K
+k=1 , Ri ̸= Rj and Ti ̸= Tj for i ̸= j
+{Mk }K
+k=1
+
+Evaluation
+MK
+{Mk }K
+k=1 , k is available
+{Mk }K
+k=1 , k is available
+{Mk }K
+k=1 , k is unavailable
+
+Mk is the MDP of task k, K is the identifier of the latest task, Ri is the reward function of task i, and Ti is the transition function of task i.
+
+perception tasks, providing a robust platform for evaluating CRL algorithms.
+The primary challenge in creating benchmarks for CRL lies
+in the design of task sequences. This is a complex engineering
+task that requires careful consideration of various factors,
+such as task difficulty, task order, and the number of tasks.
+Currently, there is no single ideal benchmark, and different
+benchmarks focus on different aspects of CRL [34]. Therefore,
+building a comprehensive and standardized benchmark for
+CRL remains an ongoing challenge.
+E. Scenario Settings
+CRL scenarios can be categorized into four main types
+based on the non-stationarity property and the availability
+of task identities. A formal comparison of these scenarios
+is provided in Table III, which outlines the learning and
+evaluation processes for each scenario type. We summarize
+the key scenario types as follows:
+Lifelong Adaptation: The agent is trained on a sequence
+of tasks, and its performance is evaluated only on new tasks.
+This scenario was prevalent in the early stages of CRL
+research [53], [97] and shares similarities with TRL, albeit
+with continual tasks. Lifelong adaptation can be viewed as a
+subproblem within the broader CRL framework, as its focus
+is on adapting to new tasks without addressing the full range
+of CRL challenges.
+Non-Stationarity Learning: The tasks in the sequence
+differ in terms of their reward functions [37], [67] or transition
+functions [69], [98], but they share the same underlying logic.
+The agent is evaluated on all tasks in the sequence. While
+some studies have explored non-stationarity in action space or
+state space within lifelong adaptation settings [99], [100], this
+specific issue has not been thoroughly investigated within the
+broader context of CRL.
+Task Incremental Learning: The tasks in the sequence
+differ significantly from one another in terms of both reward
+
+and transition functions [33], [34], [71]. These tasks are
+more distinct compared to those in non-stationary learning.
+Some tasks may even have different state and action spaces
+[101]. Moreover, a few studies have extended this scenario to
+include tasks from different domains [102], [103], increasing
+the diversity of tasks the agent must learn.
+Task-Agnostic Learning: The agent is trained on a sequence of tasks without full knowledge of task labels or
+identities [69], [104]. The agent might not even be aware
+of task boundaries, requiring it to infer task changes from
+the data itself [82], [84], [105]. This scenario is particularly
+relevant to real-world applications, where agents often do not
+have explicit knowledge of the tasks they are solving or the
+states they are in.
+In most CRL research, it is assumed that each task provides
+a sufficient number of steps for the agent to learn. Typically, the task sequence is fixed. However, some studies have
+explored dynamically generated task sequences [69], [106].
+Recent research has also increasingly focused on scenarios
+where agents are unable to observe task boundaries, which
+adds a level of realism and complexity to the problem.
+Therefore, some researchers consider this scenario as CRL
+and refer to scenarios that do not fully satisfy these criteria
+as semi-continual RL [84]. While the above categories offer a
+structured view of CRL scenarios, it is important to note that
+the boundaries between these scenarios are not always clearcut. Many studies integrate multiple scenarios to address more
+complex, general CRL problems [37], [38].
+To connect scenario settings, challenge emphasis, taxonomy
+categories, and scalability considerations in a single view,
+Table IV summarizes representative CRL families discussed
+in this survey. The “Typical Scenario” column follows the
+scenario categories in Table III. For scalability, we summarize
+qualitative resource-growth trends (memory, compute, and
+task-scaling) alongside brief bottleneck notes.
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+7
+
+TABLE IV
+U NIFIED VIEW LINKING CRL METHODS TO SCENARIOS , CHALLENGE EMPHASIS , AND SCALABILITY PROFILES . 3
+Method Family (examples)
+Policy reuse: init. (MAXQINIT
+[53], CSP [37])
+Policy decomposition (OWL
+[67], DaCoRL [98])
+Policy merging: Regularization
+(EWC [26])
+Policy merging: Masks (MASK
+[80])
+Policy merging: Distillation
+(DisCoRL [56])
+Policy merging: Hypernets
+(HN-PPO [72])
+Direct replay (CLEAR [58], Selective [51])
+Generative replay (RePR [74],
+SLER [107])
+Direct modeling (MOLe [108],
+HyperCRL [77])
+Indirect modeling (LILAC [60],
+Dreamer [83])
+Reward-focused (ELIRL [109],
+IML [110])
+1
+2
+3
+
+Taxonomy
+Category
+
+Typical Scenario
+
+Challenge Focus (P/S/Sc)1
+
+policy-focused
+
+lifelong adaptation
+
+P-high / S-low / Sc-med
+
+policy-focused
+
+task-agnostic learning
+
+P-high / S-med / Sc-high
+
+policy-focused
+
+task incremental learning
+
+P-med / S-high / Sc-low
+
+policy-focused
+
+task incremental learning
+
+P-low / S-high / Sc-low
+
+policy-focused
+
+task incremental learning
+
+P-med / S-high / Sc-med
+
+policy-focused
+
+task incremental learning
+
+P-high / S-med / Sc-med
+
+experience-focused
+
+non-stationarity learning
+
+P-med / S-high / Sc-med
+
+experience-focused
+
+task incremental learning
+
+P-med / S-high / Sc-med
+
+dynamic-focused
+
+non-stationarity learning
+
+P-med / S-high / Sc-low
+
+dynamic-focused
+
+task-agnostic learning
+
+P-high / S-med / Sc-high
+
+reward-focused
+
+task incremental learning
+
+P-high / S-med / Sc-med
+
+Scalability Profile2
+memory growth: med; compute
+growth: med; task-scaling: med
+memory growth: low; compute
+growth: high; task-scaling: high
+memory growth: low; compute
+growth: med; task-scaling: low
+memory growth: med; compute
+growth: low; task-scaling: low
+memory growth: low; compute
+growth: high; task-scaling: med
+memory growth: low; compute
+growth: high; task-scaling: med
+memory growth: high; compute
+growth: high; task-scaling: med
+memory growth: low; compute
+growth: med; task-scaling: med
+memory growth: high; compute
+growth: high; task-scaling: med
+memory growth: low; compute
+growth: med; task-scaling: high
+memory growth: low; compute
+growth: med; task-scaling: med
+
+P: Plasticity; S: Stability; Sc: Scalability.
+For growth metrics (memory/compute), low is preferable; for task-scaling, high indicates better ability to handle long task streams.
+Note that the properties described in this table are representative general trends for each family. Individual methods may exhibit different characteristics
+depending on specific algorithmic choices and implementations.
+
+IV. METHODS REVIEW
+In this section, we present our taxonomy of CRL methods.
+Khetarpal et al. [2] proposed a taxonomy for CRL, classifying
+approaches into three categories: explicit knowledge retention,
+leveraging shared structures, and learning to learn. While this
+taxonomy provides valuable insights, it does not adequately
+capture the unique characteristics of CRL, and it falls short of
+encompassing the breadth of recent advancements in the field.
+To address these limitations, we propose a new taxonomy that
+focuses on the unique aspects of CRL, distinguishing it from
+traditional CL methods. Our taxonomy is grounded in the key
+components of RL and organizes CRL methods based on the
+type of knowledge they store and transfer. In addition, we
+provide the most updated and comprehensive review of CRL
+methods, including the latest advancements in the field. The
+applications and more related works of CRL are described in
+Appendix D. Fig. 4 presents a timeline with the representative
+methods in CRL, allowing one to evaluate the novelty and
+popularity of each class of methods.
+A. Taxonomy Methodology
+Fig. 5 illustrates the general structure of CRL methods.
+In this framework, an agent’s knowledge can be broadly
+categorized into four main types: policy, experience, dynamics,
+and reward. While other elements in RL, such as action space
+and state space, can also be considered forms of knowledge,
+they are often overlooked in existing CRL methods. Therefore,
+our taxonomy primarily focuses on four categories, which are
+central to the design and implementation of CRL systems.
+To systematically organize CRL methods, we address
+the following key question: “What knowledge is stored
+and/or transferred?” Based on this guiding question, we
+
+classify CRL methods into four main categories: policyfocused, experience-focused, dynamic-focused, and rewardfocused. We further divide some categories into sub-categories
+based on how the knowledge is utilized. It is important to
+note that this taxonomy is not exhaustive, and many methods
+may span multiple categories. To facilitate a comprehensive
+overview of the development of CRL methods, we list representative approaches in Table V, organized chronologically.
+Before detailing each category, we refer readers to Table IV,
+which serves as a compact guide linking representative CRL
+families to their typical scenarios, challenge emphasis, and
+scalability profiles.
+B. Policy-Focused Methods
+We start by introducing the policy-focused methods, which
+are the most common and fundamental in CRL. This is because the policy function or value function constitutes the core
+knowledge in RL, directly determining the agent’s decisionmaking process. Among these methods, the fine-tuning strategy, where the agent inherits the policy or value function
+from a previous task, is widely adopted as a naive mechanism
+for knowledge transfer. This setup also naturally arises when
+agents start from large pretrained backbones and must update
+them continually across task streams [111]. This strategy often
+overlaps with other CRL approaches discussed later [37],
+[112]. The policy-focused methods can be further divided into
+three sub-categories: policy reuse, policy decomposition, and
+policy merging. Below, we provide a detailed discussion.
+1) Policy Reuse: Policy reuse is a widely used strategy in
+CRL, where the agent retains and reuses complete policies
+from previous tasks. As illustrated in Fig. 6, the simplest
+approach involves storing all previously learned policies to
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+8
+
+TABLE V
+T HE TAXONOMY OF CONTINUAL REINFORCEMENT LEARNING METHODS .
+Category
+
+Methods
+
+§ IV-B1: Policy Reuse
+§ IV-B
+Policy-focused
+
+§ IV-B2: Policy Decomposition
+
+§ IV-B3: Policy Merging
+
+§ IV-C
+Experience-focused
+
+§ IV-C1: Direct Replay
+
+MAXQINIT [53], LFRL [57], [97], [113], [61], [114], CSP [37], SOPGOL [115],
+ClonEx-SAC [68], UCOI [116], SWOKS [117], [111], LEGION [92]
+PG-ELLA [118], [102], [119], TaDeLL [47], PNN [48], ePG-ELLA [120], MPHRL [59],
+LPT-FTW [62], [121], CDLRL-ZPG [103], OWL [67], SANE [69], [65], HLifeRL [122],
+PT-TD [84], COVERS [123], HVCL [101], RHER [85], CompoNet [86], DaCoRL [98],
+MacPro [95]
+EWC [26], PathNet [50], Benna-Fusi [27], P&C [54], Online-EWC [54], PC [124], DisCoRL
+[56], [125], VPC [126], BLIP [127], HN-PPO [72], CoTASP [79], MASKBLC [80], UCBlvd
+[78], [128], RPT [89], C-CHAIN [91], CR [129], VQ-CD [130], CKA-RL [131], CDE [132],
+FAME [94]
+[51], CLEAR [58], CoMPS [64], [133], [134], 3RL [82], CPPO [88], [135], DAAG [93],
+[136]
+
+§ IV-C2: Generative Replay
+§ IV-D
+Dynamic-focused
+
+§ IV-D1: Direct Modeling
+
+SLER [107], RePR [74], S-TRIGGER [137], [70], [138]
+MOLe [108], [105], HyperCRL [77], VBLRL [38], LLIRL [139], [106], Losse-FTL [87],
+DRAGO [96]
+
+§ IV-D2: Indirect Modeling
+§ IV-E: Reward-focused
+
+LILAC [60], LiSP [73], 3RL [82], Continual-Dreamer [83]
+ELIRL [109], [75], IML [110], SR-LLRL [140], LSRM [63], [141], MT-Core [90]
+
+prevent catastrophic forgetting and using them as a foundation
+for developing new policies. While most methods of policy
+reuse have limited scalability, it remains a common approach
+for implementing CRL agents, as it primarily focuses on
+knowledge transfer and adaptation.
+One key form of policy reuse involves initializing new
+policies with prior knowledge before fine-tuning. To evaluate
+initial target-task performance following knowledge transfer,
+the “jumpstart” metric was introduced [53]. The jumpstart
+objective [21], [56], [84] seeks to maximize the expected value
+function at the initial state:
+π
+J(π) = argmax EM ∈M [VM
+(s0 )],
+
+(11)
+
+π
+
+π
+(s0 ) is the value function of policy π at initial state
+where VM
+s0 for task M in the task set M. Building on this, MAXQINIT
+optimally initializes the Q-function using maximum estimated
+Q-values from the empirical task distribution [53]:
+ˆ max (s, a) = max QM (s, a),
+Q
+(12)
+ˆ
+M ∈M
+
+ˆ denoting sampled tasks and QM the learned taskwith M
+specific Q-values. Additionally, Mehimeh et al. [116] proposed Uncertainty and Confidence aware Optimistic Initialization (UCOI). UCOI selectively applies optimistic initialization
+based on state-action uncertainty (derived from past outcome
+variability) and PAC-MDP confidence bounds, thereby minimizing unnecessary exploration and improving efficiency.
+Policy reuse can also improve exploration by leveraging
+past policies. Evaluating various exploration strategies for
+SAC, Wolczyk et al. [68] proposed ClonEx-SAC, which utilizes the best-return past policy to excel in knowledge transfer,
+especially for recurring tasks. Furthermore, Meta-MDP [97]
+formulates the search for an optimal exploration strategy as a
+meta-level MDP. By decoupling exploration from exploitation,
+it enables cross-task optimization of exploratory behavior,
+which boosts efficiency despite the difficulty of determining
+optimal exploration durations.
+While effective, these methods often depend heavily on
+
+task similarity for generalization. To overcome this, some
+CRL approaches achieve zero-shot generalization via task
+composition frameworks like Boolean algebra and logical
+composition [61], [114], [115], enabling the direct reuse of
+composed policies for novel tasks without retraining.
+Task composition via Boolean algebra facilitates combining
+tasks through negation (¬), disjunction (∨), and conjunction
+(∧) over a task set M [61]. Specifically:
+1) Negation
+¬
+yields
+a
+task
+with
+reward
+R¬M (s, a) = (RMMAX (s, a) + RMMIN (s, a)) − RM (s, a),
+where RMMAX (s, a) = maxM ∈M RM (s, a) and
+RMMIN (s, a) = minM ∈M RM (s, a).
+2) Disjunction ∨ merges M1 and M2 via RM1 ∨M2 (s, a) =
+max{RM1 (s, a), RM2 (s, a)}.
+3) Conjunction ∧ combines them via RM1 ∧M2 (s, a) =
+min{RM1 (s, a), RM2 (s, a)}.
+For goal-based settings, this framework extends to computing optimal value functions for composed tasks directly. The
+¯ is defined as:
+extended Q-value function Q
+X
+¯ g, a) = R(s,
+¯ g, a) + γ
+Q(s,
+P (s′ |s, a)V¯ π¯ (s′ , g), (13)
+s′
+
+¯ penalizes undesired goals, and V¯ π¯ is the
+where g is a goal, R
+value under π
+¯ . Logical operations apply analogously to these
+functions [115]:
+¯ ⋆ )(s, g, a)
+¬(Q
+¯ ⋆M (s, g, a) + Q
+¯ ⋆M (s, g, a)) − Q
+¯ ⋆ (s, g, a),
+= (Q
+MIN
+MAX
+¯ ⋆1 , Q
+¯ ⋆2 )(s, g, a) = max{Q
+¯ ⋆1 (s, g, a), Q
+¯ ⋆2 (s, g, a)}, (14)
+∨ (Q
+¯ ⋆1 , Q
+¯ ⋆2 )(s, g, a) = min{Q
+¯ ⋆1 (s, g, a), Q
+¯ ⋆2 (s, g, a)}.
+∧ (Q
+This zero-shot composition lets agents immediately solve
+novel tasks using prior skills. Furthermore, Sum Of Products with Goal-Oriented Learning (SOPGOL) accommodates
+stochastic and discounted tasks, helping agents decide between
+reusing skills or learning anew [114], significantly boosting
+sample efficiency [61], [114].
+To scale policy reuse, Continual Subspace of Policies (CSP)
+maintains a policy subspace rather than discrete models [37].
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+Task 1
+Policy-based Experience-based
+Dynamic-based Reward-based
+
+2026
+
+Ours
+
+FAME [94]
+RPG [89]
+
+2025
+
+DRAGO
+C-CHAIN
+MacPro
+LEGION
+
+[96]
+[91]
+[95]
+[92]
+
+2024
+[85]
+[21]
+[83]
+[81]
+
+Grokking [12]
+DAAG [93]
+
+Save
+
+CoMPS [64]
+
+HyperCRL [77]
+[75]
+
+[76]
+RePR [74]
+
+[61]
+LILAC [60]
+CRL Maze [41]
+MPHRL [59]
+
+2020
+
+DisCoRL [56]
+CLEAR [58]
+LFRL [57]
+
+[55]
+
+MAXQINIT [53]
+[51]
+
+2017
+
+[52]
+P&C [54]
+
+EWC [26]
+H-DRLN [49]
+
+PathNet [50]
+
+TaDeLL [47]
+
+2016
+
+PNN [48]
+CHILD [1]
+
+Fig. 4. Timeline illustrating the key developments, by order and interval, in
+the field of CRL from the end of 2016 to the present day (2026). The timeline
+includes methods, benchmarks, surveys, and analysis papers published in the
+field. At the start of the timeline, we highlight CHILD, which is described
+the first CL agent and pioneered the field of CRL. We then jump toward the
+middle of 2016, highlighting PNN, a stepping stone towards a full CRL agent.
+The dates shown in the timeline are the publication dates of the papers.
+Task i-1
+
+Task i
+
+s
+
+Experience
+Buffer
+
+Reuse
+
+Composition
+
+Fig. 6. The framework of policy reuse in CRL methods. Stored policies
+are reused to initialize new policies, enhance exploration, and improve
+generalization by leveraging task composition frameworks.
+Shared Components
+
+1
+
+Module1 Module2
+
+High-level
+Policy
+
+Latent
+Basis
+
+......
+
+Modulei
+Update
+
+i+1
+
+Low-level
+Policy 1
+
+Low-level
+Policy i+1
+
+Module1
+Head 1
+
+Head i+1
+
+Task i
+
+Task i+1
+
+Module3
+Combine
+Modulei+1
+
+Learn
+
+LiSP [73]
+
+LPG-FTW [62]
+LSRM [63]
+CRL-Unsup [41]
+
+2018
+
+Policy/Value
+Functions
+Initialize
+
+Coefficients
+
+Continual World [32]
+Liffelong Hanabi [39]
+
+2019
+
+Explore
+
+Policy Library
+
+HN-PPO [72]
+Mixing Times [71]
+[70]
+SANE [69]
+ClonEx-SAC [68]
+Continual Habitat-Lab [66]
+
+OWL [67]
+L2Explorer [40]
+[65]
+
+2021
+
+Policy/Value
+Functions
+
+CSP [37]
+
+[2]
+VBLRL [38]
+LSRM [63]
+CORA [34]
+
+2022
+
+Task i+1
+
+Learn
+
+MT-Core [90]
+Continual NavBench [44]
+
+PT-TD [84]
+COOM [33]
+3RL [82]
+[22]
+MaskBLC [80]
+
+CoTASP [79]
+UCBlvd [78]
+
+2023
+
+Task i
+
+TRAC [9]
+Losse-FTL [87]
+CompoNet [86]
+
+CPPO [88]
+RHER
+A Definition
+Continual-Dreamer
+L2D2-C
+
+Survey
+Analysis
+Method
+Benchmark
+
+9
+
+a
+
+Policy/Value
+Functions
+
+Stored Knowledge
+
+Task i+1
+
+s'
+r
+
+Dynamic Model
+Reward Transfer
+Functions
+
+Transferred Knowledge
+
+Fig. 5. Illustration of the general structure of a CRL method, organized by
+the knowledge that is stored and/or transferred.
+
+Task 1
+
+Fig. 7. The framework of policy decomposition in CRL methods. Factor
+decomposition, multi-head network, hierarchical decomposition, and modular
+architecture are used to decompose the policy into a shared base and taskspecific components.
+
+Represented as a convex hull in parameter space, each vertex
+(anchor) encapsulates a policy. New policies emerge as convex
+combinations of these anchors, while novel learning adds
+new vertices, yielding sublinear model growth and a better
+performance-scalability tradeoff.
+2) Policy Decomposition: Policy decomposition is another
+widely used strategy in CRL, where the agent decomposes the
+policy into multiple components and reuses them in various
+ways. The primary challenge in policy decomposition lies
+in determining how to effectively decompose the policy. As
+shown in Fig. 7, this can be achieved through four main
+approaches: factor decomposition, multi-head decomposition,
+modular decomposition, and hierarchical decomposition.
+Factor decomposition is mainly used in early CRL methods without deep learning, where the policy is decomposed
+into a shared base and task-specific components. This approach
+is is derived from multi-task supervised learning, and has
+been successfully applied in CRL by Policy Gradient Efficient
+Lifelong Learning Algorithm (PG-ELLA) [118], [120]. PGELLA introduces a latent basis representation to model each
+task’s parameters as a linear combination of components from
+a shared knowledge base. Specifically, the policy parameters
+for task k are represented as:
+θk = Lsk ,
+
+(15)
+
+where L is the shared latent basis and sk are the task-specific
+coefficients. However, PG-ELLA trains individual policies
+first, which may lead to incompatibility with the shared
+base. To address this, Lifelong PG: Faster Training Without
+forgetting (LPG-FTW) [62] optimizes task-specific coefficients
+directly using policy gradients, ensuring compatibility with the
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+shared base while leveraging shared knowledge to accelerate
+learning. This modification enables LPG-FTW to handle more
+complex dynamical systems.
+Building on the foundations of PG-ELLA, subsequent research has improved the efficiency and scalability of the factor
+decomposition method using kernel methods [121] or the
+multiple processing units assumption [120]. Furthermore, the
+introduction of cross-domain lifelong RL frameworks [102]
+enables agents to efficiently learn and generalize across multiple task domains. This is achieved by partitioning the series of
+tasks into task groups, such that all tasks within a particular
+group G share a common state and action space. Then, the
+policy parameters for task k in group G are represented as:
+θk = Ψ(G) Lsk ,
+
+(16)
+
+(G)
+
+where Ψ
+is a group-specific projection matrix that maps
+the shared latent basis L to the task-specific coefficients sk .
+Further advancements include the integration of task descriptors for zero-shot knowledge transfer. Task Descriptors
+for Lifelong Learning (TaDeLL) assumes that task descriptors
+ϕ(mk ) can be linearly factorized using a latent basis D over
+the descriptor space, coupled with the policy basis L to share
+the same coefficient vectors sk [47]:
+ϕ(mk ) = Dsk .
+
+(17)
+
+This allows for consistent task embeddings across policies and
+descriptors, enhancing learning efficiency and enabling zeroshot transfer. Cross-Domain Lifelong Reinforcement Learning
+algorithm with Zero-shot Policy Generation ability (CDLRLZPG) [103] further extends the zero-shot ability by constructing a linear mapping from environmental coefficients qD
+k to
+D
+task-specific coefficients sD
+using
+a
+matrix
+W
+in
+learned
+k
+task domain D:
+D D
+sD
+(18)
+k = W qk .
+This mapping allows the generation of approximate optimal
+policy parameters for new tasks directly from environmental
+information, significantly improving generalization across different task domains without additional learning.
+Finally, although PT-TD learning is not a factor decomposition method, it also uses a similar idea to decompose the
+value function, and it is also agnostic to the nature of the
+function approximator used [84]. PT-TD learning decomposes
+the value function into two components that update at different
+timescales: a permanent value function for preserving general
+knowledge and a transient value function for learning taskspecific knowledge. Then the overall value function is:
+(P)
+
+V (PT) (s) = Vθ
+
+(T)
+
+(s) + Vϕ (s),
+
+(19)
+
+where θ and ϕ are the parameters of the permanent function
+V (P) (s) and transient value function V (T) (s), respectively.
+The parameters of the transient value function are updated
+by TD learning during learning on tasks, while the parameters
+of the permanent value function are updated using all stored
+states of the task after learning.
+Due to the advances in DRL and the increasing complexity
+of tasks, many CRL methods have evolved to incorporate
+deep neural networks. Policy and value function networks can
+be decomposed into multiple parts, such as multiple heads
+and multiple modules. By combining these parts, agents can
+
+10
+
+learn and generalize across tasks more effectively, enhancing
+scalability and performance in complex environments.
+Multi-head decomposition is a common strategy in multitask learning, where the network consists of a shared backbone
+and multiple heads, each responsible for a different task. In
+CRL, Wolczyk et al. [68] empirically investigated the impact
+of multi-head networks on the continual learning performance
+of SAC. By assigning separate output heads for each task,
+the agent facilitates the transfer of knowledge across tasks.
+However, freezing the backbone of the critic can hinder forward knowledge transfer, which is against the understanding
+of transfer in supervised learning. Additionally, the agent’s
+performance can benefit from the resetting of the head for the
+critic while being damaged by the resetting of the head for
+the actor.
+Furthermore, cOntinual RL Without confLict (OWL) finds
+that a multi-head network is suitable for dealing with the
+problem of interference, in which tasks have different goals
+(reward functions) [67]. In these cases, tasks may be fundamentally incompatible with each other and thus cannot be
+learned by a single policy. By using dedicated heads for
+each task, OWL allows the network to learn task-specific
+policies without overwriting previously acquired knowledge.
+Furthermore, OWL extends the multi-head network to the
+sequence with unknown task identifiers by modeling the head
+selection as a multi-armed bandit problem.
+Expanding the application of the multi-head network to
+dynamic and non-stationary environments, Dynamics-adaptive
+Continual RL (DaCoRL) incorporates a context-conditioned
+multi-head design to detect and adapt to environmental
+changes [98]. Each head corresponds to a specific context,
+defined by a set of tasks with similar dynamics, allowing
+the network to specialize in context-specific policies. The
+framework dynamically expands its architecture by adding new
+heads when novel contexts are detected, ensuring scalability
+and adaptability to previously unseen scenarios.
+Multi-head decomposition divides a policy or value network into two components, which may not fully address the
+complexity of relationships among tasks. A more granular
+partitioning strategy will enable finer control over the transfer and retention of knowledge. Modular decomposition is
+an efficiency strategy in MTL [142]–[144], which leverages
+the composition of specialized modular deep architectures to
+capture compositional structures that arise in complex tasks.
+It has similarities with the inner workings of the human brain
+and has been provides evidence of their biological plausibility
+[145], [146]. Progressive Neural Networks (PNN) has made
+early explorations in this direction [48], although it does not
+introduce the concept of modularity. PNN trains a new column
+of network parameters for each task, while lateral connections
+are established between corresponding layers of all previously
+trained columns. This design achieves strong forward transfer
+without overwriting previously learned information. However,
+the scalability of PNNs is a notable limitation, as the number of parameters grows quadratically with the number of
+tasks [86]. The subsequent methods achieve better scalability
+through explicit modularity.
+An early effort in lifelong learning introduced a framework
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+with a two-stage learning process, separating the reuse of
+existing knowledge (assimilation) from the improvement of
+old components or creation of new components (accommodation) [147]. It emphasizes compositionality, where tasks are
+represented as combinations of reusable components. Mathematically, if a task k can be solved by reusing existing modules
+{mi }ni=1 from a module set M , the solution function fk can
+be represented as a composition of these modules:
+fk (s) = m1 ◦ m2 ◦ · · · ◦ mk (s),
+
+mi ∈ M ,
+
+(20)
+
+where ◦ denotes the compositional operation (e.g., functional
+composition or linear combination). Then, they extended this
+idea to CRL by formalizing lifelong compositional RL problems as a compositional problem graph, where each node
+represents a module to solve the corresponding subproblem
+[65]. Each module is a small neural network that takes as input
+the module-specific state component along with the output of
+the module of the previous module. The goal of a task is to find
+a path between nodes corresponding to a policy that maximizes
+the expected return. Although this method accurately captures
+the relations across tasks, it requires attempting all possible
+combinations of modules, which has low scalability.
+Subsequent works have advanced the modular paradigm by
+focusing on dynamic and autonomous module management.
+Self-Activating Neural Ensembles (SANE) introduced a taskid-free method that automatically detects and responds to drift
+in the setting by maintaining an ensemble of modules [69]. It
+does this by activating, merging, and creating modules automatically. Each module mi contains an actor and a critic. It
+is associated with an activation score ui (s), which determines
+its relevance to the current state s:
+ui (s) = |Gt − Vi (s)|,
+
+(21)
+
+where Vi (s) is the value estimate of module i at state s and
+return Gt . The module with the highest activation score is selected for inference. The Upper Confidence Bound (UCB) for
+each module is used to balance exploration and exploitation:
+ViUCB (s) = Vi (s) + αu · ui (s),
+
+(22)
+
+where αu is a hyperparameter representing how wide a margin
+around the expected value to allow. The activated module is:
+ma = arg max ViUCB (s).
+i
+
+(23)
+
+SANE was later adapted for home robotics as SANER, which
+tailored the modular framework to low-data settings using
+attention-based interaction policies [148].
+To further improve the scalability of the modular framework and avoid interference, self-Composing policies Network
+architecture (CompoNet) introduced attention mechanisms for
+selective knowledge transfer [86]. Each task corresponds to a
+module, and the modules of multiple tasks form a cascaded
+structure. Each module can access and compose the outputs of
+the previous modules by two attention heads and an internal
+policy to solve the current task. By allowing policies to
+compose themselves autonomously, CompoNet significantly
+reduces the memory and computational cost and ensures linear
+growth of parameters with the number of tasks.
+Inspired by the work related to hierarchical RL [149],
+[150], hierarchical decomposition is a prominent approach
+
+11
+
+in policy-focused CRL that leverages the natural structure of
+tasks to organize policies into a hierarchy of reusable components. This approach is particularly effective in addressing
+complex tasks with multiple steps, as it allows agents to
+decompose tasks into simpler sub-policies or skills that can be
+reused across tasks. In hierarchical decomposition, the policy
+is typically structured into high-level controllers and low-level
+sub-policies, enabling efficient task execution and scalability
+in multi-task or lifelong learning settings.
+A variety of approaches have been proposed to implement hierarchical decomposition in CRL, each emphasizing
+different mechanisms for skill discovery, knowledge storage, and transfer. For instance, Hierarchical Deep Reinforcement Learning Network (H-DRLN) integrates reusable Deep
+Skill Networks (DSNs) into a hierarchical framework [49].
+This approach enables the agent to decompose tasks into
+reusable skills, reducing sample complexity and improving
+performance in high-dimensional environments like Minecraft.
+Similarly, the Hierarchical Lifelong Reinforcement Learning
+framework (HLifeRL) employs an option framework to automatically discover and store low-level skills in an option
+library [122]. The master policy in HLifeRL selects these
+options to execute tasks, allowing for efficient skill reuse and
+combating catastrophic forgetting. Another notable method
+is the Model Primitive Hierarchical Reinforcement Learning (MPHRL) framework, which utilizes model primitives
+(suboptimal world models) to decompose tasks into modular
+sub-policies [59]. This bottom-up approach enables the agent
+to learn sub-policies and a gating controller concurrently,
+enhancing knowledge transfer and scalability. HLifeRL and
+MPHRL both show that the cost of learning the first task
+is amortized over subsequent tasks, resulting in substantial
+long-term gains. Additionally, Hihn et al. [101] introduced a
+hierarchical information-theoretic optimality principle with the
+Hierarchical Variational Continual Learning (HVCL) framework. It uses a Mixture-of-Variational-Experts (MoVE) layer
+to create multiple information processing paths governed by a
+gating policy, facilitating specialized learning and mitigating
+forgetting without requiring task-specific knowledge.
+These methods share commonalities in their hierarchical
+structuring of knowledge but differ in their specific techniques
+for skill discovery and reuse. H-DRLN relies on skill distillation to encapsulate multiple skills into a single network,
+while HLifeRL uses an explicit option framework to separate
+high-level decision-making from low-level execution. On the
+other hand, MPHRL emphasizes the use of model primitives
+to guide task decomposition, with a probabilistic gating mechanism to activate the appropriate sub-policy. HVCL introduces
+diversity objectives to enhance expert allocation and uses
+Wasserstein distance as a kernel for measuring expert diversity,
+ensuring distinct expert parameters are maintained.
+However, hierarchical decomposition methods face several
+challenges that remain open for future research. One key issue
+is the increasing complexity of the action space as the number
+of tasks and skills grows, which can strain the scalability of the
+hierarchical framework [122]. Additionally, the performance
+of these methods often depends on the quality and diversity
+of the discovered skills or model primitives [59]. Future
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+Task 1
+
+Task i
+
+Task i+1
+Hypernetwork
+Train
+
+Generate
+
+Learn
+Policy/Value
+Functions
+
+Regularize
+
+Policy/Value
+Functions
+Teacher
+
+Masks
+
+Distillation
+Dataset
+Dittllation
+
+Merged
+Functions i
+
+Mask
+
+Distillation
+Loss
+
+Student
+Merged
+Functions i+1
+
+Fig. 8. The framework of policy merging in CRL methods. Distillation,
+hypernetworks, masks, and regularization are used to merge multiple policies
+into a single policy.
+
+work could explore more adaptive mechanisms for dynamic
+skill discovery and online refinement, as well as strategies to
+manage the complexity of growing skill libraries.
+3) Policy Merging: Policy merging is a storage-sensitive
+strategy in CRL that focuses on merging the model of policies
+from multiple tasks into a single model, rather than retaining
+individual models for each task. This approach is particularly
+useful in scenarios where memory constraints are a concern,
+as it allows agents to compress knowledge from multiple
+tasks into a more compact representation. By merging policies,
+agents can reduce the memory footprint and computational
+cost of storing and executing multiple policies. As illustrated
+in Fig. 8, these methods typically involve distillation, hypernetworks, masks, or regularization to combine policies.
+Distillation is a common technique in supervised learning
+that has been adapted for CRL to merge policies and facilitate
+knowledge retention. This technique usually involves training
+a student policy on a new task to mimic the output of a teacher
+policy learned from previous tasks, effectively transferring
+knowledge from the old policies to the new ones. The Progress
+& Compress (P&C) framework [54] exemplifies this approach
+by integrating a knowledge base and an active column to
+sequentially learn tasks. After training on a new task, the active
+column’s policy is distilled into the knowledge base using
+a cross-entropy loss. The framework also employs a modified version of Elastic Weight Consolidation (EWC) [26] to
+safeguard against catastrophic forgetting during the distillation
+process. Similarly, Distillation for Continual Reinforcement
+Learning (DisCoRL) [56] employs policy distillation to merge
+multiple task-specific policies into a single student policy.
+By generating distillation datasets from each task and using
+Kullback-Leibler divergence with temperature smoothing as
+a loss function, it ensures effective knowledge transfer while
+eliminating the need for explicit task indicators at test time.
+Recent advancements have introduced novel techniques to
+enhance the distillation process. For example, an experience
+consistency distillation method for robotic manipulation tasks
+[128] combines policy distillation with experience distillation,
+leveraging Fréchet Inception Distance (FID) loss to maintain
+distribution consistency between original and distilled experiences. This approach not only mitigates forgetting but also
+optimizes memory usage by compressing experiences into a
+compact representation, which is then replayed during training.
+
+12
+
+Furthermore, UCB lifelong value distillation (UCBlvd) [78]
+incorporates theoretical guarantees into the distillation process,
+ensuring sublinear regret and computational efficiency in CRL.
+By leveraging linear representations and Quadratically Constrained Quadratic Programming (QCQP), UCBlvd minimizes
+computational complexity while achieving effective merging.
+These advancements also collectively highlight a trend
+toward leveraging distillation not only as a tool for policy
+merging but also as a means to improve data efficiency and
+scalability in CRL [49], [74], [133]. Relatedly, knowledgecentric retention objectives have been explored to preserve
+transferable representations across tasks [96]. Despite their
+successes, challenges remain, such as optimizing the distillation process for diverse task distributions and ensuring
+the scalability to a larger number of tasks or more complex
+environments.
+Hypernetworks are neural networks that generate the
+weights of another neural network, allowing for the dynamic
+generation of task-specific policies [151]. The use of hypernetworks in CL has shown promise in merging policies
+while maintaining task-specific adaptability [152]. In CRL,
+HyperNetwork-based implementation of PPO (HN-PPO) [72]
+employs a hypernetwork to generate policy weights conditioned on task embeddings, enabling the agent to adapt to
+new tasks without discarding previously acquired knowledge.
+By regularizing the output of the hypernetwork, the method
+mitigates catastrophic forgetting and ensures stability across
+tasks. Similarly, Xu et al. [153] integrated a hypernetwork for
+state-conditioned action evaluation, which dynamically generates evaluators to adapt policies based on current states. This
+not only facilitates knowledge transfer but also enhances fewshot generalization. These methods demonstrate the versatility
+of hypernetworks in dynamically encoding task-specific policies within a shared architecture, reducing memory overhead
+while ensuring efficient knowledge reuse. Recent work also
+studies how to balance model expressivity with robustness
+when shared architectures must represent diverse tasks under
+continual drift [129]. However, the computational complexity
+of hypernetwork training and the need for a refined training
+pipeline remain challenges for future research.
+Masks offer another compelling avenue for policy merging
+by leveraging task-specific modulating masks to isolate and
+reuse knowledge. While the application of masks has been
+tested extensively in CSL for classification [154], [155], very
+little is known about their effectiveness in CRL [50]. One possible reason is that the previous mask methods lack the ability
+to transfer knowledge [80]. In order to address this limitation,
+a recent study has explored combinations of previously learned
+masks to exploit previous knowledge when learning new tasks
+[80]. It introduces a fixed backbone network modulated by
+learned binary masks that selectively activate relevant parts of
+the network for each task. This approach not only preserves
+knowledge from prior tasks but also facilitates forward transfer
+by combining previously learned masks through linear or
+balanced linear compositions. Extending this method, the distributed system Lifelong Learning Distributed Decentralized
+Collective (L2D2-C) [81] enables agents to share task-specific
+masks in a decentralized manner, enhancing collective learning
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+while maintaining robustness to connection drops. The results
+demonstrate the advantages of masks in continual multi-agent
+RL, which is a promising but underexplored area. More
+broadly, activation/routing-style mechanisms are being adapted
+to offline continual RL settings, where only logged interaction
+data are available [130].
+Regularization is another effective strategy for policy
+merging, as it allows agents to retain knowledge from previous
+tasks while adapting to new ones. In CSL, regularization
+methods have been widely used to prevent catastrophic forgetting. They do so by penalizing changes in the parameters
+that are important for previous tasks. Although this method
+is often treated as a single category in many reviews [8],
+[10], [156], we consider it as a subcategory of policy merging
+because it usually combines with other methods [72], [98],
+[119]. Furthermore, many regularization methods in CSL can
+be directly applied to CRL. The most common regularization
+method is EWC [26], which has been successfully applied
+in CRL [41], [157]. EWC employs the Fisher information
+matrix to identify and constrain critical parameters, effectively
+merging knowledge from sequential tasks without significant
+loss of previously acquired knowledge. This method introduces
+a regularization term that penalizes changes in the parameters that are important for previous tasks, thereby preserving
+knowledge while allowing the model to adapt to new tasks.
+Formally, the EWC is represented by the loss function:
+Xλ
+Fi (θi − θi⋆ )2 ,
+(24)
+LEWC =
+2
+i
+where Fi is the Fisher information matrix for parameter θi ,
+θi⋆ is the parameter value after training on the previous task,
+and λ is the regularization strength.
+Building on EWC, P&C introduces an online version of
+EWC to address the computational challenges associated with
+traditional EWC’s linear growth in complexity [54]. The
+online-EWC method modifies the EWC approach by updating
+the Fisher information matrix incrementally, allowing for
+efficient knowledge preservation while enabling the model to
+gracefully forget older tasks if needed. Instead of recalculating
+the Fisher information matrix for each task, online-EWC
+updates it incrementally. The update rule incorporates a decay
+factor γ, which gradually reduces the influence of older tasks:
+(t)
+Fi
+(t)
+Fi
+
+=
+
+(t−1)
+γFi
+
++
+
+Finew ,
+
+(25)
+(t−1)
+Fi
+
+where
+is the Fisher information matrix at time t,
+is the matrix from the previous time step, and Finew is the
+matrix calculated for the current task. Then, the loss function
+incorporates the updated Fisher information matrix:
+X λ (t)
+LOnline-EWC =
+Fi (θi − θi∗ )2 .
+(26)
+2
+i
+In terms of broader regularization, Kaplanis et al. [27], [124]
+proposed models that leverage multiple timescales of learning.
+Their earlier work [27] introduces a synaptic model inspired
+by biological synapses, which incorporates dynamic variables
+to mitigate catastrophic forgetting without relying on task
+boundaries. The model’s ability to retain information is encapsulated in the dynamics of the hidden variables, which help
+to regularize the learning process. Following this, the Policy
+
+13
+
+Consolidation (PC) model builds on these ideas by using a cascade of hidden networks to regularize the current policy based
+on its historical performance, thereby preventing performance
+degradation in non-stationary environments [124]. In addition
+to these foundational methods, recent advancements such as
+adapTive RegularizAtion in Continual environments (TRAC)
+and Composing Value Functions (CFV) highlight the evolving
+landscape of regularization in CRL. TRAC, a parameter-free
+optimizer, dynamically adjusts regularization to prevent the
+loss of plasticity while enabling rapid adaptation to new
+tasks [9]. Beyond these baselines, recent CRL studies propose
+targeted objectives to mitigate the stability–plasticity tension
+via more explicit knowledge alignment and consolidation
+principles [91], [94], [131], [132]. CFV, on the other hand,
+focuses on the theoretical underpinnings of value function
+composition, providing a framework for leveraging entropyregularization to solve new tasks without further learning [55].
+Overall, policy merging in CRL, particularly through regularization methods like EWC and its variants, provides powerful mechanisms for stability. Therefore, native regularization
+methods are still used as baselines for comparison in many
+CRL studies [37], [83]. The combination of these techniques
+with transfer learning methods also provides a combinatorial
+direction for CRL.
+Scalability considerations. As summarized in Table IV, the
+main bottleneck of policy-focused methods is the overhead of
+storing, selecting, or merging policies as the task stream grows.
+Their memory growth is often driven by extra policy copies,
+heads, modules, or consolidation statistics, while compute
+growth increases with routing, distillation, or multi-policy
+optimization. Accordingly, their task-scaling is strongest in
+reusable or task-structured settings where policies can be
+composed, specialized, or merged rather than relearned from
+scratch. These methods therefore fit best when tasks admit
+recurring structure, explicit reuse, or clear decomposition, but
+they become less attractive when policy storage and merging
+overhead dominate the continual budget.
+C. Experience-Focused Methods
+
+Experience
+Collect
+
+Generative Model
+Train
+
+Save
+Replay
+Short-Term
+Update
+Save Experience Buffer
+
+Update
+Experience
+
+Long-Term
+Experience Buffer
+
+Fig. 9. The framework of experience-focused methods. Some methods use a
+complementary learning system, including a cross-task long-term experience
+buffer and a short-term experience buffer for the current task [51], [74], [82],
+[107]. Typical subcategories include direct replay and generative replay.
+
+Experience-focused methods in CRL aim to enhance the
+agent’s ability to store and reuse experiences effectively.
+These methods are similar to the experience replay mechanism
+widely used in DRL, where experiences are stored in a buffer
+and replayed to stabilize training and break the correlation
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+in data. In CRL, experience-focused methods leverage replay
+buffers, memory mechanisms, or experience relabeling to
+maintain a balance between retaining critical information from
+previous tasks and integrating new knowledge. Experiencefocused methods are particularly valuable in CRL, as they
+provide a direct mechanism for revisiting past knowledge without requiring task-specific information, making them versatile
+for both task-aware and task-agnostic scenarios. Based on
+whether the experience is stored or generated, these methods
+can be further divided into direct replay and generative replay.
+Replay can also be strengthened by explicitly enhancing which
+transitions are kept or replayed, so that limited buffers retain
+the most informative continual signal [136].
+1) Direct Replay: A major focus is direct replay, explicitly
+storing and reusing buffered experiences. Selective experience replay [51] prioritizes long-term storage by importance
+(e.g., distribution matching or state-space coverage), ensuring
+diverse revisits to mitigate forgetting. Similarly, Continual
+Learning with Experience And Replay (CLEAR) [58] merges
+on-policy learning with off-policy replay, utilizing behavior
+cloning and V-Trace corrections to stabilize multi-task learning
+without task boundaries.
+Recent methods integrate replay with other techniques.
+For example, CoMPS [64] buffers high-reward experiences
+for meta-policy search, accelerating adaptation. Replay-based
+Recurrent RL (3RL) [82] uses Recurrent Neural Networks
+(RNNs) to encode history, facilitating task-agnostic adaptation.
+Additionally, incorporating relabeling, weighting, and task
+inference improves sample efficiency in robotics and natural
+language processing [88], [134], [158].
+Despite their success, explicit storage raises memory, scalability, and privacy concerns. Future research could investigate
+dynamic memory allocation or selective forgetting to alleviate
+these bottlenecks.
+2) Generative Replay: Instead of explicitly storing experiences, generative replay methods leverage generative models to recreate or simulate previous experiences, enabling
+the agent to revisit and learn from past knowledge without
+requiring a large memory footprint. This makes generative
+replay particularly suited for scenarios with limited memory
+resources or strict privacy constraints. By synthesizing experiences on demand, these methods provide a flexible and
+efficient mechanism for continual learning.
+Most generative replay methods rely on models like
+Variational Auto-Encoders (VAEs) or Generative Adversarial Networks (GANs). For example, Reinforcement-PseudoRehearsal (RePR) [74] uses a GAN-based dual memory
+system to generate and rehearse representative states from
+previous tasks alongside new data, succeeding in Atari environments. Similarly, Self-generated Long-term Experience Replay (SLER) [107] pairs short-term replay with an Experience
+Replay Model (ERM) that simulates past experiences based
+on minimal retained task information, maximizing memory
+efficiency in complex domains like StarCraft II.
+Beyond state-level generation, trajectory-level synthesis
+generates task-relevant rollouts, preserving long-horizon credit
+assignment [138].
+
+14
+
+Other works introduce unique triggers and management
+systems. Self-TRIGgered GEnerative Replay (S-TRIGGER)
+[137] employs statistical tests to detect environmental shifts,
+prompting a VAE to generate prior samples adaptively. Alternatively, a model-free approach [70] adopts a wake-sleep
+cycle, consolidating memory by alternating between task
+learning and VAE-based replay, highlighting hidden replay as
+a state-of-the-art technique.
+While synthesizing experiences balances memory efficiency
+and knowledge retention, challenges remain in preserving
+sample fidelity and diversity. Generative models are prone
+to feature drift and inaccuracies that destabilize long-term
+learning [70], [107], [137]. Future research may explore robust
+models and hybrid systems that selectively store critical raw
+experiences.
+Scalability considerations. The main bottleneck of
+experience-focused methods is the burden of maintaining a replay buffer or a generator that remains useful throughout long
+task streams. Their memory growth is dominated by stored
+trajectories, latent summaries, or auxiliary generator states,
+while compute growth rises with replay sampling, relabeling,
+and synthetic data generation. Their task-scaling is usually
+strongest under recurring non-stationarity, where revisiting
+prior experience directly stabilizes learning, especially in taskaware or task-agnostic settings with repeated contexts. At the
+same time, these methods are tightly constrained by memory
+and privacy requirements, so their practical scalability depends
+on how aggressively past experience can be compressed,
+filtered, or regenerated.
+Task 1
+
+Task i+1
+
+Task i
+
+Plan
+
+Learn
+
+Dynamic
+Model
+
+Save
+
+Retrieval
+
+Train
+
+Generate
+
+Functions
+
+Functions
+
+Fig. 10.
+The framework of dynamic-focused methods. Direct modeling
+(above) and indirect modeling (below) are two main categories.
+
+D. Dynamic-Focused Methods
+Dynamic-focused methods in CRL are closely related to
+Model-Based Reinforcement Learning (MBRL), where the
+core idea is to learn a model of the environment’s dynamics
+to predict future states and rewards. In CRL, dynamic-focused
+methods extend this concept to tackle non-stationary environments. They enhance the agent’s ability to adapt to changing
+environments and tasks by modeling the environment’s dynamics (T (s′ |s, a)). As shown in Fig. 10, dynamic-focused
+methods can be divided into two categories: direct modeling
+and indirect modeling.
+1) Direct Modeling: Direct modeling explicitly learns the
+dynamics of the environment (e.g., the transition function)
+based on observed state-action pairs. These methods aim to
+capture the underlying structure of the environment, allowing
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+the agent to predict future states and adapt its behavior accordingly. By maintaining an explicit model of the environment,
+direct modeling approaches are well-suited for tasks requiring
+long-term planning and reasoning in changing conditions.
+Direct modeling often uses mixture models and probabilistic frameworks to manage forgetting and task adaptation. Approaches like Meta-learning for Online Learning (MOLe) [108] and LifeLong Incremental Reinforcement
+Learning (LLIRL) [139] employ the Chinese Restaurant Process (CRP) to dynamically expand a library of dynamics
+(l)
+models {dηt }L
+l=1 . Assigning a new observation (st , at , st+1 )
+to a model is dictated by a probabilistic prior, such as the
+CRP:
+( (l)
+n
+, if l ≤ L,
+(27)
+P (xt = l) = t−1+ζ
+ζ
+t−1+ζ , if l = L + 1,
+where xt assigns the observation, n(l) denotes counts for
+model l, and ζ scales new model creation. Leveraging probabilistic mixtures (e.g., infinite Gaussian processes [105])
+allows agents to efficiently reuse familiar models or create
+new ones for unseen shifts.
+To boost scalability, Continual Reinforcement Learning via
+Hypernetworks (HyperCRL) [77] avoids maintaining multiple
+models by using a fixed-capacity hypernetwork to generate
+task-specific dynamics models:
+sˆt+1 = fηk (st , at ), ηk = HΘk (et ),
+(28)
+where HΘk processes task embedding ek (et ). Regularization
+ensures sustained predictive accuracy. Additionally, LosseFTL [87] applies locality-sensitive sparse encoding and a
+Follow-The-Leader (FTL) objective, enabling efficient incremental updates in high-dimensional environments.
+2) Indirect Modeling: Indirect modeling methods do not
+directly model the environment’s dynamics but instead use alternative representations or abstractions (e.g., latent variables)
+to infer or adapt to the dynamics. They allow the agent to
+generalize across tasks without requiring a detailed model of
+the environment’s transitions.
+A prominent example is LIfelong Latent Actor-Critic
+(LILAC) [60], utilizing latent variables for non-stationary
+environments. LILAC frames a Dynamic Parameter Markov
+Decision Process (DP-MDP) where a latent variable z tracks
+parameters shifting stochastically across episodes. It maximizes expected returns while keeping a compact dynamics
+representation via:
+P (o1:H = 1|τ 1:i−1 ) ≥
+" T
+#
+X
+(29)
+i
+i
+EP (zi |τ 1:i−1 )
+R(st , at ; z ) − log π(at |st , z ) ,
+t=1
+
+where τ 1:i−1 is the past trajectory, and z i the current task
+embedding. This optimizes both return and policy entropy for
+robust adaptation. Similarly, task-agnostic methods like 3RL
+[82] and Continual-Dreamer [83] use abstract representations
+to handle non-stationarity. 3RL relies on recurrent memory
+and replay, whereas Continual-Dreamer merges world models
+with reservoir sampling to consolidate knowledge.
+Additionally, intrinsic rewards often guide exploration
+in these models. Lifelong Skill Planning (LiSP) [73] and
+
+15
+
+Continual-Dreamer both formulate intrinsic rewards from prediction uncertainty, promoting exploration in unfamiliar regions. These models prioritize generalized adaptability over
+exact environmental modeling, often incorporating variational
+inference [60] or ensembles [83] for scalability. However,
+managing unobserved or continuous dynamic shifts remains
+challenging [60], motivating future work toward relaxing
+episodic boundaries for real-time adaptation.
+Scalability considerations. The main bottleneck of
+dynamic-focused methods is the overhead of maintaining world models, model libraries, or latent predictors together with any downstream planning machinery. Their memory growth comes from storing model components, taskconditioned embeddings, or uncertainty estimates, and their
+compute growth is amplified by model fitting, inference over
+mixtures, and planning through learned dynamics. Their taskscaling is strongest when tasks share dynamics structure or
+when transitions evolve more systematically than rewards,
+because the same model family can be reused across multiple
+tasks. These methods are therefore especially well matched to
+non-stationarity learning and related settings where compact
+dynamics reuse can amortize modeling cost over long horizons.
+Task 1
+
+Task i+1
+
+Modified
+Reward
+
+Task i Learn
+
+Shaped
+Reward
+
+s,a, s' s
+
+a
+
+s'
+
+r
+
+Interinsic
+Reward
+Fig. 11.
+
+The framework of reward-focused methods.
+
+E. Reward-Focused Methods
+Reward-focused methods in CRL concentrate on managing
+and leveraging reward signals to facilitate efficient learning
+and adaptation to new tasks, which is similar to reward
+shaping in transfer reinforcement learning. These methods
+are particularly significant in CRL because rewards directly
+influence the agent’s policy optimization and learning trajectory. By restructuring or reshaping reward distributions,
+reward-focused approaches address key challenges such as
+sparse or delayed rewards, knowledge transfer across tasks,
+and maintaining consistent learning performance over time.
+In general, these methods modify the reward function rt
+by incorporating shaping functions or intrinsic components,
+which can be expressed as:
+RtM = Rt + h(s, a, s′ ) + αRtI ,
+′
+
+(30)
+
+where h(s, a, s ) is a shaping function derived from external knowledge or task-specific information, and RtI is an
+intrinsic reward component that encourages exploration or
+other desirable behaviors. The weighting factor α balances the
+contribution of intrinsic rewards to the overall reward signal.
+Several approaches exemplify these reward-focused methods. Shaping Rewards for LifeLong RL (SR-LLRL) [140]
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+employs a Lifetime Reward Shaping (LRS) function based on
+cumulative visit counts from prior tasks:
+ci−1 (s, a, s′ )
+hi (s, a, s′ ) = (1 − γ)Vmax
+,
+(31)
+ci−1 (s)
+where ci−1 (s, a, s′ ) and ci−1 (s) count visits from past optimal
+trajectories. This mitigates sparse rewards and accelerates
+learning. Jiang et al. [75] apply temporal-logic-based shaping,
+deriving h(s, a, s′ ) from a potential function Φ and the optimal
+Q⋆ :
+
+
+⋆ ′ ′
+Q
+(s
+,
+a
+)
+− Φ(s, a). (32)
+h(s, a, s′ ) = Φ s′ , arg max
+′
+a
+
+This robustly guides exploration using domain logic, even with
+imperfect advice.
+Intrinsic rewards also critically encourage exploration and
+curiosity. Combined with extrinsic rewards, they are formalized as:
+Rt = RtE + αRtI ,
+(33)
+where RtE and RtI denote extrinsic and intrinsic components
+weighted by α. For example, Intrinsically Motivated Lifelong
+exploration (IML) [110] merges short- and long-term intrinsic
+rewards:
+RtI = max(RtD , 1.0) · RtL ,
+(34)
+where local bonus RtL and deep bonus RtD jointly stimulate
+exploration of novel states. Similarly, Reactive Exploration
+[141] uses prediction errors to generate intrinsic signals:
+S
+R
+E
+Rt+1 = αRt+1
++ βRt+1
++ λRt+1
+,
+
+(35)
+
+S
+R
+with Rt+1
+and Rt+1
+derived from observation and reward
+models, and λ = 1 − α − β. This fosters dynamic adaptation
+by exploring significantly changed state regions. Additionally,
+Efficient Lifelong Imitation Reinforcement Learning (ELIRL)
+[109] extends this to inverse RL, rebuilding task-specific
+reward functions via shared latent components.
+Overall, these methods overcome traditional RL reward limitations, mitigating sparse feedback and improving cross-task
+transfer. However, scaling to high-dimensional state-action
+spaces remains challenging [110], [140]. Furthermore, predefined structures in logic-based shaping [75] or reward machines [63] may restrict fully autonomous deployment. Future
+work could develop automated reward-shaping mechanisms
+and integrate them seamlessly with policy- or experiencefocused CRL paradigms.
+Scalability considerations. The main bottleneck of rewardfocused methods is the overhead of maintaining reward models, shaping rules, or intrinsic-reward estimators that stay
+aligned with a changing task stream. Their memory growth is
+often modest compared with replay-heavy methods, but it still
+increases with stored reward abstractions, logic specifications,
+or auxiliary novelty estimators, while compute growth comes
+from evaluating shaping terms and updating intrinsic signals
+online. Their task-scaling is strongest when reward semantics
+drift more than transition dynamics, because reused shaping
+structure can accelerate adaptation without rebuilding the full
+policy or world model. These methods therefore fit best
+in settings with recurrent reward redesign, sparse feedback,
+or semantic task variation, but they weaken when reward
+engineering itself becomes the dominant maintenance cost.
+
+16
+
+V. FUTURE WORKS
+In this section, we present some open challenges and
+future directions in CRL, based on both retrospectives of the
+discussed methods and outlooks to the emerging trends in AI.
+More future directions are discussed in Appendix F, including
+evaluation and benchmark, interpretable knowledge, embodied
+agents, multi-agent CRL, offline learning, imitation learning
+and adjacent directions.
+A. Task-Free CRL
+Most CRL methods assume that tasks are given in advance,
+the boundaries between tasks are clear, and the environment is
+stationary within a task. However, the environment may continuously change over time. Moreover, in real-world scenarios,
+agents are expected to learn in a non-stationary environment.
+Task-free CRL is a challenging problem that requires agents
+to learn from the environment without any explicit tasks. It is
+closely related to online learning and has been preliminarily
+explored in some works on task boundary detection and taskagnostic CRL. Recent work has also studied statistical context
+detection to infer task changes online without task supervision
+[117]. We believe this direction is the necessary path for RL
+to move towards general AI.
+B. Large-Scale Pre-Trained Model
+Recently, unprecedented breakthroughs have been achieved
+in learning large-scale Pre-Trained Models (PTMs), such as
+Large Language Models (LLMs), built on massive computation resources and diverse data. This area presents several
+challenges relevant to the continual learning community. We
+briefly point out two directions that are worth exploring:
+1) CRL for large-scale PTMs: One important method for
+aligning LLMs with human preferences is RLHF [159].
+CPPO [88] has been proposed to enhance RLHF with
+CL, allowing LLMs to adapt to human preferences continuously without extensive retraining. Recently, methods such as RL with verifiable rewards have been
+proposed to fine-tune LLMs to achieve better reasoning
+ability [160]–[162]. Integrating CRL with these methods
+is expected to further improve the performance of LLMs
+in terms of reasoning and decision-making.
+2) Large-scale PTMs for CRL: PTMs can be used as
+a knowledge base for CRL, which can be transferred
+to the target task to improve sample efficiency and
+generalization ability. Existing works have shown that
+PTMs can be used to improve the performance of CL
+and RL in some specific scenarios [163]–[165]. MT-Core
+first integrates an LLM into the CRL paradigm, enabling
+agents to perform multi-granularity knowledge transfer
+across diverse tasks [90]. How to effectively leverage
+PTMs in CRL is also an open question, and we expect
+more research to be conducted in this direction.
+C. Adjacent Directions
+Several adjacent research areas offer complementary perspectives and techniques that can significantly advance
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+CRL. These include Unsupervised RL, which fosters taskagnostic adaptation through reward-free exploration and selfsupervision [166]–[168], Meta-RL, which targets fast lifelong adaptation and forward transfer via meta-learned structures [169], [170], and studies on Transfer and Negative
+Transfer, which dissect the boundaries of knowledge reuse
+to balance plasticity and stability [171], [172]. Additionally, Representation-Based Continual Learning emphasizes
+learning disentangled and discrete representations to moderate
+memory growth and mitigate interference [173]–[175], while
+Sim-to-Real and Continual Domain Randomization provide vital levers for scalable domain adaptation in real-world
+embodied deployments [176]. Finally, the emergence of InContext RL introduces prompt-driven, low-cost adaptation
+mechanisms that naturally synergize with large-scale pretrained models [177]–[180].
+VI. CONCLUSION
+Continual reinforcement learning represents a pivotal
+paradigm for advancing autonomous decision-making, transitioning from isolated task optimization toward the realization
+of persistent agents capable of lifelong adaptation in nonstationary environments. In this survey, we have systematically navigated the evolving CRL landscape, comprehensive
+examinated its challenges, scenario settings, taxonomy, and
+open challenges. Our analysis underscores that the core of
+CRL lies in navigating the triangular balance among plasticity,
+stability, and scalability. By introducing a novel taxonomy
+based on knowledge storage and transfer, we have established
+a structured framework for categorizing diverse methods and
+their respective strategies. Despite substantial progress, the
+field faces many challenges, particularly in terms of scalability
+and the fragmentation of benchmarks. Ultimately, addressing
+these challenges will be critical for bridging the gap between
+theoretical research and the deployment of robust, generalpurpose AI in dynamic, real-world applications.
+R EFERENCES
+[1] M. B. Ring, “Child: A first step towards continual learning,” Mach.
+Learn., vol. 28, no. 1, pp. 77–104, 1997.
+[2] K. Khetarpal, M. Riemer, I. Rish, and D. Precup, “Towards continual
+reinforcement learning: A review and perspectives,” Artif. Intell. Res.,
+vol. 75, pp. 1401–1476, 2022.
+[3] Z. Ding and H. Dong, Challenges of Reinforcement Learning. Springer
+Singapore, 2020.
+[4] G. Dulac-Arnold et al., “Challenges of real-world reinforcement learning: definitions, benchmarks and analysis,” Mach. Learn., vol. 110,
+no. 9, pp. 2419–2468, 2021.
+[5] D. Kudithipudi, M. Aguilar-Simon, and J. e. a. Babb, “Biological
+underpinnings for lifelong learning machines,” Mach. Intell., vol. 4,
+no. 3, pp. 196–210, 2022.
+[6] G. I. Parisi, R. Kemker, J. L. Part, C. Kanan, and S. Wermter,
+“Continual lifelong learning with neural networks: A review,” Neural
+Networks, vol. 113, pp. 54–71, 2019.
+[7] M. De Lange et al., “A continual learning survey: Defying forgetting in
+classification tasks,” Trans. Pattern Anal. Mach. Intell., vol. 44, no. 7,
+pp. 3366–3385, 2022.
+[8] L. Wang, X. Zhang, H. Su, and J. Zhu, “A comprehensive survey of
+continual learning: Theory, method and application,” Trans. Pattern
+Anal. Mach. Intell., vol. 46, no. 8, pp. 5362–5383, 2024.
+[9] A. Muppidi, Z. Zhang, and H. Yang, “Fast TRAC: A parameter-free
+optimizer for lifelong reinforcementlearning,” in NeurIPS, 2024.
+
+17
+
+[10] Z. Wang, E. Yang, L. Shen, and H. Huang, “A comprehensive survey of
+forgetting in deep learning beyond continual learning,” Trans. Pattern
+Anal. Mach. Intell., vol. 47, no. 3, pp. 1464–1483, 2025.
+[11] M. L. Puterman, “Markov decision processes,” in Stochastic Models,
+1990, vol. 2, pp. 331–434.
+[12] C. Lyle, G. Sokar, R. Pascanu, and A. Gyorgy, “What can grokking
+teach us about learning under nonstationarity?” in CoLLAs, 2025.
+[13] R. S. Sutton and A. G. Barto, Reinforcement Learning: An Introduction.
+MIT Press, 2018.
+[14] R. J. Boucherie and N. M. Van Dijk, Markov Decision Processes in
+Practice. Springer, 2017.
+[15] M. Mundt, Y. Hong, I. Pliushch, and V. Ramesh, “A wholistic view of
+continual learning with deep neural networks: Forgotten lessons and
+the bridge to active and open world learning,” Neural Networks, vol.
+160, pp. 306–336, 2023.
+[16] T. Lesort, V. Lomonaco, A. Stoian, D. Maltoni, D. Filliat, and N. DíazRodríguez, “Continual learning for robotics: Definition, framework,
+learning strategies, opportunities and challenges,” Inf. Fusion, vol. 58,
+pp. 52–68, 2020.
+[17] Y.-C. Hsu, Y.-C. Liu, and Z. Kira, “Re-evaluating continual learning scenarios: A categorization and case for strong baselines,” vol.
+abs/1810.12488, 2018.
+[18] G. M. van de Ven, T. Tuytelaars, and A. S. Tolias, “Three types of
+incremental learning,” Mach. Intell., vol. 4, no. 12, pp. 1185–1197,
+2022.
+[19] R. Rubavicius, P. D. Fagan, A. Lascarides, and S. Ramamoorthy,
+“Secure: Semantics-aware embodied conversation under unawareness
+for lifelong robot learning,” in CoLLAs, 2025.
+[20] Z. Liu, G. Fu, C. Du, W. S. Lee, and M. Lin, “Continual reinforcement
+learning by planning with online world models,” vol. abs/2507.09177,
+2025.
+[21] D. Abel, A. Barreto, B. V. Roy, D. Precup, H. P. van Hasselt,
+and S. Singh, “A definition of continual reinforcement learning,” in
+NeurIPS, vol. 36, 2023, pp. 50 377–50 407.
+[22] Z. Abbas, R. Zhao, J. Modayil, A. White, and M. C. Machado, “Loss
+of plasticity in continual deep reinforcement learning,” in CoLLAs, vol.
+232, 2023, pp. 620–636.
+[23] E. Elelimy, D. Szepesvari, M. White, and M. Bowling, “Rethinking the
+foundations for continual reinforcement learning,” in RCL, 2025.
+[24] N. Vithayathil Varghese and Q. H. Mahmoud, “A survey of multi-task
+deep reinforcement learning,” Electron., vol. 9, no. 9, 2020.
+[25] Z. Zhu, K. Lin, A. K. Jain, and J. Zhou, “Transfer learning in deep
+reinforcement learning: A survey,” Trans. Pattern Anal. Mach. Intell.,
+vol. 45, no. 11, pp. 13 344–13 362, 2023.
+[26] J. Kirkpatrick et al., “Overcoming catastrophic forgetting in neural
+networks,” PNAS, vol. 114, no. 13, pp. 3521–3526, 2017.
+[27] C. Kaplanis, M. Shanahan, and C. Clopath, “Continual reinforcement
+learning with complex synapses,” in ICML, vol. 80, 2018, pp. 2502–
+2511.
+[28] S. Dohare, J. F. Hernandez-Garcia, Q. Lan, P. Rahman, A. R. Mahmood, and R. S. Sutton, “Loss of plasticity in deep continual learning,”
+Nature, vol. 632, no. 8026, pp. 768–774, 2024.
+[29] T. Klein, L. Miklautz, K. Sidak, C. Plant, and S. Tschiatschek, “Plasticity loss in deep reinforcement learning: A survey,” ArXiv preprint,
+vol. abs/2411.04832, 2024.
+[30] A. Juliani and J. T. Ash, “A study of plasticity loss in on-policy
+deep reinforcement learning,” in NeurIPS, vol. 37, 2024, pp. 113 884–
+113 910.
+[31] G. Mesbahi, P. M. Panahi, O. Mastikhina, S. Tang, M. White, and
+A. White, “Position: Lifetime tuning is incompatible with continual
+reinforcement learning,” in ICML Position Paper Track, 2025.
+[32] M. Wolczyk, M. Zajac, R. Pascanu, L. Kucinski, and P. Milos, “Continual world: A robotic benchmark for continual reinforcementlearning,”
+in NeurIPS, vol. 34, 2021, pp. 28 496–28 510.
+[33] T. Tomilin, M. Fang, Y. Zhang, and M. Pechenizkiy, “COOM: A game
+benchmark for continual reinforcement learning,” in NeurIPS, vol. 36,
+2023, pp. 67 794–67 832.
+[34] S. Powers, E. Xing, E. Kolve, R. Mottaghi, and A. Gupta, “Cora:
+Benchmarks, baselines, and metrics as a platform for continual reinforcement learning agents,” in CoLLAs, vol. 199, 2022, pp. 705–743.
+[35] D. Lopez-Paz and M. Ranzato, “Gradient episodic memory for continual learning,” in NeurIPS, vol. 30, 2017, pp. 6467–6476.
+[36] Z. Li and D. Hoiem, “Learning without forgetting,” Trans. Pattern Anal.
+Mach. Intell., vol. 40, no. 12, pp. 2935–2947, 2018.
+[37] J. Gaya, T. Doan, L. Caccia, L. Soulier, L. Denoyer, and R. Raileanu,
+“Building a subspace of policies for scalable continual learning,” in
+ICLR, 2023, pp. 1–28.
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+[38] H. Fu, S. Yu, M. Littman, and G. Konidaris, “Model-based lifelong
+reinforcement learning with bayesian exploration,” in NeurIPS, vol. 35,
+2022, pp. 32 369–32 382.
+[39] H. Nekoei, A. Badrinaaraayanan, A. C. Courville, and S. Chandar,
+“Continuous coordination as a realistic scenario for lifelong learning,”
+in ICML, vol. 139, 2021, pp. 8016–8024.
+[40] E. C. Johnson et al., “L2explorer: A lifelong reinforcement learning
+assessment environment,” ArXiv preprint, vol. abs/2203.07454, 2022.
+[41] V. Lomonaco, K. Desai, E. Culurciello, and D. Maltoni, “Continual
+reinforcement learning in 3d non-stationary environments,” in CVPR,
+2020.
+[42] F. Yang, C. Yang, H. Liu, and F. Sun, “Evaluations of the gap between
+supervised and reinforcement lifelong learning on robotic manipulation
+tasks,” in CoRL, vol. 164, 2022, pp. 547–556.
+[43] B. Liu et al., “LIBERO: benchmarking knowledge transfer for lifelong
+robot learning,” in NeurIPS, vol. 36, 2023, pp. 44 776–44 791.
+[44] A. Kobanda, O.-A. Maillard, and R. Portelas, “A continual offline
+reinforcement learning benchmark for navigation tasks,” in CoG, 2025,
+pp. 1–8.
+[45] N. Bard et al., “The Hanabi challenge: A new frontier for AI research,”
+Artif. Intell., vol. 280, p. 103216, 2020.
+[46] T. Yu et al., “Meta-world: A benchmark and evaluation for multi-task
+and meta reinforcement learning,” in CoRL, vol. 100, 2020, pp. 1094–
+1100.
+[47] D. Isele, M. Rostami, and E. Eaton, “Using task features for zero-shot
+knowledge transfer in lifelong learning,” in IJCAI, 2016, pp. 1620–
+1626.
+[48] A. A. Rusu et al., “Progressive neural networks,” ArXiv preprint, vol.
+abs/1606.04671, 2016.
+[49] C. Tessler, S. Givony, T. Zahavy, D. J. Mankowitz, and S. Mannor, “A
+deep hierarchical approach to lifelong learning in minecraft,” in AAAI,
+vol. 31, no. 1, 2017, pp. 1553–1561.
+[50] C. Fernando et al., “Pathnet: Evolution channels gradient descent in
+super neural networks,” ArXiv preprint, vol. abs/1701.08734, 2017.
+[51] D. Isele and A. Cosgun, “Selective experience replay for lifelong
+learning,” in AAAI, vol. 32, no. 1, 2018, pp. 3302–3309.
+[52] D. Abel, D. Arumugam, L. Lehnert, and M. L. Littman, “State
+abstractions for lifelong reinforcement learning,” in ICML, vol. 80,
+2018, pp. 10–19.
+[53] D. Abel, Y. Jinnai, S. Y. Guo, G. D. Konidaris, and M. L. Littman,
+“Policy and value transfer in lifelong reinforcement learning,” in ICML,
+vol. 80, 2018, pp. 20–29.
+[54] J. Schwarz et al., “Progress & compress: A scalable framework for
+continual learning,” in ICML, vol. 80, 2018, pp. 4535–4544.
+[55] B. van Niekerk, S. James, A. C. Earle, and B. Rosman, “Composing
+value functions in reinforcement learning,” in ICML, vol. 97, 2019, pp.
+6401–6409.
+[56] R. Traoré et al., “Discorl: Continual reinforcement learning via policy
+distillation,” in NeurIPS DRL Workshop, 2019.
+[57] B. Liu, L. Wang, and M. Liu, “Lifelong federated reinforcement learning: A learning architecture for navigation in cloud robotic systems,”
+IEEE Rob. Autom. Lett., vol. 4, no. 4, pp. 4555–4562, 2019.
+[58] D. Rolnick, A. Ahuja, J. Schwarz, T. P. Lillicrap, and G. Wayne,
+“Experience replay for continual learning,” in NeurIPS, vol. 32, 2019,
+pp. 348–358.
+[59] B. Wu, J. K. Gupta, and M. Kochenderfer, “Model primitives for
+hierarchical lifelong reinforcement learning,” in AAMAS, vol. 34, no. 1,
+2020, pp. 1–38.
+[60] A. Xie, J. Harrison, and C. Finn, “Deep reinforcement learning amidst
+lifelong non-stationarity,” in ICML LML Workshop, 2020.
+[61] G. N. Tasse, S. James, and B. Rosman, “A boolean task algebra for
+reinforcement learning,” in NeurIPS, vol. 33, 2020, pp. 9497–9507.
+[62] J. A. Mendez, B. Wang, and E. Eaton, “Lifelong policy gradient
+learning of factored policies for fastertraining without forgetting,” in
+NeurIPS, vol. 33, 2020, pp. 14 398–14 409.
+[63] X. Zheng, C. Yu, and M. Zhang, “Lifelong reinforcement learning with
+temporal logic formulas and reward machines,” Knowledge-Based Syst.,
+vol. 257, p. 109650, 2022.
+[64] G. Berseth, Z. Zhang, G. Zhang, C. Finn, and S. Levine, “Comps:
+Continual meta policy search,” in ICLR, 2022, pp. 1–23.
+[65] J. A. Mendez, H. van Seijen, and E. Eaton, “Modular lifelong reinforcement learning via neural composition,” in ICLR, 2022, pp. 1–22.
+[66] N. Lucchesi, A. Carta, V. Lomonaco, and D. Bacciu, “Avalanche RL: A
+continual reinforcement learning library,” in ICIAP, 2022, p. 524–535.
+[67] S. Kessler, J. Parker-Holder, P. J. Ball, S. Zohren, and S. J. Roberts,
+“Same state, different task: Continual reinforcement learning withoutinterference,” in AAAI, vol. 36, no. 7, 2022, pp. 7143–7151.
+
+18
+
+[68] M. Wolczyk, M. Zajac, R. Pascanu, L. Kucinski, and P. Milos, “Disentangling transfer in continual reinforcement learning,” in NeurIPS,
+vol. 35, 2022, pp. 6304–6317.
+[69] S. Powers, E. Xing, and A. Gupta, “Self-activating neural ensembles
+for continual reinforcement learning,” in CoLLAs, vol. 199, 2022, pp.
+683–704.
+[70] Z. A. Daniels, A. Raghavan, J. Hostetler, and et al., “Model-free
+generative replay for lifelong reinforcement learning: Application to
+starcraft-2,” in CoLLAs, vol. 199, 2022, pp. 1120–1145.
+[71] M. Riemer, S. C. Raparthy, I. Cases, G. Subbaraj, M. P. Touzel, and
+I. Rish, “Continual learning in environments with polynomial mixing
+times,” in NeurIPS, vol. 35, 2022, pp. 21 961–21 973.
+[72] P. Schöpf, S. Auddy, J. Hollenstein, and A. Rodriguez-sanchez,
+“Hypernetwork-PPO for continual reinforcement learning,” in NeurIPS
+DRL Workshop, 2022.
+[73] K. Lu, A. Grover, P. Abbeel, and I. Mordatch, “Reset-free lifelong
+learning with skill-space planning,” in ICLR, 2021, pp. 1–20.
+[74] C. Atkinson, B. McCane, L. Szymanski, and A. Robins, “Pseudorehearsal: Achieving deep reinforcement learning without catastrophic
+forgetting,” Neurocomputing, vol. 428, pp. 291–307, 2021.
+[75] Y. Jiang, S. Bharadwaj, B. Wu, R. Shah, U. Topcu, and P. Stone,
+“Temporal-logic-based reward shaping for continuing reinforcement
+learningtasks,” in AAAI, vol. 35, no. 9, 2021, pp. 7995–8003.
+[76] E. Lecarpentier, D. Abel, K. Asadi, Y. Jinnai, E. Rachelson, and M. L.
+Littman, “Lipschitz lifelong reinforcement learning,” in AAAI, vol. 35,
+no. 9, 2021, pp. 8270–8278.
+[77] Y. Huang, K. Xie, H. Bharadhwaj, and F. Shkurti, “Continual modelbased reinforcement learning with hypernetworks,” in ICRA, 2021, pp.
+799–805.
+[78] S. Amani, L. Yang, and C. Cheng, “Provably efficient lifelong reinforcement learning with linear representation,” in ICLR, 2023, pp. 1–
+42.
+[79] Y. Yang, T. Zhou, J. Jiang, G. Long, and Y. Shi, “Continual task
+allocation in meta-policy network via sparse prompting,” in ICML, vol.
+202, 2023, pp. 39 623–39 638.
+[80] E. Ben-Iwhiwhu, S. Nath, P. K. Pilly, S. Kolouri, and A. Soltoggio, “Lifelong reinforcement learning with modulating masks,” Trans.
+Mach. Learn. Res., 2023.
+[81] S. Nath et al., “Sharing lifelong reinforcement learning knowledge via
+modulating masks,” in CoLLAs, vol. 232, 2023, pp. 936–960.
+[82] M. Caccia, J. Mueller, T. Kim, L. Charlin, and R. Fakoor, “Taskagnostic continual reinforcement learning: Gaining insights and overcoming challenges,” in CoLLAs, vol. 232, 2023, pp. 89–119.
+[83] S. Kessler et al., “The effectiveness of world models for continual
+reinforcement learning,” in CoLLAs, vol. 232, 2023, pp. 184–204.
+[84] N. Anand and D. Precup, “Prediction and control in continual reinforcement learning,” in NeurIPS, vol. 36, 2023, pp. 63 779–63 817.
+[85] Y. Luo et al., “Relay hindsight experience replay: Self-guided continual
+reinforcement learning for sequential object manipulation tasks with
+sparse rewards,” Neurocomputing, vol. 557, p. 126620, 2023.
+[86] M. Malagon, J. Ceberio, and J. A. Lozano, “Self-composing policies
+for scalable continual reinforcement learning,” in ICML, vol. 235, 2024,
+pp. 34 432–34 460.
+[87] Z. Liu, C. Du, W. S. Lee, and M. Lin, “Locality sensitive sparse
+encoding for learning world models online,” in ICLR, 2024, pp. 1–
+18.
+[88] H. Zhang et al., “CPPO: continual learning for reinforcement learning
+with human feedback,” in ICLR, 2024, pp. 1–24.
+[89] C. Yao et al., “From general relation patterns to task-specific decisionmaking in continual multi-agent coordination,” in IJCAI, vol. 1, 2025,
+pp. 6821–6829.
+[90] C. Pan et al., “Multi-granularity knowledge transfer for continual
+reinforcement learning,” in IJCAI, 2025.
+[91] H. Tang, J. Obando-Ceron, P. S. Castro, A. Courville, and G. Berseth,
+“Mitigating plasticity loss in continual reinforcement learning by
+reducing churn,” in ICML, 2025.
+[92] Y. Meng et al., “Preserving and combining knowledge in robotic
+lifelong reinforcement learning,” Mach. Intell., vol. 7, no. 2, pp. 256–
+269, 2025.
+[93] N. D. Palo, L. Hasenclever, J. Humplik, and A. Byravan, “Diffusion
+augmented agents: A framework for efficient exploration and transfer
+learning,” in CoLLAs, vol. 274, 2025, pp. 268–284.
+[94] K. Sun et al., “Principled fast and meta knowledge learners for
+continual reinforcement learning,” in ICLR, 2026.
+[95] L. Yuan, L. Li, Z. Zhang, F. Zhang, C. Guan, and Y. Yu, “Multiagent
+continual coordination via progressive task contextualization,” IEEE
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+[96]
+[97]
+[98]
+[99]
+[100]
+[101]
+[102]
+[103]
+[104]
+[105]
+[106]
+[107]
+[108]
+[109]
+[110]
+[111]
+[112]
+[113]
+[114]
+[115]
+[116]
+
+[117]
+[118]
+[119]
+[120]
+[121]
+[122]
+[123]
+
+Trans. Neural Networks Learn. Syst., vol. 36, no. 4, pp. 6326–6340,
+2025.
+H. Fu, Y. Sun, M. Littman, and G. Konidaris, “Knowledge retention
+in continual model-based reinforcement learning,” in ICML, 2025.
+F. M. Garcia and P. S. Thomas, “A meta-mdp approach to exploration
+for lifelong reinforcement learning,” in NeurIPS, vol. 32, 2019, pp.
+5692–5701.
+T. Zhang et al., “Dynamics-adaptive continual reinforcement learning via progressive contextualization,” IEEE Trans. Neural Networks
+Learn. Syst., vol. 35, no. 10, pp. 14 588–14 602, 2024.
+Y. Chandak, G. Theocharous, C. Nota, and P. S. Thomas, “Lifelong
+learning with a changing action set,” in AAAI, vol. 34, no. 04, 2020,
+pp. 3373–3380.
+W. Ding, S. Jiang, H. Chen, and M. Chen, “Incremental reinforcement
+learning with dual-adaptive ϵ-greedyexploration,” in AAAI, vol. 37,
+no. 6, 2023, pp. 7387–7395.
+H. Hihn and D. A. Braun, “Hierarchically structured task-agnostic
+continual learning,” Mach. Learn., vol. 112, no. 2, pp. 655–686, 2023.
+H. Bou-Ammar, E. Eaton, J. Luna, and P. Ruvolo, “Autonomous crossdomain knowledge transfer in lifelong policy gradientreinforcement
+learning,” in IJCAI, 2015, pp. 3345–3351.
+Y.-M. Qian, F.-Z. Xiong, and Z.-Y. Liu, “Zero-shot policy generation in
+lifelong reinforcement learning,” Neurocomputing, vol. 446, pp. 65–73,
+2021.
+M. J. Jacobson, C. Q. Wright, N. Jiang, G. Rodriguez-Rivera, and
+Y. Xue, “Task detection in continual learning via familiarity autoencoders,” in SMC, 2022, pp. 1–8.
+M. Xu, W. Ding, J. Zhu, Z. Liu, B. Chen, and D. Zhao, “Task-agnostic
+online reinforcement learning with an infinite mixtureof gaussian
+processes,” in NeurIPS, vol. 33, 2020, pp. 6429–6440.
+Z. Wang, C. Chen, and D. Dong, “A dirichlet process mixture of robust
+task models for scalable lifelong reinforcement learning,” IEEE Trans.
+Cybern., vol. 53, no. 12, pp. 7509–7520, 2023.
+C. Li, Y. Li, Y. Zhao, P. Peng, and X. Geng, “SLER: Self-generated
+long-term experience replay for continual reinforcement learning,”
+Appl. Intell., vol. 51, no. 1, pp. 185–201, 2021.
+A. Nagabandi, C. Finn, and S. Levine, “Deep online learning via metalearning: Continual adaptation for model-basedRL,” in ICLR, 2019, pp.
+1–15.
+J. A. Mendez, S. Shivkumar, and E. Eaton, “Lifelong inverse reinforcement learning,” in NeurIPS, vol. 31, 2018, pp. 4507–4518.
+N. Bougie and R. Ichise, “Intrinsically motivated lifelong exploration
+in reinforcement learning,” in AISC, 2021, pp. 109–120.
+E. Piccoli, M. Li, G. Carfı, V. Lomonaco, and D. Bacciu, “Combining
+pre-trained models for enhanced feature representation in reinforcement
+learning,” in CoLLAs, 2025.
+Y. Bengio, “Deep learning of representations for unsupervised and
+transfer learning,” in ICML, vol. 27, 2012, pp. 17–36.
+D. Grbic and S. Risi, “Towards continual reinforcement learning
+through evolutionary meta-learning,” in GECCO, 2019, p. 119–120.
+G. N. Tasse, S. James, and B. Rosman, “Logical composition in lifelong
+reinforcement learning,” in ICML LML Workshop, 2020.
+——, “Generalisation in lifelong reinforcement learning through logicalcomposition,” in ICLR, 2022, pp. 1–21.
+S. Mehimeh, X. Tang, and W. Zhao, “Value function optimistic
+initialization with uncertainty and confidence awareness in lifelong
+reinforcement learning,” Knowledge-Based Syst., vol. 280, p. 111036,
+2023.
+J. Dick, S. Nath, C. Peridis, E. Benjamin, S. Kolouri, and A. Soltoggio,
+“Statistical context detection for deep lifelong reinforcement learning,”
+in CoLLAs, 2024.
+H. Bou-Ammar, E. Eaton, P. Ruvolo, and M. E. Taylor, “Online multitask learning for policy gradient methods,” in ICML, vol. 32, 2014, pp.
+1206–1214.
+H. Bou-Ammar, R. Tutunov, and E. Eaton, “Safe policy search for
+lifelong reinforcement learning with sublinearregret,” in ICML, vol. 37,
+2015, pp. 2361–2369.
+Y. Zhan, H. B. Ammar, and M. E. Taylor, “Scalable lifelong reinforcement learning,” Pattern Recognit., vol. 72, pp. 407–418, 2017.
+R. Mowakeaa, S.-J. Kim, and D. K. Emge, “Kernel-based lifelong
+policy gradient reinforcement learning,” in ICASSP, 2021, pp. 3500–
+3504.
+F. Ding and F. Zhu, “Hliferl: A hierarchical lifelong reinforcement
+learning framework,” J. King Saud Univ. Comput. Inf. Sci., vol. 34,
+no. 7, pp. 4312–4321, 2022.
+S. Liu et al., “Continual vision-based reinforcement learning with group
+symmetries,” in CoRL, vol. 229, 2023, pp. 222–240.
+
+19
+
+[124] C. Kaplanis, M. Shanahan, and C. Clopath, “Policy consolidation for
+continual reinforcement learning,” in ICML, vol. 97, 2019, pp. 3242–
+3251.
+[125] R. Traoré, H. Caselles-Dupré, T. Lesort, T. Sun, N. Díaz-Rodríguez,
+and D. Filliat, “Continual reinforcement learning deployed in reallife using policy distillation and Sim2Real transfer,” in ICML MLRL
+Workshop, 2019.
+[126] C. Doyle, M. Guériau, and I. Dusparic, “Variational policy chaining
+for lifelong reinforcement learning,” in ICTAI, 2019, pp. 1546–1550.
+[127] Y. Shi, L. Yuan, Y. Chen, and J. Feng, “Continual learning via bit-level
+information preserving,” in CVPR, 2021, pp. 16 674–16 683.
+[128] C. Zhao, J. Xu, R. Peng, X. Chen, K. Mei, and X. Lan, “Experience
+consistency distillation continual reinforcement learning for robotic
+manipulation tasks,” in ICRA, vol. 33, 2024, pp. 501–507.
+[129] R. Surdej, M. Bortkiewicz, A. Lewandowski, M. Ostaszewski, and
+C. Lyle, “Balancing expressivity and robustness: Constrained rational
+activations for reinforcement learning,” in CoLLAs, 2025.
+[130] J. Hu et al., “Tackling continual offline RL through selective weights
+activation on aligned spaces,” in NeurIPS, 2025.
+[131] ——, “Continual knowledge adaptation for reinforcement learning,” in
+NeurIPS, 2025.
+[132] A. Jaziri, “Mitigating the stability-plasticity dilemma in adaptive train
+scheduling with curriculum-driven continual dqn expansion,” in CoLLAs, 2025.
+[133] W. Zhou et al., “Forgetting and imbalance in robot lifelong learning
+with off-policy data,” in CoLLAs, vol. 199, 2022, pp. 294–309.
+[134] A. Xie and C. Finn, “Lifelong robotic reinforcement learning by
+retaining experiences,” in CoLLAs, vol. 199, 2022, pp. 838–855.
+[135] M. Xu, X. Chen, and J. Wang, “Policy Correction and StateConditioned Action Evaluation for Few-Shot Lifelong Deep Reinforcement Learning,” IEEE Trans. Neural Networks Learn. Syst., pp. 1–15,
+2024.
+[136] T. Zhang et al., “Replay-enhanced continual reinforcement learning,”
+Trans. Mach. Learn. Res., 2023.
+[137] H. Caselles-Dupré, M. Garcia-Ortiz, and D. Filliat, “S-trigger: Continual state representation learning via self-triggered generative replay,”
+in IJCNN, 2021, pp. 1–7.
+[138] W. Yue, B. Liu, and P. Stone, “T-DGR: A trajectory-based deep
+generative replay method for continual learning in decision making,”
+in CoLLAs, 2025, pp. 481–497.
+[139] Z. Wang, C. Chen, and D. Dong, “Lifelong incremental reinforcement
+learning with online bayesian inference,” IEEE Trans. Neural Networks
+Learn. Syst., vol. 33, no. 8, pp. 4003–4016, 2022.
+[140] K. Chu, X. Zhu, and W. Zhu, “Accelerating lifelong reinforcement
+learning via reshaping rewards,” in SMC, 2021, pp. 619–624.
+[141] C. A. Steinparz et al., “Reactive exploration to cope with nonstationarity in lifelong reinforcement learning,” in CoLLAs, vol. 199,
+2022, pp. 441–469.
+[142] E. Meyerson and R. Miikkulainen, “Beyond shared hierarchies: Deep
+multitask learning through soft layerordering,” in ICLR, 2018, pp. 1–
+14.
+[143] M. Chang, A. Gupta, S. Levine, and T. L. Griffiths, “Automatically
+composing representation transformations as a meansfor generalization,” in ICLR, 2019, pp. 1–23.
+[144] J. Pfeiffer, S. Ruder, I. Vuli´c, and E. Ponti, “Modular deep learning,”
+Trans. Mach. Learn. Res., 2023.
+[145] A. Stocco, C. Lebiere, and J. R. Anderson, “Conditional routing of
+information to the cortex: A model of the basal ganglia’s role in
+cognitive coordination.” Psychological Review, vol. 117, no. 2, p. 541,
+2010.
+[146] A. J. Kell, D. L. Yamins, E. N. Shook, S. V. Norman-Haignere, and
+J. H. McDermott, “A task-optimized neural network replicates human
+auditory behavior, predicts brain responses, and reveals a cortical
+processing hierarchy,” Neuron, vol. 98, no. 3, pp. 630–644, 2018.
+[147] J. A. Mendez and E. Eaton, “Lifelong learning of compositional
+structures,” in ICLR, 2021, pp. 1–25.
+[148] S. Powers, A. Gupta, and C. Paxton, “Evaluating continual learning on
+a home robot,” in CoLLAs, vol. 232, 2023, pp. 493–512.
+[149] S. Pateria, B. Subagdja, A.-h. Tan, and C. Quek, “Hierarchical reinforcement learning: A comprehensive survey,” ACM Comput. Surv.,
+vol. 54, no. 5, pp. 1–35, 2021.
+[150] A. G. Barto and S. Mahadevan, “Recent advances in hierarchical
+reinforcement learning,” Discrete Event Dyn. Syst., vol. 13, pp. 341–
+379, 2003.
+[151] V. K. Chauhan, J. Zhou, P. Lu, S. Molaei, and D. A. Clifton, “A brief
+review of hypernetworks in deep learning,” Artif. Intell., vol. 57, no. 9,
+p. 250, 2024.
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+[152] J. von Oswald, C. Henning, J. Sacramento, and B. F. Grewe, “Continual
+learning with hypernetworks,” in ICLR, 2020, pp. 1–28.
+[153] M. Xu, X. Chen, and J. Wang, “Policy correction and state-conditioned
+action evaluation for few-shot lifelong deep reinforcement learning,”
+IEEE Trans. Neural Networks Learn. Syst., pp. 1–15, 2024.
+[154] A. Mallya and S. Lazebnik, “Packnet: Adding multiple tasks to a single
+network by iterative pruning,” in CVPR, 2018, pp. 7765–7773.
+[155] M. Wortsman et al., “Supermasks in superposition,” in NeurIPS,
+vol. 33, 2020, pp. 15 173–15 184.
+[156] M. Masana, X. Liu, B. Twardowski, M. Menta, A. D. Bagdanov, and
+J. van de Weijer, “Class-incremental learning: Survey and performance
+evaluation on image classification,” Trans. Pattern Anal. Mach. Intell.,
+vol. 45, no. 5, p. 5513–5533, 2022.
+[157] N. Wang, D. Zhang, and Y. Wang, “Learning to navigate for mobile
+robot with continual reinforcement learning,” in CCC, 2020, pp. 3701–
+3706.
+[158] M. Burhan Hafez and S. Wermter, “Behavior self-organization supports
+task inference for continual robot learning,” in IROS, 2021, pp. 6739–
+6746.
+[159] N. Stiennon et al., “Learning to summarize with human feedback,” in
+NeurIPS, vol. 33, 2020, pp. 3008–3021.
+[160] Z. Shao et al., “Deepseekmath: Pushing the limits of mathematical reasoning in open language models,” ArXiv preprint, vol. abs/2402.03300,
+2024.
+[161] D. Guo et al., “DeepSeek-R1 incentivizes reasoning in LLMs through
+reinforcement learning,” Nature, vol. 645, no. 8081, pp. 633–638, 2025.
+[162] J. H. et al., “Open-reasoner-zero: An open source approach to scaling
+up reinforcement learning on the base model,” in NeurIPS, 2025.
+[163] J. Zhang et al., “Bootstrap your own skills: Learning to solve new tasks
+with large language model guidance,” in CoRL, 2023.
+[164] K. Chen et al., “Llm-assisted multi-teacher continual learning for visual
+question answering in robotic surgery,” in ICRA, 2024, pp. 10 772–
+10 778.
+[165] H. Bai et al., “Digirl: Training in-the-wild device-control agents with
+autonomousreinforcement learning,” in NeurIPS, 2024.
+[166] K. Frans, S. Park, P. Abbeel, and S. Levine, “Unsupervised zero-shot
+reinforcement learning via functional rewardencodings,” in ICML, vol.
+235, 2024, pp. 13 927–13 942.
+[167] C. Ying et al., “PEAC: unsupervised pre-training for cross-embodiment
+reinforcementlearning,” in NeurIPS, vol. 37, 2024, pp. 54 632–54 669.
+[168] A. Zhao, E. Zhu, R. Lu, M. Lin, Y.-J. Liu, and G. Huang, “Selfreferencing agents for unsupervised reinforcement learning,” Neural
+Networks, vol. 188, p. 107448, 2025.
+[169] Z. Bing, D. Lerch, K. Huang, and A. Knoll, “Meta-reinforcement
+learning in non-stationary and dynamic environments,” Trans. Pattern
+Anal. Mach. Intell., vol. 45, no. 3, pp. 3476–3491, 2023.
+[170] T. Xu, Z. Li, and Q. Ren, “Meta-reinforcement learning robust to distributional shift via performinglifelong in-context learning,” in ICML,
+vol. 235, 2024, pp. 55 112–55 125.
+[171] K. Garces, J. Xuan, and H. Zuo, “Adaptive successor features composition for transfer reinforcement learning,” IEEE Transactions on
+Artificial Intelligence, pp. 1–12, 2025.
+[172] H. Ahn, J. Hyeon, Y. Oh, B. Hwang, and T. Moon, “Prevalence of
+negative transfer in continual reinforcement learning: Analyses and a
+simple baseline,” in ICLR, 2025.
+[173] N. Botteghi, M. Poel, and C. Brune, “Unsupervised representation
+learning in deep reinforcement learning: A review,” IEEE Control
+Systems, vol. 45, no. 2, pp. 26–68, 2025.
+[174] E. Meyer, A. White, and M. C. Machado, “Harnessing discrete representations for continual reinforcement learning,” in RCL, 2024.
+[175] R. Chua, A. Ghosh, C. Kaplanis, B. A. Richards, and D. Precup,
+“Learning successor features the simple way,” in NeurIPS, vol. 37,
+2024.
+[176] J. Josifovski, S. Auddy, M. Malmir, J. Piater, A. Knoll, and N. NavarroGuerrero, “Continual domain randomization,” in IROS, 2024, pp. 4965–
+4972.
+[177] A. Moeini et al., “A survey of in-context reinforcement learning,” ArXiv
+preprint, vol. abs/2502.07978, 2025.
+[178] J. Wang, R. Chandra, and S. Zhang, “Towards provable emergence of
+in-context reinforcement learning,” in NeurIPS, 2025.
+[179] T. Schmied, F. Paischer, V. Patil, M. Hofmarcher, R. Pascanu, and
+S. Hochreiter, “Retrieval-augmented decision transformer: External
+memory for in-context RL,” in CoLLAs, 2024.
+[180] J. Liu, J. Hao, Y. Ma, and S. Xia, “Unlock the cognitive generalization
+of deep reinforcement learningvia granular ball representation,” in
+ICML, vol. 235, 2024, pp. 31 062–31 079.
+
+20
+
+[181] M. Chevalier-Boisvert et al., “Minigrid & miniworld: Modular & customizable reinforcement learningenvironments for goal-oriented tasks,”
+in NeurIPS, 2023.
+[182] C. Beattie et al., “Deepmind lab,” ArXiv preprint, vol. abs/1612.03801,
+2016.
+[183] M. Towers et al., “Gymnasium: A standard interface for reinforcement
+learning environments,” ArXiv preprint, vol. abs/2407.17032, 2024.
+[184] E. Todorov, T. Erez, and Y. Tassa, “Mujoco: A physics engine for
+model-based control,” in IROS, 2012, pp. 5026–5033.
+[185] L. Espeholt et al., “IMPALA: scalable distributed deep-rl with importance weighted actor-learnerarchitectures,” in ICML, vol. 80, 2018, pp.
+1406–1415.
+[186] M. G. Bellemare, Y. Naddaf, J. Veness, and M. Bowling, “The arcade
+learning environment: An evaluation platform for general agents,” Artif.
+Intell. Res., vol. 47, no. 1, pp. 253–279, 2013.
+[187] V. Mnih et al., “Human-level control through deep reinforcement
+learning,” Nature, vol. 518, no. 7540, pp. 529–533, 2015.
+[188] O. Vinyals et al., “StarCraft II: A new challenge for reinforcement
+learning,” ArXiv preprint, vol. abs/1708.04782, 2017.
+[189] R. Julian, B. Swanson, G. Sukhatme, S. Levine, C. Finn, and K. Hausman, “Never stop learning: The effectiveness of fine-tuning in robotic
+reinforcement learning,” in CoRL, 2021, pp. 2120–2136.
+[190] N. Justesen, P. Bontrager, J. Togelius, and S. Risi, “Deep learning for
+video game playing,” IEEE Trans. Games, vol. 12, no. 1, pp. 1–20,
+2020.
+[191] K. Cobbe, C. Hesse, J. Hilton, and J. Schulman, “Leveraging procedural
+generation to benchmark reinforcement learning,” in ICML, vol. 119,
+2020, pp. 2048–2056.
+[192] Q. Delfosse, J. Blüml, B. Gregori, and K. Kersting, “Hackatari: Atari
+learning environments for robust and continual reinforcement learning,”
+in RLC IPRL Workshop, 2024.
+[193] I. Sur et al., “System design for an integrated lifelong reinforcement
+learning agent for real-time strategy games,” in AIMLSystems, 2023,
+pp. 1–9.
+[194] C. Geishauser et al., “Dynamic dialogue policy for continual reinforcement learning,” in COLING, 2022, pp. 266–284.
+[195] V. Shulev and K. Sima’an, “Continual reinforcement learning for
+controlled text generation,” in COLING, 2024, pp. 3881–3889.
+[196] G. Zheng, S. Zhou, V. Braverman, M. A. Jacobs, and V. S. Parekh,
+“Selective experience replay compression using coresets for lifelong
+deep reinforcement learning in medical imaging,” in MIDL, 2024, pp.
+1751–1764.
+[197] S. Liu, B. Wang, H. Li, C. Chen, and Z. Wang, “Continual portfolio selection in dynamic environments via incremental reinforcement
+learning,” Int. J. Mach. Learn. Cybern., vol. 14, no. 1, pp. 269–279,
+2023.
+[198] A. Q. Md et al., “A novel approach for self-driving car in partially
+observable environment using life long reinforcement learning,” Sustainable Energy, Grids and Networks, vol. 38, p. 101356, 2024.
+[199] Y. Wang, F. Shang, and J. Lei, “Multi-granularity fusion resource allocation algorithm based on dual-attention deep reinforcement learning
+and lifelong learning architecture in heterogeneous IIoT,” Inf. Fusion,
+vol. 99, p. 101871.
+[200] R. Wang, Z. Cao, X. Zhou, Y. Wen, and R. Tan, “Phyllis: Physicsinformed lifelong reinforcement learning for data center cooling control,” in ACM E-Energy, 2023, pp. 114–126.
+[201] R. Aljundi, D. O. Reino, N. Chumerin, and R. E. Turner, “Continual
+novelty detection,” in CoLLAs, vol. 199, 2022, pp. 1004–1025.
+[202] X. Liu, Y. Bai, Y. Lu, A. Soltoggio, and S. Kolouri, “Wasserstein task
+embedding for measuring task similarities,” Neural Networks, vol. 181,
+p. 106796, 2025.
+[203] G. Sibo, W. Donglin, and H. Li, “OER: Offline experience replay
+for continual offline reinforcement learning,” ArXiv preprint, vol.
+abs/2305.13804, 2023.
+[204] L. Chen, S. Jayanthi, R. R. Paleja, D. Martin, V. Zakharov, and
+M. Gombolay, “Fast lifelong adaptive inverse reinforcement learning
+from demonstrations,” in CoRL, vol. 205, 2023, pp. 2083–2094.
+[205] T. Kobayashi and T. Sugino, “Reinforcement learning for quadrupedal
+locomotion with design of continual–hierarchical curriculum,” Eng.
+Appl. Artif. Intell., vol. 95, p. 103869, 2020.
+[206] T. Tomilin et al., “MEAL: A benchmark for continual multi-agent
+reinforcement learning,” ArXiv preprint, vol. abs/2506.14990, 2025.
+[207] L. Fan et al., “Minedojo: Building open-ended embodied agents with
+internet-scaleknowledge,” in NeurIPS, vol. 35, 2022, pp. 18 343–
+18 362.
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+21
+
+Wei Wei (Member, IEEE) received the Ph.D. degree in computer science from Shanxi University in
+2012. He is currently a professor with the School
+of Computer and Information Technology, Shanxi
+University. He has authored or coauthored more than
+20 journal papers in his research fields. His research
+interests include reinforcement learning and granular
+computing.
+
+[208] J. Mendez-Mendez, L. P. Kaelbling, and T. Lozano-Pérez, “Embodied
+lifelong learning for task and motion planning,” in CoRL, vol. 229,
+2023, pp. 2134–2150.
+[209] G. Tziafas and H. Kasaei, “Lifelong robot library learning: Bootstrapping composable and generalizable skills for embodied control with
+language models,” in ICRA, 2024, pp. 515–522.
+[210] G. Wang et al., “Voyager: An open-ended embodied agent with large
+language models,” Trans. Mach. Learn. Res., 2024.
+[211] B. Kim, M. Seo, and J. Choi, “Online continual learning for interactive
+instruction following agents,” in ICLR, 2024, pp. 1–18.
+[212] X. Zeng, H. Luo, Z. Wang, S. Li, Z. Shen, and T. Li, “A continual
+learning approach for embodied question answering with generative
+adversarial imitation learning,” in ICASSP, 2025, pp. 1–5.
+[213] S. Rajeswar et al., “Mastering the unsupervised reinforcement learning
+benchmark from pixels,” in ICML, vol. 202, 2023, pp. 28 598–28 617.
+[214] S. E. Ada and E. Ugur, “Unsupervised meta-testing with conditional
+neural processes for hybrid meta-reinforcement learning,” IEEE Rob.
+Autom. Lett., vol. 9, no. 10, pp. 8427–8434, 2024.
+[215] Y. Fang et al., “Scrl: Self-supervised continual reinforcement learning
+for domain adaptation,” in AIoTSys, 2023, pp. 55–63.
+[216] J. Beck et al., “A tutorial on meta-reinforcement learning,” Foundations
+and Trends in Machine Learning, vol. 18, no. 2-3, pp. 224–384, 2025.
+[217] A. Nagabandi et al., “Learning to adapt in dynamic, real-world environments through meta-reinforcementlearning,” in ICLR, 2019.
+[218] C. Sherstan, M. C. Machado, and P. M. Pilarski, “Accelerating learning
+in constructive predictive frameworks with the successor representation,” in IROS, 2018, pp. 2997–3003.
+[219] S. C. Raparthy, E. Hambro, R. Kirk, M. Henaff, and R. Raileanu,
+“Generalization to new sequential decision making tasks with incontextlearning,” in ICML, 2024.
+
+Tiranrui Li (Senior Member, IEEE) received the
+Ph.D. degree from Southwest Jiaotong University,
+Chengdu, China, in 2002.
+He is currently a professor of the Key Laboratory
+of Cloud Computing and Intelligent Techniques,
+Southwest Jiaotong University. He has published
+more than 300 research papers in refereed journals
+and conferences. His research interests include big
+data, machine learning, data mining, granular computing, and rough sets.
+Bo An (Senior Member, IEEE) received his Ph.D.
+degree in Computer Science from the University of
+Massachusetts, Amherst, MA, USA, in 2010. He is
+a President’s Council Chair professor at Nanyang
+Technological University. His research interests include artificial intelligence, multi-agent systems, reinforcement learning, game theory, and optimization.
+
+VII. B IOGRAPHY S ECTION
+Jiye Liang (Fellow, IEEE) received the Ph.D. degree
+from Xi’an Jiaotong University, Xi’an, China, in
+2001. He is a professor with the School of Computer and Information Technology, Shanxi University, where he is the director of the Key Laboratory
+of Computational Intelligence and Chinese Information Processing of Ministry of Education. He has
+published more than 200 papers, including the IEEE
+TPAMI, ICML, AAAI, etc.. His research interests
+include data mining and artificial intelligence.
+
+Chaofan Pan received the B.S. and M.S. degrees
+from Southwest Petroleum University, Chengdu,
+China, in 2020 and 2023, respectively. Now he
+is pursuing a Ph.D. degree from the School of
+Computing and Artificial Intelligence, Southwestern
+University of Finance and Economics. His main research interests include reinforcement learning, selfsupervised learning, and continual reinforcement
+learning.
+
+Xin Yang (Member, IEEE) received the Ph.D. degree in computer science from Southwest Jiaotong
+University, Chengdu, in 2019. He is currently a
+Professor at the School of Computing and Artificial
+Intelligence, Southwestern University of Finance and
+Economics. He has authored more than 100 research
+papers in refereed journals and conferences. His research interests include federated learning, continual
+learning, and multi-granularity learning.
+
+A PPENDIX A
+T HE P OPULARITY OF CRL
+Figure 12 shows the number of published articles in CRL
+and RL over the past ten years (from 2015-2025) according to
+Google Scholar. For the CRL articles, we included those that
+have either the “continual reinforcement learning” or “lifelong
+reinforcement learning” keywords. The results show that the
+number of articles in CRL has been increasing rapidly since
+2018, indicating a growing interest in this field.
+
+Yanhua Li received the M.S. degree from Southwest
+Petroleum University, Chengdu, China, in 2022. She
+is currently working toward a Ph.D. degree at the
+School of Computing and Artificial Intelligence,
+Southwestern University of Finance and Economics,
+Chengdu, China. Her research interests include continual learning, multi-granularity learning, and open
+intent classification. She has published several papers in conferences and journals, such as AAAI and
+Information Fusion.
+
+Number of Articles (100x for RL)
+
+2500
+2000
+
+Research Trends in RL and CRL
+CRL
+RL
+
+1500
+1000
+500
+0
+
+2016
+
+2018
+
+2020
+Year
+
+2022
+
+2024
+
+Fig. 12. The popularity of CRL and RL from 2015 to 2025.
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+TABLE VI
+M ATHEMATICAL N OTATIONS .
+Notation
+M
+S, A, O
+T, R, Ω
+ρ0
+t
+H
+γ
+s, a, r
+π, θ(θ)
+V, Q
+G
+M
+K
+N
+D
+g
+i, j, k
+pi,j
+Ai
+AN
+F Gi
+FG
+pi (t)
+∆
+AUCi
+AUCbi
+F Ti
+FT
+BW T
+L, s
+G,
+D
+D
+q
+δ
+α, β, λ
+m, M
+f
+u
+η
+F
+l, L
+ζ
+x
+H, Θ
+e
+τ
+z
+h
+c
+Φ
+
+Meaning
+MDP (also represents the task in CRL)
+State space, action space and observation space
+Transition function, reward function and observation
+function
+Initial state distribution
+Time step
+Episode horizon for episodic finite-horizon MDPs
+Discount factor for continuing (infinite-horizon)
+MDPs
+State, action and reward
+Policy function and its parameters
+State value function and state-action value function
+Return
+Task set
+The space of all tasks
+Number of tasks
+Data
+Goal state
+Task indices
+Normalized performance of task j after training on
+task i
+Average performance after training sequentially
+through tasks 1 to i
+Final average performance after training through all
+N tasks
+Forgetting on task i (performance drop from learning
+time to final)
+Average forgetting over tasks
+Normalized performance on task i at training step t
+Per-task training budget (in steps) used for AUC
+normalization
+Normalized area under the learning curve for task i
+over its training interval
+AUC of a single-task baseline reference run for task
+i
+Per-task forward transfer based on AUC improvement over baseline
+Average forward transfer over tasks
+Backward transfer (final performance change on past
+tasks)
+Policy latent basis and the task-specific coefficients
+Task group
+Task descriptors latent basis
+Task domain
+Environmental coefficients
+TD error
+Learning rates or weighting factors
+module and module set
+solution function
+activation score
+parameters of dynamic models
+Fisher information matrix
+Dynamic model and capacity of dynamic models
+libraries
+concentration parameter
+assignment
+Hyperparameter and its parameters
+Task embedding
+trajectory
+Task latent variable
+Shaping function
+Cumulative visit counts
+Potential function
+
+22
+
+A PPENDIX B
+M ATHEMATICAL N OTATIONS
+Table VI summarizes the mathematical notations used in
+this survey.
+A PPENDIX C
+C ONTINUAL R EINFORCEMENT L EARNING TASKS
+A. Tasks
+In the domain of CRL, most agents are tasked with objectives at each step of a task sequence that aligns with the goals
+of RL tasks. This positions tasks as the foundational units of
+CRL. This section aims to introduce existing tasks within CRL
+and provide a succinct analysis of them.
+Navigation tasks are one of the most commonly employed
+scenarios in CRL, often utilizing two-dimensional state spaces
+and a discrete set of actions. In these tasks, agents must
+explore unknown environments via continuous movement to
+reach a designated goal. Researchers frequently design task
+sequences based on grid-world environments [13], where
+rewards or environmental dynamics vary to assess CRL algorithms [53]. These tasks are relatively simple to learn and
+provide a lower difficulty for computationally intensive CRL
+algorithms. Furthermore, navigation tasks lend themselves
+well to environment procedural generation, which is essential
+for CRL. MiniGrid [181]7 is the most widely used environment
+library, offering a variety of map sizes and layouts for task
+generation. It provides preset environments like Doorkeyenv,
+Fourroomsenv, and Memoryenv for constructing diverse CRL
+task sequences. Additionally, JBW offers a testbed for lifelong
+learning by generating non-stationary environments within a
+2D grid world. For more realistic evaluations, 3D navigation
+tasks, such as those based on DeepMind Lab [182], have been
+used to further assess CRL algorithms [54].
+Control tasks are another prevalent CRL task type, typically involving three-dimensional state spaces and a discrete
+action set. Classic examples include the mountain car, inverted
+pendulum, and double pendulum tasks 8 , where agents must
+reach specific target states (e.g., the peak of the mountain,
+an upright position, or a target height) using simple control
+commands (e.g., forward, backward, left turn, right turn) [183].
+Task sequences in control tasks are often formed by altering
+the objectives [67] or by switching between different tasks
+[27], enabling the evaluation of CRL algorithms. In more
+complex tasks, agents are required to control robotic devices,
+such as robotic arms and legs [184]. These tasks involve physical properties, presenting significant challenges while also
+offering practical applications. Researchers typically modify
+parameters such as limb length, mass, environmental friction,
+and gravity within control tasks to create diverse task sequences for CRL evaluation [37], [38], [124].
+Video games present challenging reinforcement learning
+tasks, where the state space typically consists of images, and
+the actions are discrete. Within these environments, agents
+must perform complex controls to achieve specific goals, making video games an ideal testbed for evaluating the scalability
+7 https://minigrid.farama.org
+8 https://www.gymlibrary.dev/environments/classic_control
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+of CRL algorithms in challenging scenarios [84], [185]. The
+Atari 2600 9 , with its collection of games that share consistent
+state and action spaces, is one of the most frequently used sets
+in DRL experiments [186], [187]. Researchers evaluate CRL
+algorithms by combining different games into task sequences
+[26], [48], [54]. For more complex tasks involving longhorizon strategy games with rich observations, some works
+have explored environments like MineCraft and StarCraft II
+[63], [70], [73], [188]. However, these tasks are computationally expensive due to their large state spaces and complex task
+structures, requiring extended training durations [22].
+Although most tasks are in simulated environments, some
+studies have also applied CRL algorithms to real-world robotic
+tasks. These include 2D navigation tasks for mobile robots
+[56], [57], robotic arm control tasks [123], and home robot
+tasks [148]. They present additional challenges, such as sensor
+noise, mechanical constraints, and the need for robust online
+learning, making them a practical direction for the further
+development of CRL techniques.
+A PPENDIX D
+A PPLICATIONS
+Although the research on CRL is shown to be promising,
+the application of CRL in real-world scenarios is still in its
+infancy. In this section, we summarize recent applications that
+are closely related to CRL, including robotics, autonomous
+driving, and game playing.
+B. Robotics Learning
+Robotics is a prominent application domain of CRL, where
+lifelong robots are required to adapt to new tasks or environments without forgetting previously learned tasks. For
+example, robots must continuously learn new skills as they
+encounter various tasks, appliances, and user preferences in
+home environments [148]. Traditional robot learning methods
+typically rely on a large amount of independent and identically
+distributed data, which is impractical in dynamic settings. Recent studies have focused on addressing this challenge by using
+offline reinforcement learning, skill learning, and distillation
+that enable robots to learn efficiently from limited demonstrations and adapt to new tasks while mitigating catastrophic
+forgetting [128], [133], [134], [148]. Fine-tuning pre-trained
+policies is also an effective strategy for continual learning in
+robotics. By adapting policies to new variations with minimal
+offline data, robots can improve their performance in dynamic
+environments [189].
+The navigation task of mobile robots has been widely
+studied in CRL due to its extensive application and relative
+simplicity. CRL has been applied to enable mobile robots
+to learn sequentially in unknown environments through techniques such as policy distillation, task decomposition, and
+behavior self-organization [125], [157], [158]. Additionally,
+Lifelong Federated Reinforcement Learning (LFRL) leverages
+cloud-based systems to enhance navigation capabilities by
+fusing experiences from multiple robots, thereby improving
+generalization across different environments [57].
+9 https://www.gymlibrary.dev/environments/atari
+
+23
+
+Recent developments have also introduced benchmarks
+specifically designed to evaluate the performance of CRL
+methods in robotic tasks. Continual World provides a structured sequence of robotic manipulation tasks that emphasize
+forward transfer, challenging existing algorithms to balance
+forgetting and transfer [32]. Furthermore, CORA provides a
+more comprehensive benchmark, in which sequences based
+on household robot tasks test agents in a more realistic visual
+domain and evaluate their sample efficiency [34]. Despite these
+advancements, some researchers have pointed out that they are
+too challenging for current CRL agents, and have proposed
+simpler benchmarks to facilitate the development of more
+effective methods [42], [134].
+
+C. Game Playing
+The game is a common testbed for RL algorithms. It has
+evolved from classical benchmarks such as GridWorld games
+to more complex settings such as video games with multimodal inputs [190]. These environments provide a controlled
+yet challenging setting for assessing the continual learning
+capabilities of CRL agents. Simple video games, such as
+Procgen [191] and Atari [186], have been widely utilized
+as benchmarks for evaluating CRL methods [9], [22], [54],
+[74]. These games offer a diverse range of tasks (different
+environments and play modes) that test an agent’s ability
+to generalize and retain knowledge, making them ideal for
+studying the effects of catastrophic forgetting and the efficacy
+of knowledge transfer mechanisms. Based on these games,
+CORA introduces controlled variations and benchmarks that
+further challenge CRL agents, emphasizing the need for robust
+generalization and sample-efficient learning [34]. They provide
+structured sequences of tasks that highlight the strengths and
+limitations of current CRL methods, revealing that while some
+algorithms excel in preserving knowledge, they often struggle
+with adapting to new, visually complex tasks. Furthermore,
+HackAtari introduces controlled novelty into traditional game
+environments [192]. By modifying game dynamics and reward
+structures, it facilitates the evaluation of agents’ ability to
+generalize and adapt to new conditions.
+As CRL research progresses, more complex games such as
+online strategy games or 3D video games have become prominent testbeds for advanced CRL methods. These games present
+a higher level of complexity due to their high-dimensional
+state spaces and more unstable dynamic environments. In
+Minecraft, hierarchical approaches have been proposed to
+efficiently transfer and reuse skills across tasks, addressing
+the sample efficiency challenge posed by the game’s vast
+and varied environment [49], [73]. In StarCraft 2, modelfree generative replay frameworks and wake-sleep mechanisms
+have been developed to improve continual learning efficiency
+[70], [193]. Additionally, COOM provides an image-based
+CRL benchmark based on ViZDoom for evaluating agents
+with embodied perception [33]. These frameworks leverage
+advanced modeling techniques to maintain performance across
+complex tasks, demonstrating significant improvements in both
+forward transfer and retention of previously acquired skills.
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+D. Others
+Recently, CRL has been explored in various other fields
+beyond the above, showcasing its versatility and potential for
+broad application. In natural language processing, CRL has
+been applied to dialogue systems by integrating a transformer,
+enabling them to integrate new knowledge dynamically to
+adapt to new topics and tasks without forgetting [194]. Similarly, in controlled text generation, CRL frameworks have
+been utilized to allow large language models to adaptively
+generate text that aligns with specified attributes, such as
+topic or sentiment, in real-time [195]. Additionally, Continual
+Proximal Policy Optimization (CPPO) has been proposed
+to enhance Reinforcement Learning from Human Feedback
+(RLHF) [159] by balancing policy learning and knowledge
+retention, allowing language models to advise human preferences without extensive retraining [88].
+In the field of medical imaging, CRL addresses the challenge of catastrophic forgetting by employing selective experience replay with corset compression [196]. In finance, CRL
+has been utilized for continual portfolio selection, allowing
+trading agents to adapt to dynamic market conditions by incrementally updating their strategies based on new data, thereby
+improving returns and reducing risks [197]. In the domain of
+autonomous driving, CRL has been employed to improve
+the adaptability of self-driving cars in partially observable
+environments [198]. Additionally, CRL has been applied in
+the field of resource allocation within industrial internet
+of things networks [199]. Here, the CRL method enables
+efficient resource management by continuously learning and
+adapting to the dynamic network conditions, thereby optimizing data transmission and energy consumption. Furthermore,
+CRL has been applied to data center cooling control, where
+it enhances energy efficiency by enabling systems to adapt
+quickly and safely to changing thermal conditions [200].
+A PPENDIX E
+B EYOND T RADITIONAL CRL
+There are several emerging research directions in CRL that
+extend beyond the traditional methods discussed in Section IV.
+These methods encompass novel techniques and pose unique
+challenges in CRL, including out-of-distribution detection,
+imitation learning, and multi-agent coordination. This section
+provides an overview of them and their potential impact on
+the field of CRL.
+E. Task Detection
+As described in Section III-E, the task-agnostic scenario is
+a common setting in CRL, where the agent is not informed
+of the task identities or boundaries. However, many CRL
+methods rely on task-specific information to guide learning
+and adaptation [104], [117]. Task detection methods bridge
+this gap by enabling agents to identify task identities or detect
+environmental changes without explicit supervision. These
+methods are particularly useful for approaches that associate
+specific structures or policies with individual tasks. Naturally,
+they can be divided into two categories: task identity detection
+and environment change detection.
+
+24
+
+Task identity detection methods aim to identify task labels
+by leveraging patterns in observations, latent representations,
+or task-specific features. Therefore, unsupervised or semisupervised learning techniques can be naturally applied to
+this problem. For example, Jacobson et al. [104] proposed
+the use of Familiarity AutoEncoders (FAEs) for discovering
+task labels. FAEs reconstruct input data for specific tasks,
+assigning task labels based on the autoencoder with the highest
+reconstruction performance. This method avoids catastrophic
+forgetting of the task detector by maintaining separate models
+for each task. Additionally, the exploration of variational and
+adversarial autoencoders as FAE variants highlights the adaptability of the approach to noisy environments. Instead of using explicit task labels, Behavior-Guided Policy Optimization
+(BGPO) [158] uses behavior embeddings as task identities.
+It employs a self-organizing network to incrementally learn a
+behavior embedding space from demonstrations. By matching
+new behaviors to the nearest embedding, the system efficiently
+infers tasks without requiring predefined task structures. This
+approach is further enhanced by a behavior-matching intrinsic
+reward, which aligns generated trajectories with demonstrated
+behaviors. The dynamic expansion of the embedding space ensures scalability to novel tasks, making this method suited for
+continual robot learning. Additionally, OWL formulates task
+identity detection as a multi-armed bandit problem, allowing
+for adaptive policy selection during test time. By combining a
+multi-head network with shared representations, this method
+effectively mitigates interference between tasks.
+In contrast, environment change detection methods focus
+on detecting environment dynamics rather than explicit task
+identities. Environment changes in RL can be categorized as
+changes in the input distribution, changes in the transition
+function, or changes in the reward function. Methods to detect
+changes in input distributions have been developed in the field
+of novelty and out-of-distribution detection with applications
+in CL [201], [202]. A commonality is the use of statistical and
+probabilistic techniques to detect changes in the environment.
+For instance, S-TRIGGER [137] employs a self-triggered
+generative replay mechanism, utilizing statistical analysis of
+reconstruction errors from VAEs to detect significant environmental changes. Similarly, LLIRL [139] leverages an infinite
+mixture model with online Bayesian inference to adapt to dynamic environments. By using the Chinese restaurant process
+for environment clustering, LLIRL can detect changes without
+external signals, showcasing the importance of probabilistic
+frameworks in managing environment dynamics.
+Recently, another statistical method, Sliced Wasserstein Online Kolmogorov-Smirnov (SWOKS) [117], combines optimal
+transport methods with the Sliced Wasserstein distance and
+the Kolmogorov-Smirnov test to measure distances between
+experience distributions. This method’s ability to operate online without predefined task labels highlights its suitability
+for real-time adaptation in complex environments. The use
+of distance metrics to detect task changes aligns with the
+statistical approaches of S-TRIGGER and LLIRL, yet SWOKS
+uniquely incorporates optimal transport methods to enhance
+detection accuracy. In contrast to these statistical approaches,
+Reactive Exploration [141] focuses on modifying reward struc-
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+tures to include intrinsic rewards based on prediction errors.
+This method utilizes the Intrinsic Curiosity Module (ICM) to
+detect changes and encourage exploration in altered regions
+of the state space. This reward-focused strategy provides
+an alternative perspective, emphasizing the role of intrinsic
+motivation in detecting environmental changes.
+F. Offline Reinforcement Learning and Imitation Learning in
+CRL
+Offline Reinforcement Learning (Offline RL) and Imitation
+Learning (IL) represent compelling extensions to CRL frameworks, particularly for leveraging static datasets or expert
+demonstrations to address the challenges of lifelong learning.
+Offline RL focuses on learning policies from pre-collected
+datasets without requiring direct interaction with the environment, which is advantageous in scenarios where real-world
+interactions are costly or infeasible. Currently, there is still
+very little research on the integration of offline RL with CRL,
+but some initial studies have shown promising results. LiSP
+is an early step in this direction, which uses offline data to
+discover skills in reset-free lifelong RL, enabling long-horizon
+planning in an abstract skill space [73]. Its effectiveness
+is demonstrated in a variety of settings, including offline
+interactions.
+A recent work, Offline Experience Replay (OER), formulates the Continual Offline Reinforcement Learning (CORL),
+where an agent learns a sequence of offline reinforcement
+learning tasks and pursues good performance on all learned
+tasks with a small replay buffer without exploring any of
+the environments of all the sequential tasks [203]. OER addresses the distribution shift problem in CORL by introducing
+a Model-Based Experience Selection (MBES) scheme. This
+approach filters offline data to build a replay buffer that
+closely aligns with the learned model, mitigating catastrophic
+forgetting while maintaining performance on new tasks. Additionally, offline RL has been applied in some CRL methods
+[65], [133], highlighting the potential of this technique to
+enhance CRL by integrating prior knowledge and reducing
+the reliance on extensive real-world interactions.
+Imitation learning, on the other hand, provides a complementary approach to RL by utilizing expert demonstrations
+to guide the agent’s learning. ELIRL [109] and Fast Lifelong Adaptive Inverse Reinforcement learning (FLAIR) [204]
+exemplify how IL can be adapted to CRL settings. ELIRL
+introduces a shared latent reward structure that facilitates
+knowledge transfer across sequential tasks while addressing
+catastrophic forgetting. FLAIR builds upon this by incorporating policy mixtures for fast adaptation to heterogeneous
+demonstrations, ensuring scalability and personalization in
+lifelong learning scenarios. Both approaches emphasize the
+importance of efficient knowledge-sharing and task-specific
+adaptation. In addition, behavioral cloning, as a simple imitation learning method, has been applied in many CRL methods
+with experience replay [58], [68], [205].
+G. Multi-Agent CRL
+Many real deployments require multiple agents to coordinate while both their partners and environments drift
+
+25
+
+over time, which raises additional non-stationarity and creditassignment challenges beyond the single-agent CRL setting.
+Recent work studies continual multi-agent coordination by
+modeling general relation patterns [89] and by formalizing
+multi-agent continual learning setups and benchmarks [95].
+However, the application of CRL to multi-agent systems is
+still in its early stages, and there are many open questions
+regarding how to effectively manage the complexities of multiagent interactions while addressing the challenges of lifelong
+learning. Furthermore, the benchmarks for multi-agent CRL
+are still limited. Although a preprinted work have proposed
+multi-agent continual learning benchmarks based on Overcook
+[206], more diverse and realistic benchmarks are needed to
+further advance research in this area.
+A PPENDIX F
+M ORE F UTURE W ORKS
+H. Evaluation and Benchmark
+Variant evaluation metrics have been proposed to measure
+CRL from different but complementary perspectives, although
+no single metric can summarize the efficacy of a CRL approach. In addition, most metrics are drawn from the CSL
+field, which may not be suitable for CRL. Designing a set of
+generalized, novel metrics is beneficial for the development of
+CRL. Moreover, with the effervescent development of largescale models, it is crucial to standardize evaluation from the
+perspectives of scalability and privacy. The appropriateness of
+the stored/transferred knowledge and the security of the model
+should also be quantified as metrics.
+I. Interpretable Knowledge
+Ranging from exterior experiences to policy function approximators, black-box knowledge is more accessible and predominant than interpretable and well-articulated knowledge.
+However, the latter is beneficial for evaluating and explaining the process of CRL. Moreover, building an interpretable
+knowledge base can help to transfer knowledge across various
+tasks and even alleviate catastrophic decision-making for highstakes tasks such as autonomous driving.
+J. Embodied Agents
+Embodied agents are agents that interact with the environment through sensors and actuators, such as virtual agents and
+robots [207], [208]. The development of embodied agents with
+CL capabilities has gained increasing attention, particularly
+with the advent of LLMs [209]. Recent works have demonstrated how LLMs can enhance embodied agents by enabling
+efficient skill acquisition, interpretable knowledge storage,
+and adaptive reuse of learned behaviors [92], [210]. Such
+capabilities align closely with the goals of CRL, particularly
+in addressing catastrophic forgetting and improving generalization across tasks. While some continual embodied agents
+often rely on imitation learning to acquire new behaviors and
+adapt to novel [210]–[212], recent advancements have begun
+to explore the integration of CRL into this domain [92]. This
+shift is motivated by the need for agents to autonomously
+
+IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, XX 2025
+
+learn from dynamic, interactive environments and operate
+without predefined task boundaries. Despite the application of
+CRL to embodied agents being relatively nascent, it offers a
+compelling direction for CRL research, serving as a platform
+to study lifelong learning in complex, real-world scenarios.
+K. Adjacent Directions
+Unsupervised RL. Learning without task labels or reward engineering keeps agents plastic when curricula shift
+unexpectedly. Works in unsupervised RL from pixels and
+functional reward encodings [166]–[168], [213] show that
+agents can bootstrap diverse behaviors and handle out-ofdistribution interactions, which reinforces CRL’s task-agnostic
+and non-stationarity scenarios and reduces dependence on
+curated rewards. Related directions that blend reward-free
+adaptation and self-supervision further underline the relevance
+to continual deployment settings [214], [215].
+Meta-RL. Meta-reinforcement learning directly targets the
+lifelong adaptation and forward-transfer goals by training
+meta-parameters that admit fast adaptation to new tasks. The
+tutorial by Beck et al. [216] surveys recipes that can be
+mapped onto CRL taxonomies to shrink sample complexity
+while keeping stability high through shared meta-structures.
+Concrete lines of work include meta-learned exploration /
+policy-reuse viewpoints [97], as well as model-based and
+online adaptation variants that cope with shifting dynamics
+[108], [217]. Recent surveys and methods further systematize
+meta-RL under non-stationarity and distribution shift [169],
+[170].
+Transfer and Negative Transfer. Transfer-focused research
+reminds CRL that reuse can hurt, and recent studies [171],
+[172] dissect when successor features compositions succeed
+and when negative transfer surfaces as a stability threat.
+Embedding such diagnostics into CRL benchmarks sharpens
+the plasticity-stability trade-off, especially for task-incremental
+and non-stationary settings where prior knowledge must be
+composed carefully.
+Representation-Based Continual Learning. Rich, disentangled representations can isolate transferable structure from
+spurious details, improving scalability across long task lists.
+Surveys on unsupervised representation learning in RL [173]
+highlight how latent dynamics models and contrastive features
+sustain memory-efficient knowledge retention, aligning with
+dynamic- and experience-focused taxonomies that aim to moderate memory and compute growth. Discrete representations
+have been shown to mitigate interference in CRL [174], while
+successor features offer compositional transfer across changing
+reward functions [175], [218].
+Sim-to-Real and Continual Domain Randomization.
+Bridging simulation and real-world deployments intensifies
+non-stationarity along transition and observation spaces, so
+continual domain randomization becomes an adjacent lever
+to evaluate generalization beyond synthetic benchmarks [176].
+This direction stresses scalability by exposing agents to parameter shifts, echoing non-stationarity learning scenarios while
+demanding plastic yet stable domain adaptation.
+For robotics and more general embodied agents, sim-toreal is often the practical bottleneck: policies must cope
+
+26
+
+with sensor noise, actuator limits, contacts, and morphology
+changes that are rarely captured by a single simulator setting.
+These embodied deployment shifts make continual adaptation
+central rather than optional, and they connect naturally to the
+embodied-agent perspective summarized in Section VII-J.
+In-Context RL. In-context learning empowers PTMs to
+solve new goals by conditioning on prompts rather than
+gradients, complementing CRL’s need for low-cost adaptation.
+Surveys and theoretical work on in-context RL [177], [178],
+[219] suggest that prompt-driven behavior could act as an
+implicit memory buffer, linking back to large-scale PTM
+aspirations and offering plug-and-play policies for lifelong
+agents, with retrieval-augmented external memory and related
+unlocking approaches as representative developments [179],
+[180].
+
+
