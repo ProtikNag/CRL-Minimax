@@ -13,14 +13,15 @@ See `docs/REINFORCE_to_PPO.md` for the equation-by-equation mapping.
 
 > **Note for Claude Code / new sessions.** Read this file and `HANDOFF.md`
 > before touching code (`HANDOFF.md` has the current status, findings, and next
-> steps). The math is fixed in
-> `docs/Objective_for_Continual_Reinforcement_Learning.pdf`, which now defines
-> **two formulations**: the **min-max** (pp. 1–4, `ppo.method: constrained`) and
-> the **stored-expert** consolidation (pp. 5–7 "When we have the expert models
-> stored", eqs 34–46, `ppo.method: stored_expert` — no `μ`, no min-max). Code
-> comments cite its equation numbers. **Two binding rules:** reported evaluation is always
-> **greedy, 100 rollouts** (never stochastic); Atari envs use **`max_steps: 0`**
-> (no episode cap). Implementation choices here are current and may evolve.
+> steps). The math is fixed in `docs/Updated_Objective_for_CRL.pdf`. On the
+> **`feature/updated-objective`** branch this repo implements **Part A only**
+> (pp. 1–8, eqs 1–48): the **min-max** consolidation, `ppo.method: constrained`,
+> **experts NOT stored**. Part A's derivation is verified SOUND (`math-verifier`)
+> and the implementation PASSES `code-verifier`; pseudocode is in `pseudocode/`.
+> Part B ("When we have the expert models stored", pp. 9–15) is **deferred and
+> stripped** from this branch. Code comments cite the doc's equation numbers.
+> **Two binding rules:** reported evaluation is always **greedy, 100 rollouts**
+> (never stochastic); Atari envs use **`max_steps: 0`** (no episode cap).
 
 ---
 
@@ -34,10 +35,14 @@ is the number of tasks seen so far, so the per-task weight shrinks as the
 sequence grows). The improvement `J_k(π) − J_k(π′)` splits into a current-task
 term and a past-task term (derivation eq 6), motivating one model per term.
 
-**Replay-free via environment access.** Past-task values are estimated from
-*fresh rollouts in the old environments*, not from a stored transition buffer.
-The method keeps no replay buffer; it assumes past environments remain
-instantiable (true for the MinAtar family here).
+**Replay-free via environment access — state the access model precisely.**
+Past-task values are estimated from *fresh rollouts in the old environments*, not
+from a stored transition buffer. The method keeps **no stored transitions**, but
+this is *not* rehearsal-free in the usual CL sense: consolidating task `k`
+re-simulates **every** past environment on-policy *each* global iteration (`O(k)`
+live access), which is a **stronger** access assumption than a fixed-size replay
+buffer. Any comparison against buffer-based baselines (ER / A-GEM / CLEAR) must
+state this asymmetry rather than call the method "rehearsal-free."
 
 ## 2. Method
 

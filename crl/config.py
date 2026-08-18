@@ -152,7 +152,8 @@ class PPOConfig:
     receives the constraint (in the global phase).
     """
 
-    # Continual method: "constrained" = full local/global min-max consolidation;
+    # Continual method: "constrained" = the full local/global min-max
+    # consolidation (Part A -- experts NOT stored; objective doc eqs 1-48);
     # "finetune" = naive sequential standard PPO on one shared net (the
     # catastrophic-forgetting baseline; no local phase, no constraint);
     # "clear" = CLEAR (Rolnick 2019 / CORA baseline): replay + behavioral-cloning
@@ -162,78 +163,14 @@ class PPOConfig:
     # on ALL games with mixed batches (no continual constraint). If the joint
     # model reaches each ceiling, a feasible theta EXISTS (rules out infeasibility
     # / capacity); if not, capacity/feasibility is the binding constraint.
-    # "consolidate" = (LEGACY, inconsistent) min-max consolidation that ALSO uses
-    # the precomputed experts as fixed local references -- keeping the mu multiplier
-    # while the reference is already an upper bound makes the constraint vacuous
-    # (objective doc, Q2). Kept only to reproduce prior results; prefer stored_expert.
-    # "stored_expert" = Formulation B ("When we have the expert models stored"): a
-    # plain gap-weighted REGRESSION toward each frozen expert ceiling V*_i, with
-    # NO multiplier / NO min-max, past and current tasks symmetric (eqs 34-46). The
-    # global inits from the task-1 expert and is consolidated incrementally; a
-    # checkpoint + retention row is saved after each task.
     method: str = "constrained"
-    expert_dir: str = "experts"    # dir with <Game>/best_model.pt single-task experts
-    # Reuse precomputed expert references (V_L + score) from a prior run's
-    # expert_refs.json instead of recomputing them (deterministic, so identical
-    # across variants) -- skips the ~40 min enumeration setup. Expert POLICIES are
-    # still loaded (needed for init/warm-start/BC); only the eval is skipped.
-    expert_refs_path: str = ""
-    ref_fraction: float = 1.0      # constrain V_k^G >= ref_fraction * V_expert (beta lever)
-    # RELATIVE constraint: normalize the shortfall by the reference value so the
-    # constraint is V_G/V_L >= 1-delta (a per-game ratio) instead of the absolute
-    # V_G >= V_L. Makes the tolerance eps mean the same fraction on every game
-    # regardless of its (clipped, discounted) value scale. eps is then in squared
-    # RELATIVE units (delta^2): eps=0.0025 <=> a 5% shortfall tolerance.
-    constraint_relative: bool = False
-    # Constraint shortfall form. "ratio": normalized shortfall (V_L-V_G)/max(|V_L|,tau)
-    # squared -- carries 1/|V_L| in the gradient, which explodes for near-zero-value
-    # tasks (Pong V_L=0.03). "floored" (default): additive floored hinge
-    #   loss = (max(0, (V_L-V_G) - delta*max(|V_L|, tau)))^2
-    # -- SAME feasibility boundary (allow a delta fractional drop) but the gradient
-    # coefficient is in raw value units (no division), so it is numerically stable.
-    constraint_form: str = "floored"
-    constraint_delta: float = 0.05   # fractional drop tolerated before the constraint bites
-    constraint_tau: float = 0.5      # floor on |V_L| so tiny-value tasks keep a min slack
-    # Intermediate-state constraint (Run B): in addition to the 50 no-op START
-    # states, also hold the current task at N re-simulated mid/late-game states
-    # (from the expert's own trajectory). The PER-STATE floored shortfall
-    #   sf(s) = max(0, (V_L(s) - V_G(s)) - delta*max(|V_L(s)|, tau))
-    # is computed for each intermediate state (V_L(s)=expert return-to-go from s;
-    # V_G(s)=global's true rollout return from s, reached by exact re-simulation)
-    # and combined with the start-state shortfall. 0 = start states only (Run A).
-    constraint_intermediate_states: int = 0
-    constraint_intermediate_path: str = ""   # cache of per-game intermediate states
-    # CRITIC-based constraint value. When true, the per-iteration constraint value
-    # V_G on the 50 no-op + 50 intermediate states is read from the trained CRITIC
-    # (one forward pass on cached observations) instead of a full Monte-Carlo
-    # rollout -- ~ms vs ~145s, so "update the value every iteration" is affordable.
-    # The critic is trained every iteration by PPO's value loss, so V_phi ~ V^pi
-    # up to function-approx error; `constraint_calibrate_every` periodically runs
-    # the true MC eval to log critic-vs-MC drift.
-    constraint_use_critic: bool = False
-    constraint_calibrate_every: int = 0   # 0=off; else run MC calibration every N iters
     # Past-task gradient collection in the global phase. "all" = roll out every
     # past task each iteration (exact sum, O(k) cost). "sample" = roll out ONE
     # uniformly-random past task per iteration, rescaled by the past-task count --
     # an unbiased minibatch estimate of the same sum at O(1) cost (removes the
     # O(k) blow-up on late tasks). Noise averages out over the iterations.
     past_task_sampling: str = "all"
-    # BRUTE-FORCE past-task retention monitor. Every N global iters, evaluate EACH
-    # past task's discounted value V_i^G with the current global policy over the
-    # same 50 no-op + 50 intermediate states used for the current-task shortfall,
-    # and log a "past_monitor" row (V_noop, V_interm, score, ratio vs expert). This
-    # is DIAGNOSTIC only -- it does not enter Eq 29's update (past tasks enter via
-    # their gradient omega_i * grad V_i, not a scalar value). 0 = off. 1 = every
-    # iteration (expensive: ~100 full-episode rollouts per past task per iter).
-    past_monitor_every: int = 0
     constraint_greedy: bool = False  # estimate the constraint value V with greedy rollouts
-    # Consolidation: give the current task a dedicated learning step before the
-    # constrained consolidation, so the global actually LEARNS the new game (not
-    # only via the mu constraint from a random head). `adapt_iters` > 0 runs that
-    # many UNCONSTRAINED PPO iters on the current task first; `warmstart_head_from
-    # _expert` inits the current task's head from its expert instead of random.
-    adapt_iters: int = 0
-    warmstart_head_from_expert: bool = False
     # Evaluate greedy value/score by ENUMERATING every no-op start (1..noop_max),
     # exactly one deterministic rollout each -> exact expected greedy return in
     # noop_max rollouts (no sampling). Overrides eval_episodes/constraint_episodes

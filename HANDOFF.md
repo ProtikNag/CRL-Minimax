@@ -5,7 +5,56 @@ first (problem, method, math); this file is status + next steps only.
 
 ---
 
-## ►► CURRENT STATE (2026-08-15)
+## ►► CURRENT STATE (2026-08-17) — branch `feature/updated-objective`
+
+**This branch is PART A ONLY (experts NOT stored) — the min-max formulation.**
+The updated objective doc is now `docs/Updated_Objective_for_CRL.pdf` (15 pp);
+**Part A = pp. 1–8, eqs 1–48** (`ppo.method: constrained`). Part B ("When we have
+the expert models stored", pp. 9–15) is **DEFERRED** and has been fully stripped
+from this branch (per user: handle Part B later).
+
+**Verification (both gates PASS):**
+- Document Part A math — **`math-verifier`: SOUND** + independent check. Exact
+  three-policy decomposition (eq 16); correct Lagrangian saddle `max_φ min_{μ≥0}`;
+  dual `μ ← [μ + η(F_k − ε)]_+`.
+- Implementation — **`code-verifier`: PASS** against eqs 26/38/40/47. Pseudocode
+  in `pseudocode/`.
+
+**Constraint-form fix (now document-exact).** `GlobalTrainer.train` implements the
+pure one-sided squared hinge `F_k = [V_k^L − V_k^G]_+^2 ≤ ε` (eq 26), dual
+`μ ← [μ + η(F_k − ε)]_+` (eq 47), current-task actor coeff `2μ·shortfall`
+(eqs 38/40). **`trainer.eps` is now the SOLE tolerance ε** (squared-value units;
+configs set `eps: 0.04`). The old `constraint_form` floored/ratio machinery
+(δ-deadband, τ floor) is GONE — GOTCHA: under the old "floored" default eps was
+ignored, so this changes behavior for pre-existing constrained configs.
+
+**What was stripped (~2.4k lines):** `crl/ppo/stored_expert.py`; `_stored_expert`
++ `_consolidate` + all expert-loading/warm-start/checkpoint helpers in
+`ppo_continual.py`; the critic-value / intermediate-state / calibration paths in
+`GlobalTrainer` (+ `_monitor_past`); 14 Part-B `PPOConfig` fields; the 4 Part-B
+eval helpers in `evaluate.py`; 8 configs (`*stored_expert*`, `consolidate*`) and 8
+experiment/bench drivers. Remaining methods: **`constrained` (Part A), `finetune`,
+`clear`, `joint`**. Package imports, all 28 configs parse, everything compiles.
+
+**Advisory flags (from `continual-learning-expert`, surfaced not silently acted on):**
+1. **"Replay-free" understates the access model** — no stored transitions, but
+   consolidation re-simulates every past environment each global iter (O(k) live
+   access), stronger than a fixed buffer. Don't market as rehearsal-free vs
+   ER/A-GEM/CLEAR without stating this. (Paper-framing decision, deferred by user.)
+2. **Greedy-only eval is config-dependent, not asserted** — safe under defaults
+   (`eval_greedy_episodes` clamps to all-greedy), but a low `eval_greedy_episodes`
+   would silently blend stochastic episodes. Consider asserting all-greedy when
+   `method != joint`.
+3. **μ `max_value` ceiling** — MINOR deviation from the pure `[·]_+` projection;
+   keep it non-binding for reported runs (configs use 20–1000).
+
+**Not yet committed** — changes are on the working tree of
+`feature/updated-objective`, awaiting user go-ahead. No training run launched yet —
+recommend a **1-seed** `atari4_minmax.yaml` / `atari5_ppo_v5.yaml` smoke run next.
+
+---
+
+## Earlier state (2026-08-15) — two-formulation separation (branch `feature/stored-expert-separation`)
 
 **The two formulations are now SEPARATED into distinct PPO methods.** The repo
 previously conflated the min-max with stored experts; the updated objective doc

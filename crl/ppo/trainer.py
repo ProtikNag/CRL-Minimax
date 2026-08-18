@@ -34,8 +34,7 @@ from crl.duals.controllers import DualController
 from crl.envs.base import Task
 from crl.policies.base import Policy
 from crl.ppo.collector import RolloutBatch, RolloutCollector
-from crl.ppo.evaluate import (critic_values, evaluate_intermediate_values_vec,
-                              evaluate_value_and_score)
+from crl.ppo.evaluate import evaluate_value_and_score
 
 # Callback invoked once per PPO iteration: (phase_type, current_task) -> None.
 ProbeHook = Callable[[str, int], None]
@@ -325,49 +324,6 @@ class GlobalTrainer(PPOTrainer):
               f"mu={mu:.2f} F_G={constraint:.4f} |g_new|/|g_old|={ratio:.3f} "
               f"cos={cos:+.3f} cur={cur_score:.1f}")
 
-    def _monitor_past(self, global_policy, past_tasks, past_caches, past_expert_values,
-                      current_task, step, past_eval_caches=None):
-        """Per-past-task retention probe: for each past task, the global's value
-        V_i^G over the 50 no-op + 50 intermediate states, logged with the ratio vs
-        the fixed expert value. Diagnostic only (not in the update). Uses the
-        CRITIC on cached obs when enabled (cheap, so it can run every iteration);
-        otherwise falls back to a full MC rollout."""
-        cfg = self.ppo
-        rows = []
-        for i, t in enumerate(past_tasks):
-            ec = past_eval_caches[i] if past_eval_caches else None
-            if cfg.constraint_use_critic and ec is not None:
-                vn = critic_values(global_policy, ec["noop_obs"], t.spec.task_id)
-                vi = critic_values(global_policy, ec["interm_obs"], t.spec.task_id)
-                v_noop = (sum(vn) / len(vn)) if vn else float("nan")
-                v_interm = (sum(vi) / len(vi)) if vi else float("nan")
-                s_noop = float("nan")
-            else:
-                v_noop, s_noop, _, _ = evaluate_value_and_score(
-                    global_policy, t, cfg.constraint_episodes, cfg.n_envs, self.device,
-                    seed=cfg.eval_seed, greedy=cfg.constraint_greedy,
-                    noop_enumerate=cfg.eval_noop_enumerate,
-                    max_ep_steps=cfg.eval_max_ep_steps)
-                v_interm = float("nan")
-                cache_i = past_caches[i] if past_caches else None
-                if cache_i is not None and cfg.constraint_intermediate_states > 0:
-                    vg_i, _ = evaluate_intermediate_values_vec(
-                        global_policy, t, t.spec.task_id, cache_i, self.device,
-                        n_envs=cfg.n_envs, max_ep_steps=cfg.eval_max_ep_steps)
-                    v_interm = (sum(vg_i) / len(vg_i)) if vg_i else float("nan")
-            ve = (past_expert_values[i] if past_expert_values else float("nan"))
-            rows.append({"name": t.spec.name, "task_id": t.spec.task_id,
-                         "V_noop": v_noop, "V_interm": v_interm, "score_noop": s_noop,
-                         "V_expert": ve,
-                         "ratio_noop": (v_noop / ve) if ve else float("nan"),
-                         "ratio_interm": (v_interm / ve) if ve else float("nan")})
-        self.logger.log({"phase": "past_monitor", "task": current_task, "step": step,
-                         "past": rows})
-        if rows:
-            summ = " ".join(f"{r['name'].replace('atari-','')}:"
-                            f"{r['ratio_noop']:.2f}/{r['ratio_interm']:.2f}" for r in rows)
-            print(f"[past_mon k={current_task}] it={step:4d} (noop/interm ratio) {summ}")
-
     def train(
         self,
         global_policy: Policy,
@@ -382,24 +338,18 @@ class GlobalTrainer(PPOTrainer):
         current_task: int,
         probe: ProbeHook | None = None,
         local_policy: Policy | None = None,
-        ref_score: float = float("nan"),
-        intermediate_cache: dict | None = None,
-        past_intermediate_caches: list[dict | None] | None = None,
-        past_expert_values: list[float] | None = None,
-        monitor_every: int = 0,
-        eval_cache: dict | None = None,
-        past_eval_caches: list[dict | None] | None = None,
     ) -> None:
-        """``omega`` is the per-stream weight list aligned to
-        ``past_tasks + [task_k]`` order is NOT used; past weights are
-        ``omega[:len(past_tasks)]`` and the current task's PG weight is the
-        constraint coefficient (computed here).
+        """Consolidate the global policy (Part A -- experts NOT stored).
 
-        ``monitor_every`` > 0 turns on the brute-force past-task retention
-        monitor: every that-many iters, each past task's global value V_i^G is
-        re-estimated over 50 no-op + 50 intermediate states (same eval as the
-        current-task shortfall) and logged as a "past_monitor" row. Diagnostic
-        only -- it does NOT change Eq 29's update."""
+        Maximizes the past-task objective ``sum_{i<k} omega_i V_i^{pi_phi}``
+        (past weights are ``omega[:len(past_tasks)]``) while a single multiplier
+        ``mu`` enforces the current-task floor via the one-sided squared hinge
+        ``F_k = [V_k^L - V_k^G]_+^2 <= eps`` (objective doc eqs 26, 27). The
+        current task's actor coefficient is the differentiated shortfall
+        ``2 mu [V_k^L - V_k^G]_+`` (eqs 38, 40); ``mu`` follows the projected
+        dual ascent ``mu <- [mu + eta (F_k - eps)]_+`` (eq 47). ``V_k^{L,G}`` are
+        fresh on-policy Monte-Carlo estimates and every past environment is
+        re-rolled out each iteration (replay-free)."""
         optimizer = self._new_optimizer(global_policy)
         cfg = self.ppo
         # One persistent collector per task (current + all past): replay-free
@@ -418,8 +368,6 @@ class GlobalTrainer(PPOTrainer):
         constraint = 0.0
         v_k_g = float("nan")
         s_k_g = float("nan")  # global's raw (undiscounted) score, same rollouts as V_k_g
-        sf_int = 0.0          # mean per-state intermediate shortfall (Run B)
-        int_vg = float("nan")  # mean global value over intermediate states
         thr = float(getattr(task_k, "threshold", float("inf")))
         met = 0
         try:
@@ -436,84 +384,23 @@ class GlobalTrainer(PPOTrainer):
                     past_coeffs = list(omega[: len(past_tasks)])
                 cur_batch = cur_collector.collect(global_policy, cfg.gae_lambda)
 
-                # Refresh V_k^G / mu every constraint_every iters. With the CRITIC
-                # value (constraint_use_critic) this is ~ms, so constraint_every=1
-                # ("update the value every iteration") is affordable.
+                # Refresh V_k^G and mu every constraint_every iters (slow dual
+                # timescale; between refreshes the coeff below is held fixed).
+                # V_k^G is a fresh on-policy Monte-Carlo estimate; the one-sided
+                # squared hinge F_k = [V_k^L - V_k^G]_+^2 (objective doc eq 26) is
+                # compared against the tolerance eps and mu follows the projected
+                # dual ascent mu <- [mu + eta (F_k - eps)]_+ (eq 47).
                 if it % max(1, cfg.constraint_every) == 0:
-                    use_critic = (cfg.constraint_use_critic and eval_cache is not None)
-                    # --- current-task value on the 50 no-op START states ---
-                    if use_critic and eval_cache.get("noop_obs") is not None:
-                        vn = critic_values(global_policy, eval_cache["noop_obs"],
-                                           task_k.spec.task_id)
-                        v_k_g = (sum(vn) / len(vn)) if vn else float("nan")
-                    else:
-                        # MC fallback: enumeration returns the value AND raw score.
-                        v_k_g, s_k_g, _, _ = evaluate_value_and_score(
-                            global_policy, task_k, cfg.constraint_episodes,
-                            cfg.n_envs, self.device, seed=cfg.eval_seed,
-                            greedy=cfg.constraint_greedy,
-                            noop_enumerate=cfg.eval_noop_enumerate,
-                            max_ep_steps=cfg.eval_max_ep_steps)
-                    # --- current-task value on the 50 INTERMEDIATE states ---
-                    if use_critic and eval_cache.get("interm_obs") is not None:
-                        vg_i = critic_values(global_policy, eval_cache["interm_obs"],
-                                             task_k.spec.task_id)
-                        ve_i = eval_cache["interm_rtg"]
-                    elif (intermediate_cache is not None
-                          and cfg.constraint_intermediate_states > 0):
-                        vg_i, ve_i = evaluate_intermediate_values_vec(
-                            global_policy, task_k, task_k.spec.task_id,
-                            intermediate_cache, self.device, n_envs=cfg.n_envs,
-                            max_ep_steps=cfg.eval_max_ep_steps)
-                    else:
-                        vg_i, ve_i = [], []
-
-                    # Per-state one-sided shortfall. "ratio" (relative) form:
-                    #   sf = max(0, V_L - V_G) / max(|V_L|, tau)   -- delta lives in
-                    # the dual threshold eps (=delta^2), and mu is capped by the dual
-                    # controller's max_value. "floored" form keeps the additive hinge
-                    # (delta inside, dual threshold 0).
-                    def _sf(vl, vg):
-                        if cfg.constraint_form == "floored":
-                            return max(0.0, (vl - vg)
-                                       - cfg.constraint_delta * max(abs(vl), cfg.constraint_tau))
-                        return max(0.0, vl - vg) / max(abs(vl), cfg.constraint_tau)
-                    dual_eps = 0.0 if cfg.constraint_form == "floored" else eps
-
-                    sf_start = _sf(ref_current, v_k_g)
-                    if vg_i:
-                        sfs = [_sf(ve, vg) for vg, ve in zip(vg_i, ve_i)]
-                        sf_int = sum(sfs) / len(sfs)
-                        int_sq = sum(s * s for s in sfs) / len(sfs)
-                        int_vg = sum(vg_i) / len(vg_i)
-                        shortfall = 0.5 * sf_start + 0.5 * sf_int
-                        constraint = 0.5 * sf_start * sf_start + 0.5 * int_sq
-                    else:
-                        sf_int = 0.0; int_vg = float("nan")
-                        shortfall = sf_start
-                        constraint = sf_start * sf_start
-                    mu = mu_ctrl.update(constraint, dual_eps)
-
-                    # Periodic MC calibration: check the critic value vs a true MC
-                    # rollout (drift diagnostic; also refreshes the logged score).
-                    if (cfg.constraint_calibrate_every
-                            and it % cfg.constraint_calibrate_every == 0):
-                        v_mc, s_mc, _, _ = evaluate_value_and_score(
-                            global_policy, task_k, cfg.constraint_episodes, cfg.n_envs,
-                            self.device, seed=cfg.eval_seed, greedy=cfg.constraint_greedy,
-                            noop_enumerate=cfg.eval_noop_enumerate,
-                            max_ep_steps=cfg.eval_max_ep_steps)
-                        vgi_mc, _ = (evaluate_intermediate_values_vec(
-                            global_policy, task_k, task_k.spec.task_id, intermediate_cache,
-                            self.device, n_envs=cfg.n_envs, max_ep_steps=cfg.eval_max_ep_steps)
-                            if intermediate_cache is not None else ([], []))
-                        s_k_g = s_mc
-                        self.logger.log({
-                            "phase": "calibration", "task": current_task, "step": it,
-                            "V_k_critic": v_k_g, "V_k_mc": v_mc, "score_k_mc": s_mc,
-                            "V_interm_critic": int_vg,
-                            "V_interm_mc": (sum(vgi_mc) / len(vgi_mc)) if vgi_mc else float("nan")})
-                coeff_k = mu * 2.0 * shortfall  # differentiated shortfall (eq 30)
+                    v_k_g, s_k_g, _, _ = evaluate_value_and_score(
+                        global_policy, task_k, cfg.constraint_episodes,
+                        cfg.n_envs, self.device, seed=cfg.eval_seed,
+                        greedy=cfg.constraint_greedy,
+                        noop_enumerate=cfg.eval_noop_enumerate,
+                        max_ep_steps=cfg.eval_max_ep_steps)
+                    shortfall = max(0.0, ref_current - v_k_g)  # [V_k^L - V_k^G]_+
+                    constraint = shortfall * shortfall          # F_k (eq 26)
+                    mu = mu_ctrl.update(constraint, eps)        # eq 47 (threshold eps)
+                coeff_k = mu * 2.0 * shortfall  # differentiated hinge, eqs 38/40
 
                 if cfg.diagnostics and it % max(1, cfg.diag_every) == 0:
                     self._log_diagnostics(
@@ -529,10 +416,6 @@ class GlobalTrainer(PPOTrainer):
 
                 if probe is not None:
                     probe("global", current_task)
-                if monitor_every > 0 and past_tasks and it % monitor_every == 0:
-                    self._monitor_past(global_policy, past_tasks,
-                                       past_intermediate_caches, past_expert_values,
-                                       current_task, it, past_eval_caches=past_eval_caches)
                 # Early stop: the global has consolidated the current game to its
                 # greedy threshold (past tasks are maintained by the omega term).
                 gscore = self._stop_score(global_policy, task_k, it + 1)
@@ -544,8 +427,7 @@ class GlobalTrainer(PPOTrainer):
                             "phase": "global", "task": current_task, "step": it,
                             "F_G": constraint, "mu": mu, "V_k_global": v_k_g,
                             "V_k_ref_local": ref_current, "coeff_k": coeff_k,
-                            "score_k_global": s_k_g, "score_k_ref": ref_score,
-                            "sf_intermediate": sf_int, "V_k_intermediate": int_vg,
+                            "score_k_global": s_k_g,
                             "greedy_score": gscore, **stats,
                         }
                     )
