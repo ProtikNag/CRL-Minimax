@@ -200,9 +200,11 @@ class PPOConfig:
     n_envs: int = 8  # parallel vectorized envs feeding the collector
     n_steps: int = 128  # rollout length per env per PPO iteration
     ppo_epochs: int = 4  # optimization epochs over each collected batch
-    # KL early-stop: if a PPO epoch's mean approx_kl exceeds this, stop optimizing
-    # this batch (standard PPO-Atari stabilizer; prevents the runaway policy blow-up
-    # seen on Boxing where the actor diverged to a uniform/NaN policy). 0 = off.
+    # KL early-stop for the LOCAL / task1 phase only: if a PPO epoch's mean approx_kl
+    # exceeds this, stop optimizing that batch (prevents the runaway actor blow-up
+    # seen on Boxing where the actor diverged to a uniform/NaN policy). The GLOBAL
+    # consolidation phase always runs FULL epochs (passes kl_stop=False) so the
+    # min-max retention update is never throttled. 0 = off.
     target_kl: float = 0.0
     num_minibatches: int = 4  # minibatches per epoch (batch = n_envs*n_steps)
     clip_ratio: float = 0.1  # PPO clip epsilon (0.1 is standard for Atari)

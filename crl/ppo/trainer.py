@@ -78,6 +78,7 @@ class PPOTrainer:
         streams: list[RolloutBatch],
         actor_coeffs: list[float],
         bc: tuple | None = None,
+        kl_stop: bool = True,
     ) -> dict[str, float]:
         """One PPO update (``ppo_epochs`` x minibatches) over the given streams.
 
@@ -158,8 +159,10 @@ class PPOTrainer:
                 optimizer.step()
             # KL early-stop: stop optimizing this batch once the mean policy shift
             # for the epoch exceeds target_kl (prevents the runaway actor blow-up
-            # observed on Boxing). Off when target_kl == 0.
-            if cfg.target_kl and ep_n and ep_kl / ep_n > cfg.target_kl:
+            # observed on Boxing). Off when target_kl == 0 or kl_stop is False -- the
+            # GLOBAL consolidation phase runs FULL epochs (kl_stop=False) so the
+            # min-max retention update is not throttled; only the LOCAL phase uses it.
+            if kl_stop and cfg.target_kl and ep_n and ep_kl / ep_n > cfg.target_kl:
                 break
         c = max(1, count)
         return {
@@ -442,7 +445,8 @@ class GlobalTrainer(PPOTrainer):
                 coeffs = past_coeffs + [coeff_k]
                 bc = ((local_policy, self.ppo.global_bc_coef)
                       if local_policy is not None and self.ppo.global_bc_coef > 0 else None)
-                stats = self.optimize_batches(global_policy, optimizer, streams, coeffs, bc=bc)
+                stats = self.optimize_batches(global_policy, optimizer, streams, coeffs,
+                                              bc=bc, kl_stop=False)  # full consolidation
 
                 if probe is not None:
                     probe("global", current_task)
