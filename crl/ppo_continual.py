@@ -203,9 +203,11 @@ class PPOAlternationTrainer:
         for cycle in range(self.cfg.cycles_per_task):
             # ---- local phase: theta^0 = phi, standard PPO on task k ---------
             local_policy = clone_policy(self.global_policy, trainable=True)
+            game = getattr(task_k, "game", task_k.spec.name)
+            n_local = self.ppo.local_iters_per_task.get(game, self.ppo.local_iters)
             loc_summ = self.local_trainer.train(
                 local_policy, task_k,
-                num_iters=self.ppo.local_iters,
+                num_iters=n_local,
                 seed=self.seed + 1000 * k + 13 * cycle,
                 current_task=k, phase_type="local", probe=self._probe,
             )

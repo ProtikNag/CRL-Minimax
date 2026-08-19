@@ -106,6 +106,8 @@ class PPOTrainer:
         count = 0
         for _ in range(cfg.ppo_epochs):
             perm = torch.randperm(n, device=self.device)
+            ep_kl = 0.0
+            ep_n = 0
             for start in range(0, n, mb_size):
                 idx = perm[start : start + mb_size]
                 total_loss = torch.zeros((), device=self.device)
@@ -142,7 +144,10 @@ class PPOTrainer:
                         pg_acc += float(pg_loss)
                         v_acc += float(v_loss)
                         ent_acc += float(entropy)
-                        kl_acc += float((ratio - 1 - logratio).mean())
+                        mb_kl = float((ratio - 1 - logratio).mean())
+                        kl_acc += mb_kl
+                        ep_kl += mb_kl
+                        ep_n += 1
                         clip_acc += float(
                             ((ratio - 1.0).abs() > cfg.clip_ratio).float().mean()
                         )
@@ -151,6 +156,11 @@ class PPOTrainer:
                 total_loss.backward()
                 nn.utils.clip_grad_norm_(policy.parameters(), cfg.max_grad_norm)
                 optimizer.step()
+            # KL early-stop: stop optimizing this batch once the mean policy shift
+            # for the epoch exceeds target_kl (prevents the runaway actor blow-up
+            # observed on Boxing). Off when target_kl == 0.
+            if cfg.target_kl and ep_n and ep_kl / ep_n > cfg.target_kl:
+                break
         c = max(1, count)
         return {
             "pg_loss": pg_acc / c,

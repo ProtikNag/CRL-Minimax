@@ -200,6 +200,10 @@ class PPOConfig:
     n_envs: int = 8  # parallel vectorized envs feeding the collector
     n_steps: int = 128  # rollout length per env per PPO iteration
     ppo_epochs: int = 4  # optimization epochs over each collected batch
+    # KL early-stop: if a PPO epoch's mean approx_kl exceeds this, stop optimizing
+    # this batch (standard PPO-Atari stabilizer; prevents the runaway policy blow-up
+    # seen on Boxing where the actor diverged to a uniform/NaN policy). 0 = off.
+    target_kl: float = 0.0
     num_minibatches: int = 4  # minibatches per epoch (batch = n_envs*n_steps)
     clip_ratio: float = 0.1  # PPO clip epsilon (0.1 is standard for Atari)
     gae_lambda: float = 0.95  # GAE(lambda)
@@ -214,6 +218,10 @@ class PPOConfig:
     # SAME cap and the SAME per-game thresholds.
     task1_iters: int = 2000  # cap for plain PPO on task 1
     local_iters: int = 2000  # cap for the local phase (standard PPO on current)
+    # Per-game local-phase cap, keyed by game name (e.g. {"Boxing": 4000}); games
+    # not listed use ``local_iters``. Lets slow/hard games get more budget while
+    # easy games keep a small cap -- sized from resource_usage.json (#1).
+    local_iters_per_task: dict[str, int] = field(default_factory=dict)
     global_iters: int = 2000  # cap for the constrained global consolidation
     # Early stopping: stop a phase once the current game's GREEDY score is
     # >= its threshold for `patience` consecutive checks (but at least min_iters),
