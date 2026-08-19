@@ -106,6 +106,23 @@ def main() -> None:
         json.dump(out, f, indent=2)
     print(f"\nwrote {path}")
 
+    # Also emit figure_data.json (forgetting matrix + expert/random scores) so
+    # experiments/make_figures.py can regenerate the whole figure set unattended
+    # (the v2 auto-visualization pipeline).
+    from crl.envs.atari import RANDOM_SCORES
+    em = os.path.join(args.run_dir, "eval_matrix.json")
+    fig = {"games": games,
+           "thresholds": [t.get("threshold") for t in cfg.env.tasks],
+           "forgetting_matrix": (json.load(open(em)) if os.path.exists(em) else None),
+           "expert_scores": expert_scores,
+           "random_scores": [RANDOM_SCORES.get(g, 0.0) for g in games],
+           "note": "forgetting_matrix rows=after task k, cols=greedy-100 score on task i "
+                   "(lower-triangular)"}
+    fpath = os.path.join(args.run_dir, "figure_data.json")
+    with open(fpath, "w") as f:
+        json.dump(fig, f, indent=2)
+    print(f"wrote {fpath}")
+
 
 if __name__ == "__main__":
     main()

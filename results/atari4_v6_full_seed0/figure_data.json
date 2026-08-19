@@ -1,0 +1,47 @@
+{
+  "games": [
+    "Qbert",
+    "Boxing",
+    "Pong",
+    "Breakout"
+  ],
+  "thresholds": [
+    4000,
+    90,
+    18,
+    50
+  ],
+  "forgetting_matrix": [
+    [
+      4217.0
+    ],
+    [
+      14329.75,
+      17.510000228881836
+    ],
+    [
+      5353.0,
+      -1.6200000047683716,
+      19.520000457763672
+    ],
+    [
+      7148.0,
+      -3.609999895095825,
+      19.75,
+      53.65999984741211
+    ]
+  ],
+  "expert_scores": [
+    17726.25,
+    65.74,
+    20.0,
+    285.4
+  ],
+  "random_scores": [
+    163.9,
+    0.1,
+    -20.7,
+    1.7
+  ],
+  "note": "forgetting_matrix rows=after task k, cols=greedy-100 score on task i (lower-triangular)"
+}
