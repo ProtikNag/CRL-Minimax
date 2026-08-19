@@ -197,6 +197,51 @@ class AtariTask(Task):
             return AsyncVectorEnv(fns, autoreset_mode=AutoresetMode.SAME_STEP)
         return SyncVectorEnv(fns, autoreset_mode=AutoresetMode.SAME_STEP)
 
+    # -- snapshot support for windowed expert-agreement eval (docs/expert_value_agreement_eval.md) --
+
+    @property
+    def game(self) -> str:
+        return self._game
+
+    @property
+    def frame_stack(self) -> int:
+        return self._frame_stack
+
+    @property
+    def max_steps(self) -> int:
+        return self._max_steps
+
+    def make_snapshot_env(self, clip_rewards: bool = False):
+        """A PREPROCESSING-ONLY env (ALE + AtariPreprocessing) that emits a single
+        84x84 frame -- no ``FrameStackObservation``, ``TimeLimit`` or reward clip.
+
+        Used by the windowed expert-agreement evaluator, which snapshots
+        ``env.unwrapped.ale.cloneState()`` and manages the 4-frame stack itself so
+        it can restore an arbitrary mid-episode state in O(1) (no seed+prefix
+        replay). ``terminal_on_life_loss`` is forced off so a restored state is not
+        spuriously terminated by a stale life counter. Rewards are raw; the caller
+        sign-clips to reproduce the training value scale.
+
+        Requires ``repeat_action_probability == 0``: the O(1) cloneState/restoreState
+        fidelity (and the whole expert-vs-policy windowed comparison) is only
+        bit-exact with sticky actions off; a non-zero value makes restored rollouts
+        stochastic and silently breaks the comparison."""
+        if self._repeat_action_prob != 0.0:
+            raise ValueError(
+                "make_snapshot_env requires repeat_action_probability == 0 for "
+                f"deterministic cloneState/restoreState; got {self._repeat_action_prob}.")
+        from gymnasium.wrappers import AtariPreprocessing
+        env = gym.make(
+            f"ALE/{self._game}-v5", frameskip=1, full_action_space=True,
+            repeat_action_probability=self._repeat_action_prob,
+        )
+        env = AtariPreprocessing(
+            env, frame_skip=self._frame_skip, screen_size=self._screen_size,
+            grayscale_obs=True, scale_obs=False, noop_max=self._noop_max,
+            terminal_on_life_loss=False,
+        )
+        return env
+
 
 class AtariFamily(TaskFamily):
     """Ordered sequence of Atari games sharing a (4,84,84) obs and 18-action space.

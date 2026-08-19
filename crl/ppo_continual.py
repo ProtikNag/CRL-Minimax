@@ -292,6 +292,15 @@ class PPOAlternationTrainer:
         print(f"[joint] ceilings={['%.0f'%c for c in ceilings]} "
               f"joint={['%.0f'%s for s in joint_scores]}")
 
+    def _save_progress(self, k: int) -> None:
+        """Persist the per-task global checkpoint + running eval matrix so a
+        preemption/crash after task k retains progress (and gives per-task
+        checkpoints ``global_after_task{k}.pt`` for the windowed expert-agreement
+        eval). Cheap relative to a phase; called once per task."""
+        self.logger.save_json("eval_matrix.json", self.eval_matrix)
+        torch.save(self.global_policy.state_dict(),
+                   self.logger.run_dir / f"global_after_task{k}.pt")
+
     def run(self) -> list[list[float]]:
         if self.method == "joint":
             self._train_joint()
@@ -309,6 +318,7 @@ class PPOAlternationTrainer:
         row, stds = self._evaluate_row(1)
         self.eval_matrix.append(row)
         self.logger.log({"phase": "eval", "task": 1, "values": row, "stds": stds})
+        self._save_progress(1)
 
         for k in range(2, len(self.family) + 1):
             if self.method == "finetune":
@@ -325,6 +335,7 @@ class PPOAlternationTrainer:
             row, stds = self._evaluate_row(k)
             self.eval_matrix.append(row)
             self.logger.log({"phase": "eval", "task": k, "values": row, "stds": stds})
+            self._save_progress(k)
 
         self.logger.save_json("eval_matrix.json", self.eval_matrix)
         torch.save(

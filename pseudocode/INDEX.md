@@ -10,6 +10,32 @@ deferred and has been stripped from the code, so its pseudocode doc (formerly
 02) was removed; the former doc 01 cited the old objective PDF and a removed
 shortfall path and was superseded by doc 04 and removed.
 
+## 05  Windowed Off-Policy Expert Value-Agreement Evaluation
+
+  File   : 05_expert_value_agreement_eval.md / .pdf
+  Source : crl/ppo/expert_eval.py (build_expert_state_set,
+             evaluate_expert_agreement, save_state_set, load_state_set)
+           crl/envs/atari.py (AtariTask.make_snapshot_env)
+  Doc    : docs/expert_value_agreement_eval.md (metric defs sec.2; D1-D6; sec.4).
+  Status : Implementation PASSED code-verifier against the design doc.
+  Summary: A cheap OFF-POLICY diagnostic of whether a policy matches its task's
+           EXPERT's windowed value from the EXPERT's own states. (1) BUILD (once
+           per task, reusable): roll the expert greedily from n_source_starts
+           no-op starts on a preprocessing-only env with a self-managed 4-frame
+           stack; snapshot ale.cloneState() + the acted-on obs + reward each step;
+           pick adaptive horizon H_i = smallest grid H with >= tau consequential
+           windows (raw >= 1 pt); keep consequential states; sample <= N per task;
+           pickle. (2) EVALUATE (per checkpoint, per task): restoreState O(1),
+           seed the stack from stored obs, roll the POLICY greedily for H_i steps
+           (cap at terminal) on the same discount+clip scale; report the one-sided
+           shortfall mean_s [V*_win - Vpi_win]_+ and relative form (lower better,
+           0 = matches/beats expert), with early/mid/near_terminal breakdown.
+           Key choices: emulator snapshot (O(1) vs O(episode) replay); frame stack
+           managed outside the ALE core; one-sided hinge mirrors training eq 26;
+           consequential filter + per-game adaptive H avoid 0~=0 vacuity. Reported
+           ALONGSIDE the on-policy no-op anchor, never as a standalone forgetting
+           number.
+
 ## 04  Part A -- Min-Max Consolidation, experts NOT stored  (CURRENT)
 
   File   : 04_partA_minmax_no_stored_experts.md / .pdf
