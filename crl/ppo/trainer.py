@@ -192,6 +192,7 @@ class LocalTrainer(PPOTrainer):
         thr = float(getattr(task, "threshold", float("inf")))
         met = 0
         t0, early, gscore = time.time(), False, None
+        best_score, best_state = float("-inf"), None
         try:
             for it in range(num_iters):
                 batch = collector.collect(policy, self.ppo.gae_lambda)
@@ -201,6 +202,10 @@ class LocalTrainer(PPOTrainer):
                 gscore = self._stop_score(policy, task, it + 1)
                 if gscore is not None:
                     met = met + 1 if gscore >= thr else 0
+                    if self.ppo.select_best_local and gscore > best_score:
+                        best_score = gscore   # snapshot the best-greedy model (salvage the peak)
+                        best_state = {k: v.detach().clone()
+                                      for k, v in policy.state_dict().items()}
                 if it % self.log_every == 0 or gscore is not None:
                     ep = batch.ep_returns
                     ep_mean = sum(ep) / len(ep) if ep else float("nan")
@@ -224,8 +229,17 @@ class LocalTrainer(PPOTrainer):
                     break
         finally:
             collector.close()
+        # Keep the best-greedy snapshot if the phase ended worse than its peak
+        # (e.g. a late divergence). No-op when select_best_local is off or the final
+        # already is the best.
+        final_g = gscore if gscore is not None else float("-inf")
+        if best_state is not None and best_score > final_g:
+            policy.load_state_dict(best_state)
+            print(f"[{phase_type} k={current_task}] kept BEST model greedy={best_score:.1f} "
+                  f"(final was {gscore})")
         return {"iters_run": it + 1, "early_stopped": early,
-                "wall_s": round(time.time() - t0, 1), "final_greedy": gscore}
+                "wall_s": round(time.time() - t0, 1), "final_greedy": gscore,
+                "best_greedy": (best_score if best_state is not None else gscore)}
 
 
 class GlobalTrainer(PPOTrainer):

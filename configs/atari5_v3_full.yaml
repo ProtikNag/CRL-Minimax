@@ -66,6 +66,7 @@ ppo:
   max_grad_norm: 0.5
   lr: 0.0002              # was 0.00025
   target_kl: 0.03         # KL early-stop -> prevents the Boxing blow-up
+  select_best_local: true # keep the best-greedy local model, not a collapsed final
   normalize_advantage: true
   task1_iters: 1500       # Qbert (early-stops ~950)
   local_iters: 3000       # default cap

@@ -222,6 +222,11 @@ class PPOConfig:
     # not listed use ``local_iters``. Lets slow/hard games get more budget while
     # easy games keep a small cap -- sized from resource_usage.json (#1).
     local_iters_per_task: dict[str, int] = field(default_factory=dict)
+    # Keep the BEST local model (by greedy score) from a phase instead of the final
+    # one, so a late training collapse (e.g. Boxing diverging to a uniform policy)
+    # doesn't discard the good peak. Applies to the local + task1 phases (single-game
+    # objective); the kept snapshot becomes pi_L / the frozen reference.
+    select_best_local: bool = False
     global_iters: int = 2000  # cap for the constrained global consolidation
     # Early stopping: stop a phase once the current game's GREEDY score is
     # >= its threshold for `patience` consecutive checks (but at least min_iters),
