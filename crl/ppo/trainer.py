@@ -24,6 +24,7 @@ shared verbatim.
 
 from __future__ import annotations
 
+import time
 from typing import Callable
 
 import torch
@@ -172,7 +173,7 @@ class LocalTrainer(PPOTrainer):
         current_task: int,
         phase_type: str = "local",
         probe: ProbeHook | None = None,
-    ) -> None:
+    ) -> dict:
         optimizer = self._new_optimizer(policy)
         collector = RolloutCollector(
             task, self.ppo.n_envs, self.ppo.n_steps, self.device, seed,
@@ -180,6 +181,7 @@ class LocalTrainer(PPOTrainer):
         )
         thr = float(getattr(task, "threshold", float("inf")))
         met = 0
+        t0, early, gscore = time.time(), False, None
         try:
             for it in range(num_iters):
                 batch = collector.collect(policy, self.ppo.gae_lambda)
@@ -206,11 +208,14 @@ class LocalTrainer(PPOTrainer):
                         f"v={stats['v_loss']:.3f} ent={stats['entropy']:.3f}{gs}"
                     )
                 if met >= self.ppo.patience:
+                    early = True
                     print(f"[{phase_type} k={current_task}] EARLY STOP it={it+1} "
                           f"greedy={gscore:.1f} >= thr={thr:.0f}")
                     break
         finally:
             collector.close()
+        return {"iters_run": it + 1, "early_stopped": early,
+                "wall_s": round(time.time() - t0, 1), "final_greedy": gscore}
 
 
 class GlobalTrainer(PPOTrainer):
@@ -338,7 +343,7 @@ class GlobalTrainer(PPOTrainer):
         current_task: int,
         probe: ProbeHook | None = None,
         local_policy: Policy | None = None,
-    ) -> None:
+    ) -> dict:
         """Consolidate the global policy (Part A -- experts NOT stored).
 
         Maximizes the past-task objective ``sum_{i<k} omega_i V_i^{pi_phi}``
@@ -370,6 +375,7 @@ class GlobalTrainer(PPOTrainer):
         s_k_g = float("nan")  # global's raw (undiscounted) score, same rollouts as V_k_g
         thr = float(getattr(task_k, "threshold", float("inf")))
         met = 0
+        t0, early = time.time(), False
         try:
             for it in range(num_iters):
                 if cfg.past_task_sampling == "sample" and past_collectors:
@@ -438,6 +444,7 @@ class GlobalTrainer(PPOTrainer):
                         f"F_G={constraint:.5f} mu={mu:.3f} pg={stats['pg_loss']:.3f}{gs}"
                     )
                 if met >= self.ppo.patience:
+                    early = True
                     print(f"[global k={current_task}] EARLY STOP it={it+1} "
                           f"greedy={gscore:.1f} >= thr={thr:.0f}")
                     break
@@ -445,3 +452,5 @@ class GlobalTrainer(PPOTrainer):
             for c in past_collectors:
                 c.close()
             cur_collector.close()
+        return {"iters_run": it + 1, "early_stopped": early,
+                "wall_s": round(time.time() - t0, 1), "final_greedy": gscore}

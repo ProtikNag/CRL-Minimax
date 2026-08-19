@@ -1,0 +1,84 @@
+# Part A -- MIN-MAX (experts NOT stored), VERSION 2 full run (5 games, from scratch).
+#   Order: Qbert -> Boxing -> Pong -> Breakout -> SpaceInvaders.
+#   Lessons from v1 (atari4_v6_full): Boxing under-learned because the 3000-iter
+#   local cap stopped it while still climbing -> local_iters raised to 6000 (early
+#   stop still ends the easy games quickly, so slow games get the budget they need).
+#   Breakout given "a bit more" by raising its early-stop threshold (50 -> 80) so it
+#   trains past the old cut-off. Per-game budget actually used is logged to
+#   resource_usage.json (so we stop guessing). Resume-capable: per-task checkpoints
+#   global_after_task{k}.pt + `run --resume-from ... --resume-after k`.
+experiment:
+  name: atari5_v2_full
+  seed: 0
+  results_dir: results
+  device: auto
+  log_every: 25
+env:
+  family: atari
+  params:
+    gamma: 0.99
+    max_steps: 0
+    frame_skip: 4
+    frame_stack: 4
+    noop_max: 50
+    terminal_on_life_loss: false
+    repeat_action_probability: 0.0
+    clip_rewards: true
+  tasks:
+  - game: Qbert
+    threshold: 4000
+  - game: Boxing
+    threshold: 90
+  - game: Pong
+    threshold: 18
+  - game: Breakout
+    threshold: 80          # raised from 50 -> train Breakout further (#5)
+  - game: SpaceInvaders
+    threshold: 800
+policy:
+  kind: impala_ac_multihead
+  hidden_sizes:
+  - 512
+  task_conditioned: false
+duals:
+  kind: projected_ascent
+  lr: 0.3
+  init: 0.0
+  max_value: 1000.0
+  warm_start: false
+trainer:
+  kind: ppo
+  cycles_per_task: 1
+  eps: 0.04
+  eval_all_tasks: false
+ppo:
+  method: constrained
+  async_envs: true
+  n_envs: 16
+  n_steps: 128
+  ppo_epochs: 4
+  num_minibatches: 4
+  clip_ratio: 0.1
+  gae_lambda: 0.95
+  vf_coef: 0.5
+  ent_coef: 0.01
+  max_grad_norm: 0.5
+  lr: 0.00025
+  normalize_advantage: true
+  task1_iters: 4000         # Qbert
+  local_iters: 6000         # slow games (Boxing) get room; easy games early-stop (#5)
+  global_iters: 2000
+  min_iters: 500
+  patience: 3
+  stop_eval_every: 50
+  stop_eval_episodes: 15
+  past_task_sampling: all
+  constraint_episodes: 16
+  constraint_every: 20
+  eval_max_ep_steps: 10000
+  eval_noop_enumerate: false
+  eval_episodes: 100
+  eval_greedy: true
+  eval_greedy_episodes: 100
+  eval_seed: 100000
+  eval_every: 0

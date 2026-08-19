@@ -66,6 +66,7 @@ class PPOAlternationTrainer:
 
         self.eval_matrix: list[list[float]] = []
         self.cumulative_step = 0
+        self._resource: dict = {}      # per-game per-phase iters/wall/early-stop (#1)
 
     # ------------------------------------------------------------------ #
     # helpers
@@ -162,7 +163,7 @@ class PPOAlternationTrainer:
 
     def _train_first_task(self) -> None:
         """Standard PPO on task 1 (the global model; no past tasks, no constraint)."""
-        self.local_trainer.train(
+        summ = self.local_trainer.train(
             self.global_policy,
             self.family.tasks[0],
             num_iters=self.ppo.task1_iters,
@@ -171,6 +172,7 @@ class PPOAlternationTrainer:
             phase_type="task1",
             probe=self._probe,
         )
+        self._record_resource(1, "task1", summ)
 
     def _finetune_task(self, k: int) -> None:
         """Naive baseline: keep fine-tuning the one shared net on task k."""
@@ -201,12 +203,13 @@ class PPOAlternationTrainer:
         for cycle in range(self.cfg.cycles_per_task):
             # ---- local phase: theta^0 = phi, standard PPO on task k ---------
             local_policy = clone_policy(self.global_policy, trainable=True)
-            self.local_trainer.train(
+            loc_summ = self.local_trainer.train(
                 local_policy, task_k,
                 num_iters=self.ppo.local_iters,
                 seed=self.seed + 1000 * k + 13 * cycle,
                 current_task=k, phase_type="local", probe=self._probe,
             )
+            self._record_resource(k, "local", loc_summ)
             frozen_local = clone_policy(local_policy, trainable=False)
             ref_current = self._eval_value(frozen_local, task_k)
 
@@ -219,7 +222,7 @@ class PPOAlternationTrainer:
                 self.global_policy.load_state_dict(local_policy.state_dict())
                 for name, p in self.global_policy.named_parameters():
                     p.requires_grad_(not name.startswith("trunk."))
-            self.global_trainer.train(
+            glob_summ = self.global_trainer.train(
                 self.global_policy, task_k, past_tasks,
                 ref_current=ref_current, mu_ctrl=self.mu_ctrl, omega=omega,
                 eps=self._eps(),
@@ -228,6 +231,7 @@ class PPOAlternationTrainer:
                 current_task=k, probe=self._probe,
                 local_policy=frozen_local,  # for KL-gap logging + optional BC term
             )
+            self._record_resource(k, "global", glob_summ)
             if self.ppo.global_probe_head_only:  # restore full trainability
                 for p in self.global_policy.parameters():
                     p.requires_grad_(True)
@@ -292,12 +296,44 @@ class PPOAlternationTrainer:
         print(f"[joint] ceilings={['%.0f'%c for c in ceilings]} "
               f"joint={['%.0f'%s for s in joint_scores]}")
 
+    def _record_resource(self, task: int, phase: str, summ: dict | None) -> None:
+        """Track per-game, per-phase budget: iters actually run, wall-time, whether
+        it early-stopped (vs hit the cap), and the final greedy score. Saved to
+        resource_usage.json so future runs can size per-game budgets instead of
+        guessing (#1)."""
+        game = self.family.tasks[task - 1].spec.name
+        rec = self._resource.setdefault(game, {"task": task})
+        rec[phase] = summ
+
+    def resume(self, ckpt_path: str, after_task: int) -> None:
+        """Continue from a saved global checkpoint instead of training from scratch.
+
+        Loads the shared trunk + already-trained per-task heads with strict=False,
+        so ADDING a task (a policy with more heads than the checkpoint) copies the
+        trunk + old heads and leaves the new task's head freshly initialised (eq 6
+        chaining: task k+1's frozen reference IS the loaded global). Reloads the
+        partial eval matrix and makes run() skip tasks 1..after_task."""
+        import json as _json
+        import os as _os
+        sd = torch.load(ckpt_path, map_location=self.device, weights_only=False)
+        missing, unexpected = self.global_policy.load_state_dict(sd, strict=False)
+        new_heads = [m for m in missing if not m.startswith("trunk.")]
+        print(f"[resume] {ckpt_path}: copied trunk + prior heads; {len(new_heads)} "
+              f"fresh new-head params, {len(unexpected)} unexpected; "
+              f"skipping tasks 1..{after_task}")
+        src = _os.path.join(_os.path.dirname(str(ckpt_path)), "eval_matrix.json")
+        if _os.path.exists(src):
+            self.eval_matrix = _json.load(open(src))
+            print(f"[resume] reloaded partial eval_matrix ({len(self.eval_matrix)} rows)")
+        self._start_task = after_task + 1
+
     def _save_progress(self, k: int) -> None:
-        """Persist the per-task global checkpoint + running eval matrix so a
-        preemption/crash after task k retains progress (and gives per-task
+        """Persist the per-task global checkpoint + running eval matrix + resource
+        log so a preemption/crash after task k retains progress (and gives per-task
         checkpoints ``global_after_task{k}.pt`` for the windowed expert-agreement
-        eval). Cheap relative to a phase; called once per task."""
+        eval and for :meth:`resume`). Cheap relative to a phase; called once per task."""
         self.logger.save_json("eval_matrix.json", self.eval_matrix)
+        self.logger.save_json("resource_usage.json", self._resource)
         torch.save(self.global_policy.state_dict(),
                    self.logger.run_dir / f"global_after_task{k}.pt")
 
@@ -311,16 +347,18 @@ class PPOAlternationTrainer:
                                                self._log_every)
             self._clear_replay = ReplayStore()
 
-        self._train_first_task()
-        if self.method == "clear":  # store task-1 behavior as a cloning target
-            self._clear_trainer.snapshot(self.global_policy, self.family.tasks[0],
-                                         self._clear_replay)
-        row, stds = self._evaluate_row(1)
-        self.eval_matrix.append(row)
-        self.logger.log({"phase": "eval", "task": 1, "values": row, "stds": stds})
-        self._save_progress(1)
+        start = getattr(self, "_start_task", 1)
+        if start <= 1:
+            self._train_first_task()
+            if self.method == "clear":  # store task-1 behavior as a cloning target
+                self._clear_trainer.snapshot(self.global_policy, self.family.tasks[0],
+                                             self._clear_replay)
+            row, stds = self._evaluate_row(1)
+            self.eval_matrix.append(row)
+            self.logger.log({"phase": "eval", "task": 1, "values": row, "stds": stds})
+            self._save_progress(1)
 
-        for k in range(2, len(self.family) + 1):
+        for k in range(max(2, start), len(self.family) + 1):
             if self.method == "finetune":
                 self._finetune_task(k)
             elif self.method == "clear":
