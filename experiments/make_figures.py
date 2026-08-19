@@ -3,22 +3,35 @@
 Self-contained: depends only on numpy + matplotlib (no seaborn, no repo-internal
 modules) so a version-2 run can call it directly.
 
+Reference model (Part A, "experts NOT stored")
+-----------------------------------------------
+The per-task reference is the run's own LOCAL model (the current-task
+specialist / constraint target), NOT an external stored single-task expert.
+Everything is normalized against that LOCAL reference. The word "expert" is
+deliberately avoided as the reference label (it would be misleading for Part A).
+The human-readable reference name is read from figure_data.json's
+`reference_label` and is used verbatim in captions/axes.
+
 Reads:
     <run-dir>/figure_data.json            (authoritative; required)
+        keys: games, thresholds, forgetting_matrix (lower-triangular),
+              reference_scores (per game), reference_label (string),
+              random_scores. Backward-tolerant: falls back to legacy
+              `expert_scores` if `reference_scores` is absent.
     <run-dir>/expert_agreement.json       (optional; enables figure 5)
+        If present it is global-vs-LOCAL relative_gap; labeled
+        "windowed agreement vs local model", lower=better. If absent
+        (as for the v1 run), figure 5 is skipped gracefully.
 
 Writes into <out>/png and <out>/svg:
     fig1_forgetting_matrix        raw greedy-100 scores, lower-triangular
-    fig2_expert_normalized        (score-random)/(expert-random), lower-triangular
-    fig3_pct_expert_retention     score/expert*100 trajectory per task
-    fig4a_avg_perf_over_tasks     mean expert-normalized perf over seen tasks
-    fig4b_forgetting_bwt          final-minus-just-learned per task (raw + normalized)
-    fig5_expert_agreement         windowed relative_gap matrix (if file present)
+    fig2_local_normalized         (score-random)/(reference-random), lower-triangular
+    fig3_pct_local_retention      score/reference*100 trajectory per task
+    fig4a_avg_perf_over_tasks     mean local-normalized perf over seen tasks
+    fig4b_forgetting_bwt          just-learned - final per task (raw + normalized)
+    fig5_local_agreement          windowed relative_gap matrix (if file present)
 
-figure_data.json is authoritative for figures 1-4. figure_data.json and
-expert_agreement.json may disagree on a per-game expert value (they are measured
-separately); figure 5 uses expert_agreement.json's own numbers and is captioned
-as such.
+figure_data.json is authoritative for figures 1-4.
 
 Usage:
     python experiments/make_figures.py \
@@ -61,6 +74,10 @@ WONG = ["#0072B2", "#E69F00", "#009E73", "#D55E00",
 
 DPI = 300
 
+# Short label used in axis text / legends. The long provenance string from
+# figure_data.json goes into the README, not onto the axes.
+SHORT_REF = "local model"
+
 
 # ------------------------- IO ---------------------------------------------- #
 
@@ -77,11 +94,22 @@ def load_figure_data(run_dir: Path) -> dict:
             if v is not None:
                 M[k, i] = float(v)
 
+    # Authoritative key is `reference_scores`; tolerate legacy `expert_scores`.
+    if "reference_scores" in d:
+        ref = np.asarray(d["reference_scores"], dtype=float)
+        ref_label_long = d.get("reference_label", "local model")
+    elif "expert_scores" in d:
+        ref = np.asarray(d["expert_scores"], dtype=float)
+        ref_label_long = d.get("reference_label", "local model")
+    else:
+        raise KeyError("figure_data.json has neither 'reference_scores' nor 'expert_scores'")
+
     return {
         "games": games,
         "T": T,
         "M": M,
-        "expert": np.asarray(d["expert_scores"], dtype=float),
+        "reference": ref,
+        "reference_label": ref_label_long,
         "random": np.asarray(d["random_scores"], dtype=float),
         "thresholds": np.asarray(d.get("thresholds", [np.nan] * T), dtype=float),
     }
@@ -105,15 +133,14 @@ def load_agreement(run_dir: Path):
         "T": T,
         "A": A,
         "horizons": d.get("horizons"),
-        "expert": d.get("expert_greedy_score"),
     }
 
 
 # ------------------------- helpers ----------------------------------------- #
 
-def expert_normalized(M, expert, random):
-    """(score - random) / (expert - random): 1.0 = expert, 0 = random."""
-    denom = (expert - random)
+def local_normalized(M, reference, random):
+    """(score - random) / (reference - random): 1.0 = local model, 0 = random."""
+    denom = (reference - random)
     denom = np.where(denom == 0, np.nan, denom)
     return (M - random[None, :]) / denom[None, :]
 
@@ -140,12 +167,12 @@ def _lower_tri_labels(ax, games):
 
 def fig1_forgetting_matrix(data, out):
     games, M, T = data["games"], data["M"], data["T"]
-    expert, random = data["expert"], data["random"]
+    reference, random = data["reference"], data["random"]
 
-    # Color by per-game expert-normalized value so different score scales are
+    # Color by per-game local-normalized value so different score scales are
     # comparable; annotate cells with the RAW score. Negative (below random)
     # values are shown honestly via a diverging map centered at 0.
-    norm_vals = expert_normalized(M, expert, random)
+    norm_vals = local_normalized(M, reference, random)
 
     fig, ax = plt.subplots(figsize=(7.2, 6.0))
     vmax = np.nanmax(np.abs(norm_vals[np.isfinite(norm_vals)]))
@@ -154,7 +181,7 @@ def fig1_forgetting_matrix(data, out):
     tsn = TwoSlopeNorm(vmin=-vmax, vcenter=0.0, vmax=vmax)
 
     disp = np.ma.masked_invalid(norm_vals)
-    im = ax.imshow(disp, cmap=cmap, norm=tsn)
+    ax.imshow(disp, cmap=cmap, norm=tsn)
 
     for k in range(T):
         for i in range(T):
@@ -162,7 +189,6 @@ def fig1_forgetting_matrix(data, out):
                 continue  # upper triangle not evaluated
             raw = M[k, i]
             nv = norm_vals[k, i]
-            # text color for contrast
             tc = "white" if (np.isfinite(nv) and abs(nv) > 0.55 * vmax) else "black"
             ax.text(i, k, f"{raw:.1f}", ha="center", va="center",
                     color=tc, fontsize=10)
@@ -178,7 +204,7 @@ def fig1_forgetting_matrix(data, out):
     _lower_tri_labels(ax, games)
     cbar = fig.colorbar(ScalarMappable(norm=tsn, cmap=cmap), ax=ax,
                         fraction=0.046, pad=0.04)
-    cbar.set_label("cell color = expert-normalized  (0=random, 1=expert)")
+    cbar.set_label(f"cell color = {SHORT_REF}-normalized  (0=random, 1={SHORT_REF})")
     ax.set_title("Continual Atari — greedy-100 forgetting matrix\n"
                  "(cells = raw score; lower-triangular; upper = not evaluated)")
     return _savefig(fig, out, "fig1_forgetting_matrix")
@@ -186,16 +212,16 @@ def fig1_forgetting_matrix(data, out):
 
 # ------------------------- figure 2: normalized matrix --------------------- #
 
-def fig2_expert_normalized(data, out):
+def fig2_local_normalized(data, out):
     games, M, T = data["games"], data["M"], data["T"]
-    expert, random = data["expert"], data["random"]
-    N = expert_normalized(M, expert, random)
+    reference, random = data["reference"], data["random"]
+    N = local_normalized(M, reference, random)
 
     fig, ax = plt.subplots(figsize=(7.2, 6.0))
     vmax = max(np.nanmax(np.abs(N[np.isfinite(N)])), 1.0)
     cmap = plt.get_cmap("RdBu")
     tsn = TwoSlopeNorm(vmin=-vmax, vcenter=0.0, vmax=vmax)
-    im = ax.imshow(np.ma.masked_invalid(N), cmap=cmap, norm=tsn)
+    ax.imshow(np.ma.masked_invalid(N), cmap=cmap, norm=tsn)
 
     for k in range(T):
         for i in range(T):
@@ -212,49 +238,49 @@ def fig2_expert_normalized(data, out):
     _lower_tri_labels(ax, games)
     cbar = fig.colorbar(ScalarMappable(norm=tsn, cmap=cmap), ax=ax,
                         fraction=0.046, pad=0.04)
-    cbar.set_label("expert-normalized score")
-    ax.set_title("Expert-normalized performance\n"
-                 r"$(\mathrm{score}-\mathrm{random})/(\mathrm{expert}-\mathrm{random})$"
-                 "   (1=expert, 0=random, <0 worse than random)")
-    return _savefig(fig, out, "fig2_expert_normalized")
+    cbar.set_label(f"{SHORT_REF}-normalized score")
+    ax.set_title(f"{SHORT_REF.capitalize()}-normalized performance\n"
+                 r"$(\mathrm{score}-\mathrm{random})/(\mathrm{local}-\mathrm{random})$"
+                 f"   (1={SHORT_REF}, 0=random, >1 beats local, <0 worse than random)")
+    return _savefig(fig, out, "fig2_local_normalized")
 
 
-# ------------------------- figure 3: % expert retention -------------------- #
+# ------------------------- figure 3: % local retention --------------------- #
 
-def fig3_pct_expert_retention(data, out):
-    """For each task i, its score across stages k>=i, as % of that task's expert."""
+def fig3_pct_local_retention(data, out):
+    """For each task i, its score across stages k>=i, as % of that task's local model."""
     games, M, T = data["games"], data["M"], data["T"]
-    expert = data["expert"]
+    reference = data["reference"]
 
     fig, ax = plt.subplots(figsize=(8.0, 5.2))
     for i, g in enumerate(games):
         stages = list(range(i, T))
-        pct = [100.0 * M[k, i] / expert[i] for k in stages]
+        pct = [100.0 * M[k, i] / reference[i] for k in stages]
         ax.plot(stages, pct, marker="o", color=WONG[i % len(WONG)],
-                label=f"{g} (expert {expert[i]:.0f})", lw=2)
+                label=f"{g} ({SHORT_REF} {reference[i]:.1f})", lw=2)
         # mark the "just learned" point
         ax.scatter([i], [pct[0]], s=110, facecolor="none",
                    edgecolor=WONG[i % len(WONG)], linewidths=2, zorder=5)
 
-    ax.axhline(100, color="0.4", ls="--", lw=1, label="expert (100%)")
+    ax.axhline(100, color="0.4", ls="--", lw=1, label=f"{SHORT_REF} (100%)")
     ax.axhline(0, color="0.7", ls=":", lw=1)
     ax.set_xticks(range(T))
     ax.set_xticklabels([f"after\n{g}" for g in games])
     ax.set_xlabel("continual-learning stage (task index at which score is measured)")
-    ax.set_ylabel("score as % of that task's expert")
-    ax.set_title("Percentage-of-expert retention across the task sequence\n"
-                 "(open circle = just after that task was learned)")
+    ax.set_ylabel(f"score as % of that task's {SHORT_REF}")
+    ax.set_title(f"Percentage-of-{SHORT_REF} retention across the task sequence\n"
+                 "(open circle = just after that task was learned; >100% beats local)")
     ax.legend(frameon=False, fontsize=9, loc="best")
     ax.margins(x=0.05)
-    return _savefig(fig, out, "fig3_pct_expert_retention")
+    return _savefig(fig, out, "fig3_pct_local_retention")
 
 
 # ------------------------- figure 4a: avg perf over seen tasks ------------- #
 
 def fig4a_avg_perf_over_tasks(data, out):
     games, M, T = data["games"], data["M"], data["T"]
-    expert, random = data["expert"], data["random"]
-    N = expert_normalized(M, expert, random)
+    reference, random = data["reference"], data["random"]
+    N = local_normalized(M, reference, random)
 
     xs = list(range(1, T + 1))
     avg = [np.nanmean(N[k, : k + 1]) for k in range(T)]
@@ -264,12 +290,12 @@ def fig4a_avg_perf_over_tasks(data, out):
     for x, y in zip(xs, avg):
         ax.annotate(f"{y:.2f}", (x, y), textcoords="offset points",
                     xytext=(0, 8), ha="center", fontsize=9)
-    ax.axhline(1.0, color="0.4", ls="--", lw=1, label="expert level")
+    ax.axhline(1.0, color="0.4", ls="--", lw=1, label=f"{SHORT_REF} level")
     ax.axhline(0.0, color="0.7", ls=":", lw=1, label="random level")
     ax.set_xticks(xs)
     ax.set_xticklabels([f"{k}\n({games[k-1]})" for k in xs])
     ax.set_xlabel("number of tasks seen")
-    ax.set_ylabel("mean expert-normalized score\nover seen tasks")
+    ax.set_ylabel(f"mean {SHORT_REF}-normalized score\nover seen tasks")
     ax.set_title("Average performance over seen tasks vs. sequence length")
     ax.legend(frameon=False, fontsize=9)
     return _savefig(fig, out, "fig4a_avg_perf_over_tasks")
@@ -278,14 +304,15 @@ def fig4a_avg_perf_over_tasks(data, out):
 # ------------------------- figure 4b: forgetting / BWT --------------------- #
 
 def fig4b_forgetting_bwt(data, out):
-    """Final score minus just-learned score, per task (raw and expert-normalized).
+    """Just-learned score minus final score, per task (raw and local-normalized).
 
-    Positive = performance dropped (forgetting). The last task has no forgetting
-    (learned last), so it is omitted from the delta bars.
+    Positive = performance dropped (forgetting). Negative = improved after the
+    task was learned (backward transfer). The last task has no post-learning
+    stage, so it is omitted from the delta bars.
     """
     games, M, T = data["games"], data["M"], data["T"]
-    expert, random = data["expert"], data["random"]
-    N = expert_normalized(M, expert, random)
+    reference, random = data["reference"], data["random"]
+    N = local_normalized(M, reference, random)
 
     idx = list(range(T - 1))  # exclude last task (no post-learning stage)
     raw_drop = [M[i, i] - M[T - 1, i] for i in idx]          # just-learned - final
@@ -296,8 +323,8 @@ def fig4b_forgetting_bwt(data, out):
     for ax, vals, ylab, ttl in [
         (ax1, raw_drop, "raw score dropped\n(just-learned - final)",
          "Forgetting (raw units)"),
-        (ax2, norm_drop, "expert-normalized dropped",
-         "Forgetting (expert-normalized)"),
+        (ax2, norm_drop, f"{SHORT_REF}-normalized dropped",
+         f"Forgetting ({SHORT_REF}-normalized)"),
     ]:
         colors = [WONG[3] if v > 0 else WONG[2] for v in vals]
         ax.bar(range(len(idx)), vals, color=colors, edgecolor="black", lw=0.6)
@@ -311,18 +338,20 @@ def fig4b_forgetting_bwt(data, out):
                         (x, v), textcoords="offset points",
                         xytext=(0, 6 if v >= 0 else -12), ha="center", fontsize=9)
 
-    fig.suptitle("Forgetting per task  (final vs. just-learned; positive/orange = "
+    fig.suptitle("Forgetting per task  (just-learned - final; positive/orange = "
                  "dropped = forgetting, negative/green = improved = backward transfer; "
                  "last task excluded).\n"
                  "Note: raw panel is dominated by Qbert's ~1000x score scale — the "
-                 "normalized panel is the honest cross-game comparison.", fontsize=10)
-    fig.tight_layout(rect=(0, 0, 1, 0.94))
+                 f"{SHORT_REF}-normalized panel is the honest cross-game comparison. "
+                 "Qbert's negative bar = backward transfer (global surpassed local).",
+                 fontsize=9.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
     return _savefig(fig, out, "fig4b_forgetting_bwt")
 
 
-# ------------------------- figure 5: expert agreement ---------------------- #
+# ------------------------- figure 5: local agreement ----------------------- #
 
-def fig5_expert_agreement(agr, out):
+def fig5_local_agreement(agr, out):
     games, A, T = agr["games"], agr["A"], agr["T"]
 
     fig, ax = plt.subplots(figsize=(7.2, 6.0))
@@ -347,10 +376,10 @@ def fig5_expert_agreement(agr, out):
 
     _lower_tri_labels(ax, games)
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("relative gap to expert (0 = matches/beats expert, lower=better)")
-    ax.set_title("Windowed expert-agreement matrix\n"
-                 "(relative_gap; lower-triangular; upper = not evaluated)")
-    return _savefig(fig, out, "fig5_expert_agreement")
+    cbar.set_label(f"relative gap to {SHORT_REF} (0 = matches/beats local, lower=better)")
+    ax.set_title(f"Windowed agreement vs {SHORT_REF}\n"
+                 "(relative_gap; lower=better; lower-triangular; upper = not evaluated)")
+    return _savefig(fig, out, "fig5_local_agreement")
 
 
 # ------------------------- main -------------------------------------------- #
@@ -368,17 +397,18 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
 
     data = load_figure_data(run_dir)
+    print(f"[make_figures] reference = {data['reference_label']}")
     paths = []
     paths.append(fig1_forgetting_matrix(data, out))
-    paths.append(fig2_expert_normalized(data, out))
-    paths.append(fig3_pct_expert_retention(data, out))
+    paths.append(fig2_local_normalized(data, out))
+    paths.append(fig3_pct_local_retention(data, out))
     paths.append(fig4a_avg_perf_over_tasks(data, out))
     paths.append(fig4b_forgetting_bwt(data, out))
 
     agr = load_agreement(run_dir)
     if agr is not None:
-        paths.append(fig5_expert_agreement(agr, out))
-        print("[make_figures] expert_agreement.json found -> figure 5 written")
+        paths.append(fig5_local_agreement(agr, out))
+        print("[make_figures] expert_agreement.json found -> figure 5 (vs local) written")
     else:
         print("[make_figures] no expert_agreement.json -> skipping figure 5")
 

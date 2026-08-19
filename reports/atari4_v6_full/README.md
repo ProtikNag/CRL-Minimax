@@ -1,8 +1,18 @@
 # atari4_v6_full — continual-learning result figures (seed 0)
 
-Data provenance: `results/atari4_v6_full_seed0/figure_data.json` (authoritative)
-and `results/atari4_v6_full_seed0/expert_agreement.json` (optional; drives fig5).
-All scores are **greedy (argmax) evaluation over 100 rollouts**.
+## Reference model: the LOCAL model, NOT a stored expert
+
+This is a **Part A ("experts NOT stored")** run. The per-task reference used for
+all normalization is the run's **own LOCAL model** (`pi_L`) — the current-task
+specialist / constraint target produced during that task's training — **not** an
+external, separately-trained single-task expert. Earlier versions of these
+figures wrongly normalized against stored experts; that is fixed here. The word
+"expert" no longer appears as the reference anywhere in the figures or captions.
+
+Data provenance: `results/atari4_v6_full_seed0/figure_data.json` (authoritative).
+The forgetting-matrix scores are **greedy (argmax) evaluation over 100 rollouts**
+(greedy-100). The per-task reference (LOCAL) scores come from `reference_scores`;
+their meaning is given by `reference_label` (see the v1 provenance caveat below).
 
 Regenerate everything with:
 
@@ -13,8 +23,8 @@ python experiments/make_figures.py \
 ```
 
 Outputs are written to `png/` (300 DPI) and `svg/` (vector). The script depends
-only on numpy + matplotlib and is run-agnostic, so a version-2 run can call it
-with a different `--run-dir`.
+only on numpy + matplotlib, has no repo-internal imports, and is run-agnostic, so
+a version-2 run can call it with a different `--run-dir`.
 
 ## Task arrival order
 
@@ -28,57 +38,78 @@ The forgetting matrix is **lower-triangular**. Row `k` = the agent's state
 absent — it is masked/hatched in every heatmap and must not be read as "zero" or
 "not forgotten".
 
+## v1 LOCAL-score provenance caveat (important)
+
+The v1 run did **not** save the per-task local models. So `reference_scores` are
+sourced heterogeneously:
+
+- **Task 1 (Qbert):** `4217.0` is `global_after_task1`'s greedy-100 score — a
+  genuine greedy-100 measurement of the just-trained model.
+- **Tasks 2–4 (Boxing `36.3`, Pong `20.3`, Breakout `87.6`):** taken from the
+  training logs as a **15-episode stop-eval**, not greedy-100. These are a
+  coarser estimate of the local specialist's level and are **not** directly
+  comparable in evaluation protocol to the greedy-100 forgetting-matrix scores.
+
+Treat retention/normalization for tasks 2–4 as approximate for this reason.
+Future runs that save local models should replace these with greedy-100 local
+scores, at which point this caveat is removed.
+
 ## Normalization formulas
 
-- **Expert-normalized** (fig1 colors, fig2, fig4a, fig4b right):
-  `(score - random) / (expert - random)`.
-  `1.0` = single-task expert, `0.0` = random agent, `< 0` = **worse than random**.
-- **Percentage-of-expert** (fig3): `score / expert * 100`.
+- **Local-normalized** (fig1 colors, fig2, fig4a, fig4b right):
+  `(score - random) / (reference_local - random)`.
+  `1.0` = the LOCAL specialist's level, `0.0` = random agent,
+  `> 1.0` = **beats the local specialist** (positive backward transfer),
+  `< 0` = **worse than random**.
+- **Percentage-of-local** (fig3): `score / reference_local * 100`.
 
-Per-game `expert` and `random` baselines come directly from
-`figure_data.json` (`expert_scores`, `random_scores`).
+Per-game `reference_local` and `random` baselines come directly from
+`figure_data.json` (`reference_scores`, `random_scores`).
 
 ## Honesty notes specific to this run
 
-- **Boxing goes negative.** After Pong and after Breakout, Boxing scores are
-  `-1.62` and `-3.61` (below the random baseline of `0.1`), i.e. worse than random.
-  This is preserved literally: annotations show the true negative numbers, and
-  the diverging colormap is centered at 0 so "below random" is visually distinct
-  from "at random", never silently clipped.
-- **Cross-game scale gap is not hidden.** Qbert's final score (7148) is only
-  ~40% of its expert (17726.25); Breakout's final (53.66) is ~19% of its expert
-  (285.4); Pong sits at ~99%. Expert normalization makes the four very different
-  score scales comparable *without* flattening these gaps — fig2/fig3 show Qbert
-  and Breakout clearly below expert while Pong is near 1.0.
-- **Qbert exhibits backward transfer, not forgetting.** Its just-learned score
-  (4217) is *lower* than its final score (7148); later tasks improved it. fig4b
-  shows this as a negative bar (green), labeled as backward transfer, so it is not
-  mistaken for forgetting.
+- **Qbert exceeds its local specialist (positive backward transfer).** Qbert's
+  local reference is `4217.0` (task-1 greedy-100). Its greedy-100 global score
+  *rises* across later tasks: `5353.0` after Pong and **`7148.0` after Breakout**,
+  i.e. a ratio of `7148 / 4217 = 1.70` — a local-normalized value of **`1.72`**
+  (well above `1.0`). This is rendered **honestly and un-clipped**: fig2 shows
+  `1.28`/`1.72` (and `3.50` mid-sequence) as values above `1.0`, fig3 shows Qbert
+  above the 100% line, and fig4b classifies Qbert's improvement as **backward
+  transfer (negative/green bar)**, never as forgetting. The color scale extends
+  past `1.0` rather than saturating at the local level.
+- **Boxing collapses below random.** After Pong and after Breakout, Boxing scores
+  are `-1.62` and `-3.61` (below the random baseline of `0.1`), i.e. worse than
+  random → local-normalized `-0.05` and `-0.10`. Preserved literally: annotations
+  show the true negative numbers, and the diverging colormap is centered at 0 so
+  "below random" is visually distinct from "at random", never silently clipped.
+  In fig4b this is the one true **forgetting** case (positive/orange bar).
+- **Pong ~ local, Breakout partial.** Pong's final `19.75` vs local `20.3` is
+  **~97%** of local (near-flat retention). Breakout's final `53.66` vs local
+  `87.6` is **~61%** of local. Both are shown directly in fig3.
 
-## Expert-value discrepancy (fig5 only)
+## Figure 5 (windowed agreement vs local model) — not present for v1
 
-`figure_data.json` and `expert_agreement.json` were measured separately and
-disagree on one baseline: Boxing expert = `65.74` (figure_data) vs `68.64`
-(expert_agreement). Figures 1-4 use `figure_data.json` throughout. Figure 5 uses
-`expert_agreement.json`'s own `relative_gap` values (which were computed against
-that file's own expert scores), and is captioned as a separate windowed metric.
-Report it *alongside* the greedy-100 matrix, never alone.
+fig5 reads the **optional** `expert_agreement.json`. **No such file exists for the
+v1 run, so fig5 is skipped.** When a future run supplies it, it is interpreted as
+the **global-vs-LOCAL** `relative_gap` (lower = better; 0 = global matches/beats
+the local model), captioned "windowed agreement vs local model", and reported
+*alongside* the greedy-100 matrix, never alone.
 
 ## Figure index
 
 | File | What it shows |
 |------|---------------|
-| `fig1_forgetting_matrix` | Raw greedy-100 scores, lower-triangular; cells annotated with raw score, colored by expert-normalized value (diverging, centered at 0). |
-| `fig2_expert_normalized` | Expert-normalized matrix `(score-random)/(expert-random)`; 1=expert, 0=random, <0 worse than random. |
-| `fig3_pct_expert_retention` | Per-task `score/expert*100` trajectory across the sequence; open circle = just-learned point. Pong ~99% flat, Boxing collapses below 0, Qbert/Breakout partial. |
-| `fig4a_avg_perf_over_tasks` | Mean expert-normalized performance over seen tasks vs. number of tasks seen. |
-| `fig4b_forgetting_bwt` | Forgetting per task = (just-learned - final), raw and expert-normalized. Positive/orange = forgetting, negative/green = backward transfer. Last task excluded (no post-learning stage). |
-| `fig5_expert_agreement` | Windowed expert-agreement matrix (`relative_gap`, lower=better), lower-triangular. Only produced if `expert_agreement.json` exists. |
+| `fig1_forgetting_matrix` | Raw greedy-100 scores, lower-triangular; cells annotated with raw score, colored by local-normalized value (diverging, centered at 0, extends above 1). |
+| `fig2_local_normalized` | Local-normalized matrix `(score-random)/(local-random)`; 1=local, 0=random, >1 beats local, <0 worse than random. |
+| `fig3_pct_local_retention` | Per-task `score/local*100` trajectory across the sequence; open circle = just-learned point. Pong ~97% flat, Boxing collapses below 0, Qbert >100% (beats local), Breakout ~61%. |
+| `fig4a_avg_perf_over_tasks` | Mean local-normalized performance over seen tasks vs. number of tasks seen. |
+| `fig4b_forgetting_bwt` | Forgetting per task = (just-learned - final), raw and local-normalized. Positive/orange = forgetting (Boxing), negative/green = backward transfer (Qbert). Last task excluded (no post-learning stage). |
+| `fig5_local_agreement` | Windowed agreement vs local model (`relative_gap`, lower=better), lower-triangular. Only produced if `expert_agreement.json` exists — absent for v1. |
 
 ## Colormaps
 
 - Diverging `RdBu` (centered at 0) for signed normalized matrices — colorblind-safe,
-  0-anchored so "below random" is unambiguous.
-- `cividis_r` (perceptually uniform, colorblind-safe) for the agreement gap.
+  0-anchored so "below random" is unambiguous; not saturated at 1 so ">local" is visible.
+- `cividis_r` (perceptually uniform, colorblind-safe) for the agreement gap (fig5).
 - Wong/Okabe-Ito categorical palette for line plots.
 No rainbow/jet; no meaning encoded by hue alone (every cell is also annotated).
