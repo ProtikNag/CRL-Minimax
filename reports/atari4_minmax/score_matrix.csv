@@ -1,5 +1,0 @@
-stage \ game,Pong,Boxing,Freeway,Breakout
-after_T1_Pong,20.13,,,
-after_T2_Boxing,20.30,-27.00,,
-after_T3_Freeway,17.10,-7.77,15.53,
-after_T4_Breakout,20.33,-5.63,22.07,36.63
