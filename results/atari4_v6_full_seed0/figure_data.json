@@ -31,17 +31,18 @@
       53.65999984741211
     ]
   ],
-  "expert_scores": [
-    17726.25,
-    65.74,
-    20.0,
-    285.4
+  "reference_scores": [
+    4217.0,
+    36.3,
+    20.3,
+    87.6
   ],
+  "reference_label": "local model (pi_L): task1=global_after_task1 (greedy-100); tasks 2-4 = 15-ep stop-eval from logs (v1 did not save local models)",
   "random_scores": [
     163.9,
     0.1,
     -20.7,
     1.7
   ],
-  "note": "forgetting_matrix rows=after task k, cols=greedy-100 score on task i (lower-triangular)"
+  "note": "reference = per-task LOCAL model (Part A specialist), NOT a stored expert."
 }
