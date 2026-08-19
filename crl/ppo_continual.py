@@ -211,7 +211,16 @@ class PPOAlternationTrainer:
             )
             self._record_resource(k, "local", loc_summ)
             frozen_local = clone_policy(local_policy, trainable=False)
+            # Retain the local model + its greedy-100 score: for Part A (experts NOT
+            # stored) the LOCAL model is the per-task reference/"specialist" (it IS the
+            # constraint target V_k^L), so results are normalised against it, not an
+            # external single-task expert. (Task 1 has no local phase; its specialist
+            # is global_after_task1.)
+            torch.save(frozen_local.state_dict(),
+                       self.logger.run_dir / f"local_after_task{k}.pt")
             ref_current = self._eval_value(frozen_local, task_k)
+            self._resource.setdefault(task_k.spec.name, {"task": k})["local_greedy"] = \
+                self._eval_report(frozen_local, task_k)[0]
 
             # ---- global phase: PPO + actor-only mu constraint ---------------
             self.mu_ctrl.reset()
