@@ -1,0 +1,36 @@
+{
+  "atari-Boxing": {
+    "task": 4,
+    "local": {
+      "iters_run": 600,
+      "early_stopped": true,
+      "wall_s": 895.9,
+      "final_greedy": 65.13333129882812,
+      "best_greedy": 68.46666717529297
+    },
+    "local_greedy": 68.45999908447266,
+    "global": {
+      "iters_run": 1250,
+      "early_stopped": true,
+      "wall_s": 9565.6,
+      "final_greedy": 73.93333435058594
+    }
+  },
+  "atari-SpaceInvaders": {
+    "task": 5,
+    "local": {
+      "iters_run": 3000,
+      "early_stopped": false,
+      "wall_s": 4986.4,
+      "final_greedy": 973.6666870117188,
+      "best_greedy": 1042.3333740234375
+    },
+    "local_greedy": 1062.4000244140625,
+    "global": {
+      "iters_run": 1800,
+      "early_stopped": true,
+      "wall_s": 15551.1,
+      "final_greedy": 855.3333129882812
+    }
+  }
+}

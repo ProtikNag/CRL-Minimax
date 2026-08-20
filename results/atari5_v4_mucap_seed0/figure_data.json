@@ -1,0 +1,59 @@
+{
+  "games": [
+    "Qbert",
+    "Pong",
+    "Breakout",
+    "Boxing",
+    "SpaceInvaders"
+  ],
+  "thresholds": [
+    4000,
+    18,
+    80,
+    55,
+    800
+  ],
+  "forgetting_matrix": [
+    [
+      4467.75
+    ],
+    [
+      4145.5,
+      19.75
+    ],
+    [
+      5448.0,
+      20.0,
+      90.44999694824219
+    ],
+    [
+      842.5,
+      20.0,
+      64.56999969482422,
+      69.58000183105469
+    ],
+    [
+      676.25,
+      19.760000228881836,
+      63.0099983215332,
+      -6.590000152587891,
+      902.5
+    ]
+  ],
+  "reference_scores": [
+    4171.67,
+    20.01,
+    132.68,
+    68.46,
+    1062.4
+  ],
+  "reference_label": "local model (pi_L): tasks 1-3 from v3 resume source, tasks 4-5 from this run",
+  "random_scores": [
+    163.9,
+    -20.7,
+    1.7,
+    0.1,
+    148.0
+  ],
+  "note": "reference = per-task LOCAL model (Part A). V4 was resumed from v3 task3, so tasks 1-3 local refs come from v3."
+}
