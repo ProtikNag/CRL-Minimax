@@ -173,6 +173,10 @@ class PPOAlternationTrainer:
             probe=self._probe,
         )
         self._record_resource(1, "task1", summ)
+        # Task 1 has no local phase -> the task1 model IS its specialist; record its
+        # greedy score as the local reference (used by the V5 all-tasks retention stop).
+        self._resource.setdefault(self.family.tasks[0].spec.name, {"task": 1})[
+            "local_greedy"] = self._eval_report(self.global_policy, self.family.tasks[0])[0]
 
     def _finetune_task(self, k: int) -> None:
         """Naive baseline: keep fine-tuning the one shared net on task k."""
@@ -233,6 +237,12 @@ class PPOAlternationTrainer:
                 self.global_policy.load_state_dict(local_policy.state_dict())
                 for name, p in self.global_policy.named_parameters():
                     p.requires_grad_(not name.startswith("trunk."))
+            refs = None
+            if self.ppo.global_stop_all_tasks:
+                # local reference greedy for every seen task (past + current), aligned
+                # to past_tasks + [task_k]; the global stops only when ALL are >= frac.
+                refs = [self._resource.get(t.spec.name, {}).get("local_greedy")
+                        for t in past_tasks + [task_k]]
             glob_summ = self.global_trainer.train(
                 self.global_policy, task_k, past_tasks,
                 ref_current=ref_current, mu_ctrl=self.mu_ctrl, omega=omega,
@@ -241,6 +251,7 @@ class PPOAlternationTrainer:
                 seed=self.seed + 1000 * k + 13 * cycle,
                 current_task=k, probe=self._probe,
                 local_policy=frozen_local,  # for KL-gap logging + optional BC term
+                retention_refs=refs, retention_frac=self.ppo.global_retention_frac,
             )
             self._record_resource(k, "global", glob_summ)
             if self.ppo.global_probe_head_only:  # restore full trainability
@@ -339,6 +350,13 @@ class PPOAlternationTrainer:
             self.eval_matrix = _json.load(open(src))[:after_task]
             print(f"[resume] reloaded eval_matrix -> {len(self.eval_matrix)} rows "
                   f"(truncated to task {after_task})")
+        # Carry over the local reference scores of the skipped tasks (needed by the
+        # V5 all-tasks retention stop, since their local phases are not re-run).
+        rsrc = _os.path.join(_os.path.dirname(str(ckpt_path)), "resource_usage.json")
+        if _os.path.exists(rsrc):
+            self._resource = _json.load(open(rsrc))
+            print(f"[resume] reloaded resource_usage (local refs for "
+                  f"{len(self._resource)} games)")
         self._start_task = after_task + 1
 
     def _save_progress(self, k: int) -> None:

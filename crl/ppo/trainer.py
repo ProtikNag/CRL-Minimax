@@ -356,6 +356,26 @@ class GlobalTrainer(PPOTrainer):
               f"mu={mu:.2f} F_G={constraint:.4f} |g_new|/|g_old|={ratio:.3f} "
               f"cos={cos:+.3f} cur={cur_score:.1f}")
 
+    def _retention_check(self, policy, past_tasks, task_k, refs, frac, iters_done):
+        """V5 all-tasks early-stop probe. Only a check iteration returns a result:
+        (current_task_greedy_score_or_None, all_ok), where all_ok is True iff EVERY
+        seen task (past + current) scores >= frac * its LOCAL reference greedy."""
+        cfg = self.ppo
+        if (iters_done < cfg.min_iters or cfg.stop_eval_every <= 0
+                or iters_done % cfg.stop_eval_every != 0):
+            return None, False
+        seen = list(past_tasks) + [task_k]
+        all_ok, cur = True, float("nan")
+        for t, ref in zip(seen, refs):
+            _, sc, _, _ = evaluate_value_and_score(
+                policy, t, cfg.stop_eval_episodes, cfg.n_envs, self.device,
+                seed=cfg.eval_seed, greedy=True, max_ep_steps=cfg.eval_max_ep_steps)
+            if t is task_k:
+                cur = sc
+            if ref is None or ref <= 0 or sc < frac * ref:
+                all_ok = False
+        return cur, all_ok
+
     def train(
         self,
         global_policy: Policy,
@@ -370,6 +390,8 @@ class GlobalTrainer(PPOTrainer):
         current_task: int,
         probe: ProbeHook | None = None,
         local_policy: Policy | None = None,
+        retention_refs: list[float] | None = None,
+        retention_frac: float = 0.7,
     ) -> dict:
         """Consolidate the global policy (Part A -- experts NOT stored).
 
@@ -450,11 +472,19 @@ class GlobalTrainer(PPOTrainer):
 
                 if probe is not None:
                     probe("global", current_task)
-                # Early stop: the global has consolidated the current game to its
-                # greedy threshold (past tasks are maintained by the omega term).
-                gscore = self._stop_score(global_policy, task_k, it + 1)
-                if gscore is not None:
-                    met = met + 1 if gscore >= thr else 0
+                # Early stop. Default: current game reached its greedy threshold.
+                # V5 (retention_refs given): stop ONLY when EVERY seen task is >=
+                # retention_frac of its local reference; else run to the cap.
+                if retention_refs is not None:
+                    gscore, all_ok = self._retention_check(
+                        global_policy, past_tasks, task_k, retention_refs,
+                        retention_frac, it + 1)
+                    if gscore is not None:
+                        met = met + 1 if all_ok else 0
+                else:
+                    gscore = self._stop_score(global_policy, task_k, it + 1)
+                    if gscore is not None:
+                        met = met + 1 if gscore >= thr else 0
                 if it % self.log_every == 0 or gscore is not None:
                     self.logger.log(
                         {
@@ -473,8 +503,10 @@ class GlobalTrainer(PPOTrainer):
                     )
                 if met >= self.ppo.patience:
                     early = True
-                    print(f"[global k={current_task}] EARLY STOP it={it+1} "
-                          f"greedy={gscore:.1f} >= thr={thr:.0f}")
+                    reason = ("all seen tasks >= retention frac"
+                              if retention_refs is not None
+                              else f"greedy={gscore:.1f} >= thr={thr:.0f}")
+                    print(f"[global k={current_task}] EARLY STOP it={it+1} ({reason})")
                     break
         finally:
             for c in past_collectors:

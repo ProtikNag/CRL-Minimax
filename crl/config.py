@@ -229,6 +229,14 @@ class PPOConfig:
     # doesn't discard the good peak. Applies to the local + task1 phases (single-game
     # objective); the kept snapshot becomes pi_L / the frozen reference.
     select_best_local: bool = False
+    # V5 global early-stop: the consolidation stops ONLY when EVERY seen task (past +
+    # current) reaches >= global_retention_frac of its LOCAL reference greedy score,
+    # for `patience` consecutive checks; otherwise it runs to global_iters (no early
+    # stop). Default off = the current-task-only criterion. It evaluates ALL seen
+    # tasks each check, so pair it with a sparse stop_eval_every and small
+    # stop_eval_episodes.
+    global_stop_all_tasks: bool = False
+    global_retention_frac: float = 0.7
     global_iters: int = 2000  # cap for the constrained global consolidation
     # Early stopping: stop a phase once the current game's GREEDY score is
     # >= its threshold for `patience` consecutive checks (but at least min_iters),
