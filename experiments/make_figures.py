@@ -342,8 +342,7 @@ def fig4b_forgetting_bwt(data, out):
                  "dropped = forgetting, negative/green = improved = backward transfer; "
                  "last task excluded).\n"
                  "Note: raw panel is dominated by Qbert's ~1000x score scale — the "
-                 f"{SHORT_REF}-normalized panel is the honest cross-game comparison. "
-                 "Qbert's negative bar = backward transfer (global surpassed local).",
+                 f"{SHORT_REF}-normalized panel is the honest cross-game comparison.",
                  fontsize=9.5)
     fig.tight_layout(rect=(0, 0, 1, 0.92))
     return _savefig(fig, out, "fig4b_forgetting_bwt")
