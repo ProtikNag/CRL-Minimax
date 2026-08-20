@@ -334,8 +334,11 @@ class PPOAlternationTrainer:
               f"skipping tasks 1..{after_task}")
         src = _os.path.join(_os.path.dirname(str(ckpt_path)), "eval_matrix.json")
         if _os.path.exists(src):
-            self.eval_matrix = _json.load(open(src))
-            print(f"[resume] reloaded partial eval_matrix ({len(self.eval_matrix)} rows)")
+            # Keep only the rows up to after_task (later rows belong to tasks we are
+            # NOT carrying over -- e.g. dropping Boxing); the resumed run appends fresh.
+            self.eval_matrix = _json.load(open(src))[:after_task]
+            print(f"[resume] reloaded eval_matrix -> {len(self.eval_matrix)} rows "
+                  f"(truncated to task {after_task})")
         self._start_task = after_task + 1
 
     def _save_progress(self, k: int) -> None:
