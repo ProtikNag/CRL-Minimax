@@ -234,20 +234,26 @@ advantages.
   `crl/policies/impala.py` (Impala-CNN, current), `crl/ppo/` (reusable
   `PPOTrainer` → `LocalTrainer` = standard PPO, `GlobalTrainer` = PPO + actor
   constraint), `crl/ppo_continual.py` (orchestrator).
-- **Methods** (`ppo.method`): `constrained` (**min-max**, dual `μ`, no experts),
-  `stored_expert` (**Formulation B**, `crl/ppo/stored_expert.py`: no `μ`, no
-  min-max — gap-weighted regression `ω_i·2·max(0, V*_i − V_i^G)` toward each
-  frozen expert ceiling, past+current symmetric; both values from the same MC
-  evaluator, fixing the critic-drift/scale bugs), `finetune`, `clear`
-  (replay+cloning baseline), `joint` (feasibility upper bound). **`consolidate`
-  is DEPRECATED** — the buggy min-max/stored-expert hybrid that kept `μ` while
-  using stored experts (μ vacuous against an upper-bound reference). Diagnostic
-  knobs: `diagnostics`, `global_probe_head_only` (freeze-trunk probe),
-  `global_bc_coef` (behavioral cloning).
-- **4-game min-max result** (`reports/atari4_minmax/`, 1 seed, trimmed first
-  look): `experiments/atari4_minmax_matrix.py` renders a lower-triangular,
-  color-coded score matrix; `experiments/atari4_confusion.py` compares two runs
-  (min-max vs stored-expert) side by side. See `HANDOFF.md` for status.
+- **Methods** (`ppo.method`) on this branch: `constrained` (**min-max**, dual `μ`,
+  no experts — the Part-A method), `finetune`, `clear` (replay+cloning baseline),
+  `joint` (feasibility upper bound). The Part-B `stored_expert` / deprecated
+  `consolidate` methods have been **stripped from `feature/updated-objective`**
+  (deferred; see `HANDOFF.md`). Diagnostic knobs: `diagnostics`,
+  `global_probe_head_only` (freeze-trunk probe), `global_bc_coef` (behavioral
+  cloning — the "ours + BC" retention variant).
+- **Reference is the LOCAL model** (per-task specialist `local_after_task{k}.pt`), not
+  stored experts; retention/normalization use the greedy-100 `local_greedy` score.
+- **5-game min-max result (current, seed 0):** sequence
+  Qbert→Pong→Breakout→Boxing→SpaceInvaders, best run `configs/atari5_v5.yaml`
+  (μ-cap + retention-gated global early-stop). Forgetting-matrix / retention figures
+  in `reports/atari5_v5/`, `reports/atari5_v4_mucap/`, `reports/v4_v5_compare/`
+  (all `visualization-expert`-verified). Headline: retention gate rescues the oldest
+  task (Qbert 15%→91%) but Boxing is still wiped by the following SpaceInvaders
+  consolidation. **Current status, open decisions, and roadmap: `HANDOFF.md`.**
+- **Next up (roadmap, `HANDOFF.md`):** apples-to-apples **CLEAR** comparison (fairness
+  settings TBD by user), 1–2 recent baselines on separate GPUs, longer task sequence,
+  and multi-seed. Paper/rebuttal clarifications are logged in
+  `docs/clarifications_qa.md`.
 - **Evaluation rule (binding): greedy (argmax) actions, 100 rollouts, never
   stochastic** (`eval_episodes: 100`, `eval_greedy: true`). The constraint value
   `V_G/V_L` stays on-policy stochastic (it's the constrained quantity, not

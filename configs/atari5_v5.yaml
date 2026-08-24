@@ -1,3 +1,4 @@
+# ===== CANONICAL SETUP (2026-08-24) — all future changes branch from V5. =====
 # Part A -- MIN-MAX, V5 = V4 (mu-cap) + RETENTION-GATED global early-stop.
 #   The global consolidation no longer stops when just the CURRENT game is good;
 #   it stops ONLY when EVERY seen task (past + current) is >= 70% of its LOCAL model

@@ -5,7 +5,88 @@ first (problem, method, math); this file is status + next steps only.
 
 ---
 
-## ►► CURRENT STATE (2026-08-17) — branch `feature/updated-objective`
+## ►► CURRENT STATE (2026-08-24) — branch `feature/updated-objective`
+
+**Part A (min-max, experts NOT stored) is implemented, verified, and has run
+end-to-end on Atari.** Doc math `math-verifier: SOUND`; implementation
+`code-verifier: PASS` against eqs 26/38/40/47; pseudocode in `pseudocode/`.
+Constraint = one-sided squared hinge `F_k = [V_k^L − V_k^G]_+² ≤ ε` (eq 26), dual
+`μ ← [μ+η(F_k−ε)]_+` (eq 47), current-task actor coeff `2μ·shortfall`; `trainer.eps`
+is the sole tolerance ε (configs `eps: 0.04`). Part B (stored experts) stays stripped.
+
+### The reference is the LOCAL model (not stored experts)
+Part A's per-task reference = the frozen **local specialist** `local_after_task{k}.pt`.
+All normalization / retention / agreement is vs the local model. The reference score
+MUST be the **greedy-100 `local_greedy`** field (same basis as the eval-matrix
+diagonal), never the noisy 3-episode `final_greedy`/`best_greedy` (that bug inflated
+SI retention to 133%; correct = 68%). Task 1 has no consolidation → its reference is
+its own greedy-100 diagonal (normalizes to exactly 1.0). (memory:
+`local-model-is-partA-reference`)
+
+### Atari runs (all seed 0, sequence Qbert→Pong→Breakout→Boxing→SpaceInvaders)
+- Iterated V1→V5 + a no-Boxing control. Current best = **V5** (`configs/atari5_v5.yaml`):
+  μ-cap (`duals.max_value: 5`) + **retention-gated global early-stop**
+  (`global_stop_all_tasks`: stop only when EVERY seen task ≥ 70% of its local, else run
+  to `global_iters`).
+- **V5 final retention vs local:** Qbert 91%, Pong 99%, SI 68%, Breakout 39%,
+  **Boxing −27%**. Headline: the retention gate rescued the OLDEST task
+  (Qbert 15%→91% vs V4), but the final SI consolidation still destroys Boxing — a
+  targeted **SI⟂Boxing interference**, not a global collapse.
+- Method additions since Aug 17 (none were in the old handoff): `target_kl` (fixes the
+  Boxing PPO divergence-to-uniform in LOCAL training), μ-cap, retention-gated stop,
+  `local_iters_per_task`, `select_best_local`, `resume(ckpt, after_task)` head-expansion,
+  `local_after_task{k}.pt` saving, windowed off-policy value-agreement eval
+  (`crl/ppo/expert_eval.py`, DIAGNOSTIC only — never backpropagated).
+- Figures (all `visualization-expert: FAITHFUL`, committed): `reports/atari5_v4_mucap/`,
+  `reports/atari5_v5/` (fig1–4 suites), `reports/v4_v5_compare/`, and
+  `reports/atari5_v5/png/prev_minmax_vs_v5_fig2__mixed_norm` (record vs old min-max).
+- **Clarifications for the paper/rebuttal live in `docs/clarifications_qa.md`** — append
+  to it (ours-vs-CLEAR, eval/metrics, method internals).
+
+### Advisory flags (`continual-learning-expert`, surfaced not silently acted on)
+- "Replay-free" understates the access model: no stored transitions, but consolidation
+  re-simulates every past env each global iter (O(k) live access) — STRONGER than a
+  fixed buffer. State this in any buffer-baseline comparison.
+- Greedy-only eval is config-dependent, not asserted (safe under current defaults).
+- μ `max_value` ceiling is a MINOR deviation from pure `[·]_+`; keep claims honest.
+
+---
+
+## ►► OPEN DECISIONS — ASK THE USER AT THE START OF A NEW SESSION
+
+The user has NOT decided these; a new session must ask BEFORE running anything.
+
+1. **CLEAR apples-to-apples settings (UNDECIDED — the user will choose next session).**
+   We will compare against CLEAR, but the fairness protocol is not fixed. Ask:
+   - (a) equalize on **total environment frames** (recommended) — agree?
+   - (b) **CLEAR buffer size** — standard buffer + report footprints, or ALSO sweep a
+     "generous CLEAR" (more memory) point to show our result is robust?
+   - (c) run the **mechanism ablation** (hold data/access fixed: ours+BC, and/or CLEAR
+     fed fresh rollouts) to isolate whether the dual value-*constraint* beats
+     replay+cloning?
+   Background is in `docs/clarifications_qa.md` §A: the two different "memories"
+   (buffer vs models+live env), the **critic-predict-vs-policy-achieve fork**, and why
+   ours ≠ CLEAR only as long as we keep the dual/min-max. **First verify CLEAR's exact
+   loss set (V-trace + policy cloning + value cloning) against the primary paper.**
+
+2. **Global KL trust-region (UNDECIDED).** Whether to re-add a per-update KL trust
+   region to global consolidation (a stabilizer — DISTINCT from the task-level
+   early-stop the user rejected) to fix the SI⟂Boxing interference. Awaiting sign-off.
+   (memory: `v5-consolidation-collapse-decision`)
+
+## Roadmap (after the decisions above)
+1. **CLEAR comparison** on the current setup, apples-to-apples per the chosen protocol.
+2. **1–2 more recent baselines**, same protocol, run in parallel on separate GPUs to
+   get results faster; establish *why* ours is better.
+3. **Longer task sequence.**
+Cross-cutting gaps for the paper: everything so far is **seed 0 only** — multi-seed
+(≥3) is the single biggest gap. Also pending: a **better retention metric** that credits
+competent-but-sub-specialist play (Breakout 0.38 ≫ random but ≪ its very strong local);
+**fig5** windowed-agreement for the resumed runs (needs cross-run reference-model lookup).
+
+---
+
+## ►► EARLIER STATE (2026-08-17) — branch `feature/updated-objective`
 
 **This branch is PART A ONLY (experts NOT stored) — the min-max formulation.**
 The updated objective doc is now `docs/Updated_Objective_for_CRL.pdf` (15 pp);
@@ -48,9 +129,9 @@ experiment/bench drivers. Remaining methods: **`constrained` (Part A), `finetune
 3. **μ `max_value` ceiling** — MINOR deviation from the pure `[·]_+` projection;
    keep it non-binding for reported runs (configs use 20–1000).
 
-**Not yet committed** — changes are on the working tree of
-`feature/updated-objective`, awaiting user go-ahead. No training run launched yet —
-recommend a **1-seed** `atari4_minmax.yaml` / `atari5_ppo_v5.yaml` smoke run next.
+**(SUPERSEDED — see CURRENT STATE at the top.)** At the time this was written the
+changes were uncommitted and no Atari run had launched; since then V1→V5 + a no-Boxing
+control have run (seed 0) and everything is committed on `feature/updated-objective`.
 
 ---
 
