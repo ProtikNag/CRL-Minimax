@@ -1,0 +1,38 @@
+{
+  "title": "Shared PPO Update Core",
+  "subtitle": "The one reusable clipped-PPO optimizer; all continual weighting enters via actor coefficients.",
+  "sections": [
+    {"kind":"heading","text":"Overview"},
+    {"kind":"prose","text":"One update is $\\mathrm{ppo\\_epochs}$ passes of minibatch SGD over one or more collected rollout STREAMS (one per task, each already GAE-processed). Each stream $i$ adds $c_i \\cdot (\\mathrm{clipped\\ surrogate}_i)$ to the actor loss, a STANDARD $\\mathrm{vf\\_coef}\\cdot(\\mathrm{value\\ MSE}_i)$ critic loss, and an entropy bonus $-\\mathrm{ent\\_coef}\\cdot\\mathcal{H}_i$; the sum is optimized under a single global grad-norm clip. Only the list of actor coefficients $c_i$ differs between the local phase ($[1]$) and the constrained global phase ($[\\omega_1,\\dots,\\omega_{k-1},\\,2\\mu\\,s_k]$)."},
+    {"kind":"prose","text":"KEY STABILIZER: the actor coefficients are renormalized by their sum before use. The dual term $2\\mu s_k$ is unbounded in $\\mu$; without normalization a large $\\mu$ makes the actor gradient dominate the shared grad-norm clip and STARVES the shared critic's value gradient, breaking GAE. Division by the sum is a positive rescaling of the ascent direction: it preserves the relative past/current weighting (and the saddle fixed point) and only bounds the step magnitude. For the local phase ($c=[1]$) it is a no-op."},
+    {"kind":"algorithm","name":"$\\mathrm{optimize\\_batches}(\\mathrm{policy},\\ \\mathrm{opt},\\ \\mathrm{streams},\\ \\mathrm{actor\\_coeffs})$",
+     "inputs":["shared-trunk multi-head actor+critic $\\mathrm{policy}$; Adam optimizer $\\mathrm{opt}$ over its trainable params","$\\mathrm{streams}$: list of GAE rollout batches (obs, actions, old log-probs, advantages, returns, task-id), all of equal length $N=n_\\mathrm{envs}\\cdot n_\\mathrm{steps}$","$\\mathrm{actor\\_coeffs}=[c_1,\\dots,c_m]$: one actor weight per stream","config: $\\mathrm{num\\_minibatches}$, $\\mathrm{ppo\\_epochs}$, $\\mathrm{clip\\_ratio}$, $\\mathrm{vf\\_coef}$, $\\mathrm{ent\\_coef}$, $\\mathrm{max\\_grad\\_norm}$; optional $(\\pi_L,\\mathrm{bc\\_coef})$ behavioral-cloning term","optional KL early-stop flag $\\mathrm{kl\\_stop}$ (used by the local phase; the global phase runs full epochs)"],
+     "outputs":["in-place gradient steps on $\\mathrm{policy}$","diagnostics: mean pg-loss, value-loss, entropy, approx-KL, clip-fraction"],
+     "body":[
+       {"lvl":0,"text":"$N \\leftarrow$ rows in $\\mathrm{streams}[0]$;   $\\mathrm{mb} \\leftarrow \\max(1,\\ N / \\mathrm{num\\_minibatches})$"},
+       {"lvl":0,"text":"$S \\leftarrow \\sum_i c_i$;   if $S > 0$: renormalize $c_i \\leftarrow c_i / S$ for all $i$"},
+       {"lvl":0,"text":"for $\\mathrm{epoch} = 1,\\dots,\\mathrm{ppo\\_epochs}$ do"},
+       {"lvl":1,"text":"draw a fresh random permutation of $\\{1,\\dots,N\\}$ (shared by all streams)"},
+       {"lvl":1,"text":"for each minibatch index set $\\mathrm{idx}$ (size $\\mathrm{mb}$) do"},
+       {"lvl":2,"text":"$L \\leftarrow 0$"},
+       {"lvl":2,"text":"for each $(c_i,\\ \\mathrm{batch}_i)$ in zip$(\\mathrm{actor\\_coeffs},\\ \\mathrm{streams})$ do"},
+       {"lvl":3,"text":"$\\mathrm{dist},\\ V \\leftarrow \\mathrm{policy}.\\mathrm{dist\\_value}(\\mathrm{batch}_i.\\mathrm{obs}[\\mathrm{idx}],\\ \\mathrm{batch}_i.\\mathrm{task\\_id})$"},
+       {"lvl":3,"text":"$\\rho \\leftarrow \\exp\\left(\\mathrm{dist}.\\log p(a) - \\mathrm{old\\ log\\ }p\\right)$;   $A \\leftarrow$ advantages (optionally standardized)"},
+       {"lvl":3,"text":"$\\mathrm{pg}_i \\leftarrow \\mathrm{mean}\\ \\max\\left(-A\\rho,\\ -A\\cdot\\mathrm{clip}(\\rho,\\,1-\\mathrm{clip\\_ratio},\\,1+\\mathrm{clip\\_ratio})\\right)$"},
+       {"lvl":3,"text":"$\\mathrm{vloss}_i \\leftarrow \\frac{1}{2}\\,\\mathrm{mean}\\,(V - \\mathrm{returns})^2$;   $\\mathcal{H}_i \\leftarrow \\mathrm{mean}\\ \\mathrm{dist}.\\mathrm{entropy}()$"},
+       {"lvl":3,"text":"$L \\leftarrow L + c_i\\,\\mathrm{pg}_i + \\mathrm{vf\\_coef}\\cdot\\mathrm{vloss}_i - \\mathrm{ent\\_coef}\\cdot\\mathcal{H}_i$"},
+       {"lvl":3,"text":"if $\\mathrm{bc}$ set and this is the LAST (current-task) stream:  $L \\leftarrow L + \\mathrm{bc\\_coef}\\cdot\\mathrm{mean}\\ \\mathrm{KL}(\\pi_L \\Vert \\mathrm{dist})$"},
+       {"lvl":3,"text":"accumulate diagnostics (pg, vloss, entropy, approx-KL $=\\mathrm{mean}(\\rho-1-\\log\\rho)$, clip-frac)"},
+       {"lvl":2,"text":"end for","num":false},
+       {"lvl":2,"text":"$\\mathrm{opt}.$zero-grad;   $L.$backward"},
+       {"lvl":2,"text":"clip-grad-norm$(\\mathrm{policy}.\\mathrm{parameters}(),\\ \\mathrm{max\\_grad\\_norm})$   (single GLOBAL clip)"},
+       {"lvl":2,"text":"$\\mathrm{opt}.$step"},
+       {"lvl":1,"text":"end for","num":false},
+       {"lvl":1,"text":"if $\\mathrm{kl\\_stop}$ and $\\mathrm{target\\_kl}>0$ and epoch-mean approx-KL $> \\mathrm{target\\_kl}$: break"},
+       {"lvl":0,"text":"end for","num":false},
+       {"lvl":0,"text":"return averaged {pg-loss, value-loss, entropy, approx-KL, clip-frac}"}
+     ]},
+    {"kind":"heading","text":"What is updated, and when"},
+    {"kind":"prose","text":"The policy parameters move once per minibatch ($\\mathrm{ppo\\_epochs}\\times\\mathrm{num\\_minibatches}$ steps per update). Only params with requires-grad move (the whole net normally; only the heads under the head-only probe). The critic and entropy terms are IDENTICAL for every stream (coefficients $\\mathrm{vf\\_coef}$ and $\\mathrm{ent\\_coef}$); ONLY the actor term carries the per-stream continual weight $c_i$. The KL early-stop is used by the local phase ($\\mathrm{kl\\_stop}=$ true); the global consolidation phase passes $\\mathrm{kl\\_stop}=$ false so the retention update is never throttled."}
+  ]
+}
