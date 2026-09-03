@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1560 820" width="1560" height="820" role="img" aria-label="Atari continual learning comparison">
+<title>Atari 5-task continual RL: min-max consolidation vs CLEAR</title>
+<rect x="0" y="0" width="1560" height="820" fill="#FFFFFF"/>
+<text x="64.0" y="62.0" font-family="'Source Serif 4', 'Source Serif Pro', Georgia, serif" font-size="31" font-weight="600" fill="#212529" text-anchor="start" letter-spacing="0">CLEAR's retention, without CLEAR's replay buffer</text>
+<text x="64.0" y="92.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#6C757D" text-anchor="start" letter-spacing="0">5 Atari games in sequence  ·  normalized score, random = 0, threshold = 1  ·  2 seeds</text>
+<line x1="64" y1="116" x2="1496" y2="116" stroke="#DEE2E6" stroke-width="1"/>
+<text x="154.0" y="178.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#2563EB" text-anchor="start" letter-spacing="0">Min-max (ours)</text>
+<text x="520.0" y="178.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#D97706" text-anchor="start" letter-spacing="0">CLEAR (Rolnick '19)</text>
+<text x="140.0" y="246.5" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">after T1</text>
+<text x="140.0" y="306.5" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">after T2</text>
+<text x="140.0" y="366.5" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">after T3</text>
+<text x="140.0" y="426.5" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">after T4</text>
+<text x="140.0" y="486.5" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">after T5</text>
+<rect x="154.0" y="214.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.773"/>
+<rect x="155.0" y="215.0" width="54.0" height="54.0" rx="3.5" fill="none" stroke="#2563EB" stroke-width="2.2"/>
+<text x="182.0" y="246.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.85</text>
+<rect x="214.0" y="214.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="274.0" y="214.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="334.0" y="214.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="394.0" y="214.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="154.0" y="274.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.882"/>
+<text x="182.0" y="306.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.97</text>
+<rect x="214.0" y="274.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.627"/>
+<rect x="215.0" y="275.0" width="54.0" height="54.0" rx="3.5" fill="none" stroke="#2563EB" stroke-width="2.2"/>
+<text x="242.0" y="306.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.69</text>
+<rect x="274.0" y="274.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="334.0" y="274.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="394.0" y="274.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="154.0" y="334.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.864"/>
+<text x="182.0" y="366.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.95</text>
+<rect x="214.0" y="334.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.400"/>
+<text x="242.0" y="366.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.44</text>
+<rect x="274.0" y="334.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.536"/>
+<rect x="275.0" y="335.0" width="54.0" height="54.0" rx="3.5" fill="none" stroke="#2563EB" stroke-width="2.2"/>
+<text x="302.0" y="366.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#212529" text-anchor="middle" letter-spacing="0">0.59</text>
+<rect x="334.0" y="334.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="394.0" y="334.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="154.0" y="394.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.727"/>
+<text x="182.0" y="426.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.80</text>
+<rect x="214.0" y="394.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.327"/>
+<text x="242.0" y="426.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.36</text>
+<rect x="274.0" y="394.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.050"/>
+<text x="302.0" y="426.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">-0.02</text>
+<rect x="334.0" y="394.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.873"/>
+<rect x="335.0" y="395.0" width="54.0" height="54.0" rx="3.5" fill="none" stroke="#2563EB" stroke-width="2.2"/>
+<text x="362.0" y="426.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.96</text>
+<rect x="394.0" y="394.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="154.0" y="454.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.791"/>
+<text x="182.0" y="486.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.87</text>
+<rect x="214.0" y="454.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.345"/>
+<text x="242.0" y="486.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.38</text>
+<rect x="274.0" y="454.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.050"/>
+<text x="302.0" y="486.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.05</text>
+<rect x="334.0" y="454.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.200"/>
+<text x="362.0" y="486.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.22</text>
+<rect x="394.0" y="454.0" width="56.0" height="56.0" rx="4" fill="#2563EB" fill-opacity="0.645"/>
+<rect x="395.0" y="455.0" width="54.0" height="54.0" rx="3.5" fill="none" stroke="#2563EB" stroke-width="2.2"/>
+<text x="422.0" y="486.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.71</text>
+<rect x="520.0" y="214.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.918"/>
+<rect x="521.0" y="215.0" width="54.0" height="54.0" rx="3.5" fill="none" stroke="#D97706" stroke-width="2.2"/>
+<text x="548.0" y="246.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">1.01</text>
+<rect x="580.0" y="214.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="640.0" y="214.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="700.0" y="214.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="760.0" y="214.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="520.0" y="274.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.709"/>
+<text x="548.0" y="306.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.78</text>
+<rect x="580.0" y="274.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.873"/>
+<rect x="581.0" y="275.0" width="54.0" height="54.0" rx="3.5" fill="none" stroke="#D97706" stroke-width="2.2"/>
+<text x="608.0" y="306.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.96</text>
+<rect x="640.0" y="274.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="700.0" y="274.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="760.0" y="274.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="520.0" y="334.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.245"/>
+<text x="548.0" y="366.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.27</text>
+<rect x="580.0" y="334.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.509"/>
+<text x="608.0" y="366.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.56</text>
+<rect x="640.0" y="334.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.827"/>
+<rect x="641.0" y="335.0" width="54.0" height="54.0" rx="3.5" fill="none" stroke="#D97706" stroke-width="2.2"/>
+<text x="668.0" y="366.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.91</text>
+<rect x="700.0" y="334.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="760.0" y="334.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="520.0" y="394.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.182"/>
+<text x="548.0" y="426.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.20</text>
+<rect x="580.0" y="394.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.618"/>
+<text x="608.0" y="426.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.68</text>
+<rect x="640.0" y="394.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.809"/>
+<text x="668.0" y="426.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.89</text>
+<rect x="700.0" y="394.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="1.000"/>
+<rect x="701.0" y="395.0" width="54.0" height="54.0" rx="3.5" fill="none" stroke="#D97706" stroke-width="2.2"/>
+<text x="728.0" y="426.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">1.78</text>
+<rect x="760.0" y="394.0" width="56.0" height="56.0" rx="4" fill="#F1F3F5"/>
+<rect x="520.0" y="454.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.555"/>
+<text x="548.0" y="486.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.61</text>
+<rect x="580.0" y="454.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.391"/>
+<text x="608.0" y="486.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#212529" text-anchor="middle" letter-spacing="0">0.43</text>
+<rect x="640.0" y="454.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.800"/>
+<text x="668.0" y="486.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.88</text>
+<rect x="700.0" y="454.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.845"/>
+<text x="728.0" y="486.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="400" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.93</text>
+<rect x="760.0" y="454.0" width="56.0" height="56.0" rx="4" fill="#D97706" fill-opacity="0.736"/>
+<rect x="761.0" y="455.0" width="54.0" height="54.0" rx="3.5" fill="none" stroke="#D97706" stroke-width="2.2"/>
+<text x="788.0" y="486.5" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle" letter-spacing="0">0.81</text>
+<g transform="translate(182.0,532.0) rotate(-32)"><text x="0.0" y="0.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">Pong</text></g>
+<g transform="translate(242.0,532.0) rotate(-32)"><text x="0.0" y="0.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">Breakout</text></g>
+<g transform="translate(302.0,532.0) rotate(-32)"><text x="0.0" y="0.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">Boxing</text></g>
+<g transform="translate(362.0,532.0) rotate(-32)"><text x="0.0" y="0.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">Qbert</text></g>
+<g transform="translate(422.0,532.0) rotate(-32)"><text x="0.0" y="0.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">SpaceInvaders</text></g>
+<g transform="translate(548.0,532.0) rotate(-32)"><text x="0.0" y="0.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">Pong</text></g>
+<g transform="translate(608.0,532.0) rotate(-32)"><text x="0.0" y="0.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">Breakout</text></g>
+<g transform="translate(668.0,532.0) rotate(-32)"><text x="0.0" y="0.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">Boxing</text></g>
+<g transform="translate(728.0,532.0) rotate(-32)"><text x="0.0" y="0.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">Qbert</text></g>
+<g transform="translate(788.0,532.0) rotate(-32)"><text x="0.0" y="0.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">SpaceInvaders</text></g>
+<text x="154.0" y="600.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#ADB5BD" text-anchor="start" letter-spacing="0">Read down a column. Outlined cell = the moment that game was learned.</text>
+<text x="940.0" y="178.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#212529" text-anchor="start" letter-spacing="0">How far each game falls</text>
+<circle cx="1200" cy="173" r="5.5" fill="#FFFFFF" stroke="#6C757D" stroke-width="2"/>
+<text x="1212.0" y="178.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#6C757D" text-anchor="start" letter-spacing="0">at learning</text>
+<circle cx="1320" cy="173" r="6" fill="#6C757D"/>
+<text x="1332.0" y="178.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#6C757D" text-anchor="start" letter-spacing="0">after all 5</text>
+<line x1="990.0" y1="514.0" x2="1470.0" y2="514.0" stroke="#E9ECEF" stroke-width="1"/>
+<text x="980.0" y="518.0" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="12" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">0.0</text>
+<line x1="990.0" y1="435.1" x2="1470.0" y2="435.1" stroke="#E9ECEF" stroke-width="1"/>
+<text x="980.0" y="439.1" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="12" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">0.5</text>
+<line x1="990.0" y1="356.1" x2="1470.0" y2="356.1" stroke="#ADB5BD" stroke-width="1" stroke-dasharray="5 5"/>
+<text x="980.0" y="360.1" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="12" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">1.0</text>
+<line x1="990.0" y1="277.2" x2="1470.0" y2="277.2" stroke="#E9ECEF" stroke-width="1"/>
+<text x="980.0" y="281.2" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="12" font-weight="400" fill="#6C757D" text-anchor="end" letter-spacing="0">1.5</text>
+<text x="1470.0" y="348.1" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="500" fill="#6C757D" text-anchor="end" letter-spacing="0">threshold</text>
+<line x1="990.0" y1="214.0" x2="990.0" y2="514.0" stroke="#495057" stroke-width="1.2"/>
+<line x1="990.0" y1="514.0" x2="1470.0" y2="514.0" stroke="#495057" stroke-width="1.2"/>
+<text x="1038.0" y="536.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#212529" text-anchor="middle" letter-spacing="0">Pong</text>
+<line x1="1027.0" y1="379.8" x2="1027.0" y2="376.6" stroke="#2563EB" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"/>
+<circle cx="1027.0" cy="379.8" r="6" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.2"/>
+<circle cx="1027.0" cy="376.6" r="6.5" fill="#2563EB"/>
+<line x1="1049.0" y1="354.5" x2="1049.0" y2="417.7" stroke="#D97706" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"/>
+<circle cx="1049.0" cy="354.5" r="6" fill="#FFFFFF" stroke="#D97706" stroke-width="2.2"/>
+<circle cx="1049.0" cy="417.7" r="6.5" fill="#D97706"/>
+<text x="1134.0" y="536.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#212529" text-anchor="middle" letter-spacing="0">Breakout</text>
+<line x1="1123.0" y1="405.1" x2="1123.0" y2="454.0" stroke="#2563EB" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"/>
+<circle cx="1123.0" cy="405.1" r="6" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.2"/>
+<circle cx="1123.0" cy="454.0" r="6.5" fill="#2563EB"/>
+<line x1="1145.0" y1="362.4" x2="1145.0" y2="446.1" stroke="#D97706" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"/>
+<circle cx="1145.0" cy="362.4" r="6" fill="#FFFFFF" stroke="#D97706" stroke-width="2.2"/>
+<circle cx="1145.0" cy="446.1" r="6.5" fill="#D97706"/>
+<text x="1230.0" y="536.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#212529" text-anchor="middle" letter-spacing="0">Boxing</text>
+<line x1="1219.0" y1="420.8" x2="1219.0" y2="506.1" stroke="#2563EB" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"/>
+<circle cx="1219.0" cy="420.8" r="6" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.2"/>
+<circle cx="1219.0" cy="506.1" r="6.5" fill="#2563EB"/>
+<line x1="1241.0" y1="370.3" x2="1241.0" y2="375.1" stroke="#D97706" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"/>
+<circle cx="1241.0" cy="370.3" r="6" fill="#FFFFFF" stroke="#D97706" stroke-width="2.2"/>
+<circle cx="1241.0" cy="375.1" r="6.5" fill="#D97706"/>
+<text x="1326.0" y="536.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#212529" text-anchor="middle" letter-spacing="0">Qbert</text>
+<line x1="1315.0" y1="362.4" x2="1315.0" y2="479.3" stroke="#2563EB" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"/>
+<circle cx="1315.0" cy="362.4" r="6" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.2"/>
+<circle cx="1315.0" cy="479.3" r="6.5" fill="#2563EB"/>
+<line x1="1337.0" y1="232.9" x2="1337.0" y2="367.2" stroke="#D97706" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"/>
+<circle cx="1337.0" cy="232.9" r="6" fill="#FFFFFF" stroke="#D97706" stroke-width="2.2"/>
+<circle cx="1337.0" cy="367.2" r="6.5" fill="#D97706"/>
+<text x="1422.0" y="536.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#212529" text-anchor="middle" letter-spacing="0">SpaceInvaders</text>
+<line x1="1411.0" y1="401.9" x2="1411.0" y2="401.9" stroke="#2563EB" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"/>
+<circle cx="1411.0" cy="401.9" r="6" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.2"/>
+<circle cx="1411.0" cy="401.9" r="6.5" fill="#2563EB"/>
+<line x1="1433.0" y1="386.1" x2="1433.0" y2="386.1" stroke="#D97706" stroke-width="4" stroke-opacity="0.35" stroke-linecap="round"/>
+<circle cx="1433.0" cy="386.1" r="6" fill="#FFFFFF" stroke="#D97706" stroke-width="2.2"/>
+<circle cx="1433.0" cy="386.1" r="6.5" fill="#D97706"/>
+<text x="1422.0" y="552.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="400" fill="#ADB5BD" text-anchor="middle" letter-spacing="0">trained last</text>
+<line x1="64" y1="620.0" x2="1496" y2="620.0" stroke="#DEE2E6" stroke-width="1"/>
+<rect x="64.0" y="650.0" width="196.0" height="132.0" rx="10" fill="#F8F9FA" stroke="#DEE2E6" stroke-width="1"/>
+<text x="82.0" y="676.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#6C757D" text-anchor="start" letter-spacing="0.09em">FORGETTING  ↓</text>
+<text x="82.0" y="716.0" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="30" font-weight="400" fill="#2563EB" text-anchor="start" letter-spacing="0">0.44</text>
+<text x="82.0" y="742.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#D97706" text-anchor="start" letter-spacing="0">vs 0.45 CLEAR</text>
+<text x="82.0" y="762.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#ADB5BD" text-anchor="start" letter-spacing="0">same within noise, n = 2</text>
+<rect x="276.0" y="650.0" width="196.0" height="132.0" rx="10" fill="#F8F9FA" stroke="#DEE2E6" stroke-width="1"/>
+<text x="294.0" y="676.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#6C757D" text-anchor="start" letter-spacing="0.09em">STORED FRAMES</text>
+<text x="294.0" y="716.0" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="30" font-weight="400" fill="#2563EB" text-anchor="start" letter-spacing="0">0</text>
+<text x="294.0" y="742.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#D97706" text-anchor="start" letter-spacing="0">vs 8,192 CLEAR</text>
+<text x="294.0" y="762.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#ADB5BD" text-anchor="start" letter-spacing="0">replay-free</text>
+<rect x="488.0" y="650.0" width="196.0" height="132.0" rx="10" fill="#F8F9FA" stroke="#DEE2E6" stroke-width="1"/>
+<text x="506.0" y="676.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600" fill="#6C757D" text-anchor="start" letter-spacing="0.09em">AVG PERFORMANCE  ↑</text>
+<text x="506.0" y="716.0" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="30" font-weight="400" fill="#2563EB" text-anchor="start" letter-spacing="0">0.45</text>
+<text x="506.0" y="742.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#D97706" text-anchor="start" letter-spacing="0">vs 0.73 CLEAR</text>
+<text x="506.0" y="762.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#ADB5BD" text-anchor="start" letter-spacing="0">CLEAR still ahead</text>
+<rect x="700.0" y="650.0" width="796.0" height="132.0" rx="10" fill="#EFF6FF"/>
+<rect x="700.0" y="650.0" width="4" height="132.0" rx="2" fill="#2563EB"/>
+<text x="724.0" y="696.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#212529" text-anchor="start" letter-spacing="0">A constraint retains as well as a replay buffer.</text>
+<text x="724.0" y="728.0" font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#6C757D" text-anchor="start" letter-spacing="0">What is left to close is raw score, not memory.</text>
+</svg>

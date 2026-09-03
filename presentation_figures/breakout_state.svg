@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 210" width="1280" height="1680" shape-rendering="crispEdges" role="img" aria-label="Atari 2600 Breakout - mid-game state">
+<title>Atari 2600 Breakout - mid-game state</title>
+<rect x="0" y="0" width="160" height="210" fill="#000000"/>
+<g fill="#8E8E8E"><rect x="36" y="5" width="12" height="2"/><rect x="52" y="5" width="12" height="2"/><rect x="68" y="5" width="12" height="2"/><rect x="68" y="7" width="4" height="2"/><rect x="76" y="7" width="4" height="2"/><rect x="68" y="9" width="12" height="2"/><rect x="36" y="7" width="4" height="6"/><rect x="44" y="7" width="4" height="6"/><rect x="52" y="7" width="4" height="6"/><rect x="60" y="7" width="4" height="6"/><rect x="36" y="13" width="12" height="2"/><rect x="52" y="13" width="12" height="2"/><rect x="76" y="11" width="4" height="4"/><rect x="104" y="5" width="4" height="10"/><rect x="136" y="5" width="4" height="10"/><rect x="0" y="17" width="160" height="15"/><rect x="0" y="32" width="8" height="157"/><rect x="152" y="32" width="8" height="157"/></g>
+<g fill="#C84848"><rect x="8" y="57" width="144" height="6"/><rect x="71" y="94" width="2" height="4"/><rect x="49" y="189" width="16" height="4"/><rect x="152" y="189" width="8" height="6"/></g>
+<g fill="#4248C8"><rect x="16" y="87" width="16" height="6"/><rect x="40" y="87" width="8" height="6"/><rect x="72" y="87" width="40" height="6"/><rect x="128" y="87" width="24" height="6"/></g>
+<g fill="#48A048"><rect x="16" y="81" width="48" height="6"/><rect x="72" y="81" width="80" height="6"/></g>
+<g fill="#C66C3A"><rect x="8" y="63" width="144" height="6"/></g>
+<g fill="#B47A30"><rect x="8" y="69" width="144" height="6"/></g>
+<g fill="#A2A22A"><rect x="8" y="75" width="144" height="6"/></g>
+<g fill="#429E82"><rect x="0" y="189" width="8" height="7"/></g>
+</svg>
