@@ -1,15 +1,14 @@
-# Part A -- MIN-MAX (experts NOT stored), VERSION 3 (from scratch, seed 0).
+# ===== CANONICAL 5-game Atari setup (the min-max consolidation method) =====
+# min-max consolidation: mu-cap (duals.max_value) + a RETENTION-GATED global
+# early-stop. The global consolidation stops ONLY when EVERY seen task (past +
+# current) is >= global_retention_frac of its LOCAL model reference, else it runs
+# to the global_iters cap (checked every stop_eval_every iters). Reported eval is
+# greedy-100; Atari envs are uncapped (max_steps: 0).
 #   Sequence: Qbert -> Pong -> Breakout -> Boxing -> SpaceInvaders.
-#   Fixes from the v2 diagnosis (Boxing PPO DIVERGED to a uniform/NaN policy at
-#   ~it 4000: clipfrac ~0.5, approx_kl ~0.04-0.06 rising, then ent->ln(18), kl->0):
-#     * target_kl = 0.03  -> KL early-stop prevents the runaway actor blow-up.
-#     * ppo_epochs 4->3, lr 0.00025->0.0002 -> gentler per-batch updates.
-#     * Boxing threshold 90->55 (its expert is only 65.7, so 90 was UNREACHABLE ->
-#       it could never early-stop and always burned the full cap).
-#   Per-task local budgets (sized from v1/v2 resource_usage.json). Local models
-#   saved (local_after_task{k}.pt) -> local is the Part-A reference. Resume-capable.
+#   Run:    python -m experiments.run --config configs/atari5.yaml --seed 0
+#   Resume: --resume-from results/atari5_seed0/global_after_task{k}.pt --resume-after {k}
 experiment:
-  name: atari5_v3_full
+  name: atari5
   seed: 0
   results_dir: results
   device: auto
@@ -33,7 +32,7 @@ env:
   - game: Breakout
     threshold: 80
   - game: Boxing
-    threshold: 55          # expert is 65.7; 90 was unreachable
+    threshold: 55
   - game: SpaceInvaders
     threshold: 800
 policy:
@@ -45,7 +44,7 @@ duals:
   kind: projected_ascent
   lr: 0.3
   init: 0.0
-  max_value: 1000.0
+  max_value: 5.0          # mu cap (from v4)
   warm_start: false
 trainer:
   kind: ppo
@@ -57,20 +56,20 @@ ppo:
   async_envs: true
   n_envs: 16
   n_steps: 128
-  ppo_epochs: 3            # was 4 (gentler updates)
+  ppo_epochs: 3
   num_minibatches: 4
   clip_ratio: 0.1
   gae_lambda: 0.95
   vf_coef: 0.5
   ent_coef: 0.01
   max_grad_norm: 0.5
-  lr: 0.0002              # was 0.00025
-  target_kl: 0.03         # KL early-stop -> prevents the Boxing blow-up
-  select_best_local: true # keep the best-greedy local model, not a collapsed final
+  lr: 0.0002
+  target_kl: 0.03
+  select_best_local: true
   normalize_advantage: true
-  task1_iters: 1500       # Qbert (early-stops ~950)
-  local_iters: 3000       # default cap
-  local_iters_per_task:   # per-game caps (from resource_usage.json)
+  task1_iters: 1500
+  local_iters: 3000
+  local_iters_per_task:
     Pong: 1500
     Breakout: 3000
     Boxing: 4000
@@ -78,8 +77,11 @@ ppo:
   global_iters: 2000
   min_iters: 500
   patience: 3
-  stop_eval_every: 50
-  stop_eval_episodes: 15
+  # V5 retention-gated global early-stop
+  global_stop_all_tasks: true
+  global_retention_frac: 0.7
+  stop_eval_every: 200        # check all seen tasks every 200 global iters
+  stop_eval_episodes: 3       # 3 greedy episodes/task per check
   past_task_sampling: all
   constraint_episodes: 16
   constraint_every: 20

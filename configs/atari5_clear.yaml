@@ -1,18 +1,15 @@
-# CLEAR baseline, apples-to-apples with atari5_v5.yaml (ours, min-max).
-# IDENTICAL to atari5_v5 in task order, thresholds, architecture, env params, and
-# all PPO hyperparameters. The ONLY deltas vs v5:
+# CLEAR baseline, apples-to-apples with atari5.yaml (ours, min-max).
+# IDENTICAL to atari5.yaml in task order, thresholds, architecture, env params, and
+# all PPO hyperparameters. The ONLY deltas vs ours:
 #   * ppo.method: clear  (replay + policy/value cloning instead of the dual constraint)
-#   * frame-matched iter budget: ours' global phase re-simulates every past env each
-#     iter (k rollouts/iter), so V5 spends ~30k env-rollout-equivalents. CLEAR does
+#   * frame-matched iter budget: our global phase re-simulates every past env each
+#     iter (k rollouts/iter), so ours spends ~30k env-rollout-equivalents. CLEAR does
 #     1 rollout/iter, so to EQUALIZE TOTAL ENVIRONMENT FRAMES it gets ~30k train iters
 #     (task1 1500 + 4 tasks x 7500). CLEAR early-stops at each threshold, so it may use
 #     fewer; the cap guarantees it never exceeds our frame budget.
-#   * clear_* buffer knobs. This is sweep point A = "equal / standard buffer" (the
-#     matched-resource headline point). B (generous) and C (very generous) only raise
-#     clear_snapshot_batches. clear_replay_task_per_step is held high in ALL points so
-#     every past task is rehearsed each update -> buffer SIZE is the only swept axis.
+#   * clear_* buffer knobs (standard / equal buffer).
 experiment:
-  name: atari5_v5_clearA_equal
+  name: atari5_clear
   seed: 0
   results_dir: results
   device: auto

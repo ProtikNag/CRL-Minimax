@@ -13,15 +13,13 @@ See `docs/REINFORCE_to_PPO.md` for the equation-by-equation mapping.
 
 > **Note for Claude Code / new sessions.** Read this file and `HANDOFF.md`
 > before touching code (`HANDOFF.md` has the current status, findings, and next
-> steps). The math is fixed in `docs/Updated_Objective_for_CRL.pdf`. On the
-> **`feature/updated-objective`** branch this repo implements **Part A only**
-> (pp. 1–8, eqs 1–48): the **min-max** consolidation, `ppo.method: constrained`,
-> **experts NOT stored**. Part A's derivation is verified SOUND (`math-verifier`)
-> and the implementation PASSES `code-verifier`; pseudocode is in `pseudocode/`.
-> Part B ("When we have the expert models stored", pp. 9–15) is **deferred and
-> stripped** from this branch. Code comments cite the doc's equation numbers.
-> **Two binding rules:** reported evaluation is always **greedy, 100 rollouts**
-> (never stochastic); Atari envs use **`max_steps: 0`** (no episode cap).
+> steps). The canonical branch is **`feature/updated-objective`**: the **min-max**
+> consolidation (`ppo.method: constrained`), verified SOUND (`math-verifier`) and
+> PASS (`code-verifier`); pseudocode is in `pseudocode/`. **Two binding rules:**
+> reported evaluation is always **greedy, 100 rollouts** (never stochastic); Atari
+> envs use **`max_steps: 0`** (no episode cap). An abandoned "critic-based
+> retention" variant is preserved on branch `feature/updated-objective-v2` (see
+> HANDOFF for why it was dropped) — do not resume it without a decision.
 
 ---
 
@@ -234,26 +232,24 @@ advantages.
   `crl/policies/impala.py` (Impala-CNN, current), `crl/ppo/` (reusable
   `PPOTrainer` → `LocalTrainer` = standard PPO, `GlobalTrainer` = PPO + actor
   constraint), `crl/ppo_continual.py` (orchestrator).
-- **Methods** (`ppo.method`) on this branch: `constrained` (**min-max**, dual `μ`,
-  no experts — the Part-A method), `finetune`, `clear` (replay+cloning baseline),
-  `joint` (feasibility upper bound). The Part-B `stored_expert` / deprecated
-  `consolidate` methods have been **stripped from `feature/updated-objective`**
-  (deferred; see `HANDOFF.md`). Diagnostic knobs: `diagnostics`,
+- **Methods** (`ppo.method`): `constrained` (**min-max**, dual `μ` — ours),
+  `finetune` (catastrophic-forgetting baseline), `clear` (replay+cloning baseline),
+  `joint` (budget-matched multi-task ceiling). Diagnostic knobs: `diagnostics`,
   `global_probe_head_only` (freeze-trunk probe), `global_bc_coef` (behavioral
   cloning — the "ours + BC" retention variant).
 - **Reference is the LOCAL model** (per-task specialist `local_after_task{k}.pt`), not
   stored experts; retention/normalization use the greedy-100 `local_greedy` score.
-- **5-game min-max result (current, seed 0):** sequence
-  Qbert→Pong→Breakout→Boxing→SpaceInvaders, best run `configs/atari5_v5.yaml`
-  (μ-cap + retention-gated global early-stop). Forgetting-matrix / retention figures
-  in `reports/atari5_v5/`, `reports/atari5_v4_mucap/`, `reports/v4_v5_compare/`
-  (all `visualization-expert`-verified). Headline: retention gate rescues the oldest
-  task (Qbert 15%→91%) but Boxing is still wiped by the following SpaceInvaders
-  consolidation. **Current status, open decisions, and roadmap: `HANDOFF.md`.**
-- **Next up (roadmap, `HANDOFF.md`):** apples-to-apples **CLEAR** comparison (fairness
-  settings TBD by user), 1–2 recent baselines on separate GPUs, longer task sequence,
-  and multi-seed. Paper/rebuttal clarifications are logged in
-  `docs/clarifications_qa.md`.
+- **5-game min-max result (seed 0):** sequence
+  Qbert→Pong→Breakout→Boxing→SpaceInvaders, `configs/atari5.yaml`
+  (μ-cap + retention-gated global early-stop). Headline: the retention gate rescues the
+  oldest task (Qbert 15%→91%) but Boxing is still wiped by the following SpaceInvaders
+  consolidation (an SI⟂Boxing interference). **Current status, results, and roadmap:
+  `HANDOFF.md`.**
+- **CLEAR baseline:** `configs/atari5_clear.yaml` (apples-to-apples: same net / games /
+  env, frame-matched). **Joint ceiling:** a budget-matched jointly-trained model (all 5
+  games at once) is the fair upper bound (a single net *can* clear all 5 thresholds);
+  see `HANDOFF.md`. **Roadmap:** order-sensitivity (in progress), joint-vs-consolidated
+  comparison, multi-seed.
 - **Evaluation rule (binding): greedy (argmax) actions, 100 rollouts, never
   stochastic** (`eval_episodes: 100`, `eval_greedy: true`). The constraint value
   `V_G/V_L` stays on-policy stochastic (it's the constrained quantity, not
@@ -270,7 +266,7 @@ advantages.
   feasibility (joint), and value-constraint sufficiency (KL gap + BC). Headline:
   the scalar value constraint is too weak (behavior-matching fixes it) and the
   shared trunk interferes.
-- Configs: `configs/atari5_ppo_v5*.yaml` (headline). Launch:
+- Configs: `configs/atari5.yaml` (ours) + `configs/atari5_clear.yaml` (CLEAR). Launch:
   `scripts/hpc_atari_worker.sbatch` (continual) / `scripts/hpc_expert.sbatch`
   (experts). **Current status + next steps: `HANDOFF.md`.**
 
