@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Continual Reinforcement Learning with Minimax Algorithm · Results</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink: '#0B0F14', surface: '#111827',
+          hair: '#1F2937', body: '#E5E7EB',
+          muted: '#9CA3AF', accent: '#2563EB'
+        },
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'Helvetica', 'Arial', 'sans-serif'],
+          mono: ['JetBrains Mono', 'Menlo', 'Consolas', 'monospace']
+        },
+        maxWidth: { shell: '1280px' }
+      }
+    }
+  };
+</script>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --dash-bg: #0B0F14;
+    --dash-surface: #111827;
+    --dash-border: #1F2937;
+    --dash-text: #E5E7EB;
+    --dash-muted: #9CA3AF;
+    --dash-accent: #2563EB;
+    --dash-inset: #FFFFFF;
+    --sp: 8px;
+  }
+  [data-theme="dark"] {
+      --b1: 16.65% 0.012 254.17;
+      --b2: 21.01% 0.032 264.66;
+      --b3: 27.81% 0.030 256.85;
+      --bc: 92.76% 0.006 264.53;
+      --p: 54.61% 0.215 262.88;
+      --pc: 100% 0 0;
+      --n: 21.01% 0.032 264.66;
+      --nc: 92.76% 0.006 264.53;
+      --a: 54.61% 0.215 262.88;
+      --ac: 100% 0 0;
+      --rounded-box: 0.75rem;
+      --rounded-btn: 0.5rem;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--dash-bg);
+    color: var(--dash-text);
+    font-family: 'Inter', system-ui, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  img, svg, iframe { max-width: 100%; }
+  a { color: inherit; text-decoration: none; }
+  /* Lucide replaces each <i data-lucide> with <svg class="lucide lucide-NAME">,
+     dropping the placeholder's own attributes. Every icon rule below therefore
+     targets both the placeholder and the .lucide element that replaces it. */
+  .lucide { flex: 0 0 auto; width: 16px; height: 16px; }
+  :focus-visible { outline: 2px solid var(--dash-accent); outline-offset: 2px; border-radius: 6px; }
+
+  /* ── Shell ─────────────────────────────────────────────────────────── */
+  .shell { max-width: 1280px; margin: 0 auto; display: flex; align-items: flex-start; }
+  .sidebar {
+    position: sticky; top: 0; height: 100vh; width: 264px; flex: 0 0 264px;
+    border-right: 1px solid var(--dash-border);
+    padding: 24px 16px; overflow-y: auto; overflow-x: hidden;
+  }
+  .content { flex: 1 1 auto; min-width: 0; padding: 32px 24px 64px; }
+  @media (max-width: 1023px) {
+    .sidebar { display: none; }
+    .content { padding: 24px 16px 48px; }
+  }
+
+  .brand { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand small { display: block; font-weight: 400; font-size: 12px; color: var(--dash-muted); margin-top: 2px; }
+
+  .search-wrap { position: relative; margin: 24px 0 16px; }
+  .search-wrap i, .search-wrap .lucide {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 15px; color: var(--dash-muted); pointer-events: none;
+  }
+  .search-input {
+    width: 100%; padding: 8px 10px 8px 32px; font-size: 13px;
+    color: var(--dash-text); background: var(--dash-surface);
+    border: 1px solid var(--dash-border); border-radius: 8px; outline: none;
+  }
+  .search-input::placeholder { color: var(--dash-muted); }
+  .search-input:focus { border-color: var(--dash-accent); }
+
+  .nav-label {
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--dash-muted); margin: 8px 0 8px 2px;
+  }
+  .nav-link {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; margin-bottom: 2px; border-radius: 8px;
+    font-size: 13px; color: var(--dash-muted);
+    border-left: 2px solid transparent;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .nav-link i, .nav-link .lucide { width: 15px; height: 15px; flex: 0 0 15px; }
+  .nav-link em { margin-left: auto; font-style: normal; font-family: 'JetBrains Mono', monospace; font-size: 11px; opacity: .6; }
+  .nav-link:hover { background: var(--dash-surface); color: var(--dash-text); }
+  .nav-link.active { background: var(--dash-surface); color: var(--dash-text); border-left-color: var(--dash-accent); }
+
+  /* ── Mobile top bar ────────────────────────────────────────────────── */
+  .topbar {
+    display: none; position: sticky; top: 0; z-index: 40;
+    background: rgba(11,15,20,.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--dash-border); padding: 12px 16px;
+  }
+  @media (max-width: 1023px) { .topbar { display: block; } }
+  .chiprow { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .chiprow::-webkit-scrollbar { display: none; }
+  .chip-nav {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; font-size: 12px; white-space: nowrap;
+    color: var(--dash-muted); background: var(--dash-surface);
+    border: 1px solid var(--dash-border); border-radius: 999px;
+  }
+  .chip-nav i, .chip-nav .lucide { width: 13px; height: 13px; }
+  .chip-nav.active { color: var(--dash-text); border-color: var(--dash-accent); }
+
+  /* ── Header ────────────────────────────────────────────────────────── */
+  .page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+  .page-sub { color: var(--dash-muted); font-size: 13px; margin-top: 6px; }
+  .statbar {
+    margin-top: 24px; background: var(--dash-surface);
+    border: 1px solid var(--dash-border); border-radius: 12px; width: 100%;
+  }
+  .statbar .stat { border-color: var(--dash-border) !important; padding: 16px 20px; }
+  .statbar .stat-title { color: var(--dash-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  .statbar .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 500; color: var(--dash-text); }
+
+  /* ── Sections and cards ────────────────────────────────────────────── */
+  .group-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 9px;
+    background: var(--dash-surface); border: 1px solid var(--dash-border);
+    color: var(--dash-accent);
+  }
+  .group-icon i, .group-icon .lucide { width: 16px; height: 16px; }
+  .group-title { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  .group-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dash-muted); }
+
+  /* Bento grid: fills the row whatever the card count, never narrower than the
+     viewport allows, so the paper figure inside stays legible. */
+  .bento {
+    display: grid;
+    gap: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+    align-items: stretch;
+  }
+  .fig-card {
+    background: var(--dash-surface);
+    border: 1px solid var(--dash-border);
+    border-radius: 12px;
+    overflow: visible;
+    transition: border-color 160ms ease, transform 160ms ease;
+  }
+  .fig-card:hover { border-color: #2b3648; }
+  .fig-card .card-body { padding: 16px; display: flex; flex-direction: column; height: 100%; }
+  .fig-card .card-actions { margin-top: auto; padding-top: 16px; }
+  .fig-card.span-2 { grid-column: span 2 / span 2; }
+  @media (max-width: 899px) { .fig-card.span-2 { grid-column: span 1 / span 1; } }
+
+  .fig-title { font-size: 14px; font-weight: 600; margin: 0; line-height: 1.35; }
+  .fig-caption { margin: 12px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--dash-muted); }
+
+  /* The paper figure keeps its white ground: never inverted, tinted, filtered. */
+  .fig-inset {
+    margin-top: 4px; padding: 10px; border-radius: 9px; width: 100%;
+    background: var(--dash-inset); border: 1px solid var(--dash-border);
+    display: flex; align-items: center; justify-content: center; min-height: 120px;
+    cursor: zoom-in; appearance: none; font: inherit; text-align: inherit;
+  }
+  .fig-inset:hover { border-color: var(--dash-accent); }
+  .fig-img { display: block; width: 100%; height: auto; opacity: 1; transition: opacity 200ms ease-out; }
+
+  .chip {
+    display: inline-flex; align-items: baseline; gap: 5px;
+    padding: 3px 8px; border-radius: 6px; font-size: 11px;
+    background: rgba(37,99,235,.10); border: 1px solid rgba(37,99,235,.25);
+    color: var(--dash-muted); font-family: 'JetBrains Mono', monospace;
+  }
+  .chip b { color: var(--dash-text); font-weight: 500; }
+  .chip i { font-style: normal; opacity: .7; }
+
+  .join .vbtn {
+    font-size: 11.5px; padding: 5px 11px; color: var(--dash-muted);
+    background: var(--dash-bg); border: 1px solid var(--dash-border);
+    cursor: pointer; transition: color 120ms ease, background 120ms ease;
+  }
+  .join .vbtn:hover { color: var(--dash-text); }
+  .join .vbtn-active { color: #fff; background: var(--dash-accent); border-color: var(--dash-accent); }
+
+  .mini-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; font-size: 11.5px; border-radius: 7px;
+    color: var(--dash-muted); background: var(--dash-bg);
+    border: 1px solid var(--dash-border); cursor: pointer;
+    transition: color 120ms ease, border-color 120ms ease;
+  }
+  .mini-btn:hover { color: var(--dash-text); border-color: var(--dash-accent); }
+  .mini-btn i, .mini-btn .lucide { width: 13px; height: 13px; }
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 7px; flex: 0 0 26px;
+    color: var(--dash-muted); background: transparent;
+    border: 1px solid var(--dash-border); cursor: pointer;
+  }
+  .icon-btn:hover, .icon-btn[aria-expanded="true"] { color: var(--dash-text); border-color: var(--dash-accent); }
+  .icon-btn i, .icon-btn .lucide { width: 14px; height: 14px; }
+
+  /* ── Info popover ──────────────────────────────────────────────────── */
+  .pop-wrap { position: relative; }
+  .popover {
+    position: absolute; right: 0; top: 32px; z-index: 30;
+    width: min(340px, calc(100vw - 48px));
+    max-height: 420px; overflow-y: auto;
+    padding: 14px; border-radius: 10px;
+    background: #0F1724; border: 1px solid var(--dash-border);
+    box-shadow: 0 16px 40px rgba(0,0,0,.55);
+    font-size: 12.5px; line-height: 1.6; color: var(--dash-muted);
+  }
+  .popover[hidden] { display: none; }
+  .pop-head { font-size: 12px; font-weight: 600; color: var(--dash-text); margin-bottom: 8px; }
+  .pop-md p { margin: 0 0 8px; }
+  .pop-md code { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dash-text); }
+  .pop-md ul, .pop-md ol { margin: 0 0 8px 16px; padding: 0; }
+  .pop-meta { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--dash-border); }
+  .pop-row { display: flex; justify-content: space-between; gap: 12px; font-size: 11.5px; padding: 2px 0; }
+  .pop-row b { font-family: 'JetBrains Mono', monospace; font-weight: 400; color: var(--dash-text); }
+  .pop-files { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--dash-border); display: flex; flex-wrap: wrap; gap: 6px; }
+  .pop-files a {
+    font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
+    padding: 2px 7px; border-radius: 5px; color: var(--dash-muted);
+    border: 1px solid var(--dash-border);
+  }
+  .pop-files a:hover { color: var(--dash-text); border-color: var(--dash-accent); }
+
+  /* ── Modal ─────────────────────────────────────────────────────────── */
+  #embed-modal .modal-box {
+    max-width: 1100px; width: calc(100vw - 32px); background: var(--dash-surface);
+    border: 1px solid var(--dash-border); padding: 0; border-radius: 12px;
+  }
+  #embed-modal header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--dash-border); font-size: 13px;
+  }
+  #embed-frame { width: 100%; height: min(70vh, 640px); border: 0; background: #fff; display: block; }
+
+  /* ── Entrance animation ────────────────────────────────────────────── */
+  .reveal { opacity: 0; transform: translateY(12px); }
+  .reveal.in {
+    opacity: 1; transform: none;
+    transition: opacity 300ms ease-out, transform 300ms ease-out;
+    transition-delay: calc(var(--stagger, 0) * 60ms);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal, .reveal.in { opacity: 1; transform: none; transition: none; }
+    .fig-img { transition: none; }
+  }
+
+  .empty-state { display: none; padding: 48px 0; text-align: center; color: var(--dash-muted); font-size: 13px; }
+  .footer {
+    margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--dash-border);
+    font-size: 11.5px; color: var(--dash-muted);
+    display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between;
+  }
+  .footer code { font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="flex items-center justify-between gap-3 mb-3">
+    <div class="brand">Continual Reinforcement Learning with Minimax Algorithm<small>Results dashboard</small></div>
+  </div>
+  <div class="search-wrap" style="margin:0 0 12px;">
+    <i data-lucide="search"></i>
+    <input class="search-input js-search" type="search" placeholder="Filter figures…"
+           aria-label="Filter figures">
+  </div>
+  <nav class="chiprow" aria-label="Sections (compact)">
+    <a class="chip-nav" href="#group-training_dynamics" data-group="training_dynamics"><i data-lucide="activity"></i>Training dynamics</a><a class="chip-nav" href="#group-retention" data-group="retention"><i data-lucide="layers"></i>Retention and forgetting</a>
+  </nav>
+</div>
+
+<div class="shell">
+  <aside class="sidebar" aria-label="Sections">
+    <div class="brand">Continual Reinforcement Learning with Minimax Algorithm<small>Results dashboard</small></div>
+    <div class="search-wrap">
+      <i data-lucide="search"></i>
+      <input class="search-input js-search" type="search" placeholder="Filter figures…"
+             aria-label="Filter figures">
+    </div>
+    <div class="nav-label">Groups</div>
+    <nav><a class="nav-link" href="#group-training_dynamics" data-group="training_dynamics"><i data-lucide="activity"></i><span class="truncate">Training dynamics</span><em>2</em></a><a class="nav-link" href="#group-retention" data-group="retention"><i data-lucide="layers"></i><span class="truncate">Retention and forgetting</span><em>2</em></a></nav>
+  </aside>
+
+  <main class="content">
+    <header>
+      <h1 class="page-title">Continual Reinforcement Learning with Minimax Algorithm</h1>
+      <p class="page-sub">Run 2026-09-09 · generated from
+        <code class="font-mono">report/manifest.json</code></p>
+      <div class="statbar stats stats-vertical sm:stats-horizontal">
+        <div class="stat">
+          <div class="stat-title">Figures</div>
+          <div class="stat-value">4</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">Groups</div>
+          <div class="stat-value">2</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">Seeds</div>
+          <div class="stat-value">1</div>
+        </div>
+      </div>
+    </header>
+
+    <div style="height:40px"></div>
+    
+    <section id="group-training_dynamics" class="group-section scroll-mt-24 mb-16">
+      <header class="mb-6 flex items-center gap-3">
+        <span class="group-icon"><i data-lucide="activity"></i></span>
+        <h2 class="group-title">Training dynamics</h2>
+        <span class="group-count">2 figures</span>
+      </header>
+      <div class="bento">
+        
+      <article class="fig-card card" data-figure-id="return_curves_seed_sweep"
+               data-search="normalized return across seeds mean return with ±1 std across 5 seeds; the min-max objective overtakes clear at 0.92m environment steps. training dynamics training_dynamics"
+               data-variants="[{&quot;label&quot;: &quot;Overlay&quot;, &quot;png&quot;: &quot;figures/return_curves_seed_sweep_line.png&quot;, &quot;svg&quot;: &quot;figures/return_curves_seed_sweep_line.svg&quot;, &quot;html&quot;: null}, {&quot;label&quot;: &quot;Small multiples&quot;, &quot;png&quot;: &quot;figures/return_curves_seed_sweep_grid.png&quot;, &quot;svg&quot;: &quot;figures/return_curves_seed_sweep_grid.svg&quot;, &quot;html&quot;: null}]"
+               style="--stagger:0">
+        <div class="card-body">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="fig-title">Normalized return across seeds</h3>
+            <div class="pop-wrap">
+              <button type="button" class="icon-btn js-info" aria-expanded="false"
+                      aria-label="Details for Normalized return across seeds">
+                <i data-lucide="info"></i>
+              </button>
+              <div class="popover" role="dialog"
+                   aria-label="Details for Normalized return across seeds" hidden>
+                <div class="pop-head">Normalized return across seeds</div>
+                <div class="pop-md"><p><strong>Synthetic pipeline check.</strong> Learning curves for three continual-RL objectives on a stand-in MinAtar task suite.</p>
+<ul>
+<li><strong>Method.</strong> Alternating local/global primal-dual policy gradient (min-max), compared against CLEAR replay and naive fine-tuning.</li>
+<li><strong>Seeds.</strong> 5 per method, shown as mean ± 1 std. Faint per-seed traces appear in the small-multiples variant.</li>
+<li><strong>What to look for.</strong> The crossover point, and whether the min-max band separates from the CLEAR band rather than merely shifting.</li>
+</ul>
+<p>Data is generated by <code>report/make_sample_figures.py</code> and carries no experimental meaning.</p></div>
+                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>MinAtar (synthetic)</b></div><div class="pop-row"><span>Model</span><b>DQN</b></div><div class="pop-row"><span>Created</span><b>2026-09-09T16:49:35</b></div></div>
+                <div class="pop-files"><a href="figures/return_curves_seed_sweep_line.png" target="_blank" rel="noopener">return_curves_seed_sweep_line.png</a><a href="figures/return_curves_seed_sweep_line.svg" target="_blank" rel="noopener">return_curves_seed_sweep_line.svg</a><a href="figures/return_curves_seed_sweep_grid.png" target="_blank" rel="noopener">return_curves_seed_sweep_grid.png</a><a href="figures/return_curves_seed_sweep_grid.svg" target="_blank" rel="noopener">return_curves_seed_sweep_grid.svg</a></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="join mb-3" role="tablist" aria-label="Chart variants for Normalized return across seeds"><button type="button" class="join-item vbtn vbtn-active" role="tab" aria-selected="true" tabindex="0" data-variant-index="0">Overlay</button><button type="button" class="join-item vbtn" role="tab" aria-selected="false" tabindex="-1" data-variant-index="1">Small multiples</button></div>
+
+          <button type="button" class="fig-inset js-zoom"
+                  aria-label="Open Normalized return across seeds full size">
+            <img class="fig-img" src="figures/return_curves_seed_sweep_line.svg"
+                 alt="Normalized return across seeds" loading="lazy" decoding="async">
+          </button>
+
+          <p class="fig-caption">Mean return with ±1 std across 5 seeds; the min-max objective overtakes CLEAR at 0.92M environment steps.</p>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">final return (ours)<b>0.8438</b></span><span class="chip">final return (CLEAR)<b>0.7153</b></span><span class="chip">seeds<b>5</b></span></div>
+
+          <div class="card-actions flex flex-wrap items-center gap-2">
+            
+            <div class="ml-auto flex gap-2">
+              <a class="mini-btn js-dl-png" href="figures/return_curves_seed_sweep_line.png" download>
+                <i data-lucide="download"></i><span>PNG</span></a>
+              <a class="mini-btn js-dl-svg" href="figures/return_curves_seed_sweep_line.svg" download>
+                <i data-lucide="download"></i><span>SVG</span></a>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="fig-card card" data-figure-id="consolidation_trajectory"
+               data-search="parameter trajectory under consolidation iterates drift out of the shallow local basin into the global one over 24 consolidation steps. training dynamics training_dynamics"
+               data-variants="[{&quot;label&quot;: &quot;Selected frames&quot;, &quot;png&quot;: &quot;figures/consolidation_trajectory.png&quot;, &quot;svg&quot;: &quot;figures/consolidation_trajectory.svg&quot;, &quot;html&quot;: &quot;figures/consolidation_trajectory.html&quot;}]"
+               style="--stagger:1">
+        <div class="card-body">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="fig-title">Parameter trajectory under consolidation</h3>
+            <div class="pop-wrap">
+              <button type="button" class="icon-btn js-info" aria-expanded="false"
+                      aria-label="Details for Parameter trajectory under consolidation">
+                <i data-lucide="info"></i>
+              </button>
+              <div class="popover" role="dialog"
+                   aria-label="Details for Parameter trajectory under consolidation" hidden>
+                <div class="pop-head">Parameter trajectory under consolidation</div>
+                <div class="pop-md"><p><strong>Synthetic pipeline check.</strong> A mixture-of-Gaussians loss surface with the parameter iterate drawn over it.</p>
+<ul>
+<li><strong>Why animate.</strong> The <em>order</em> in which the iterate leaves the shallow basin is the point; a single static path hides the pacing and the early dwell time.</li>
+<li><strong>Static form.</strong> Four selected frames as a small multiple, never the blank first frame.</li>
+<li><strong>What to look for.</strong> How long the iterate lingers near the local basin before the drift term dominates.</li>
+</ul>
+<p>Surface and path are generated by <code>report/make_sample_figures.py</code>.</p></div>
+                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>MinAtar (synthetic)</b></div><div class="pop-row"><span>Model</span><b>DQN</b></div><div class="pop-row"><span>Created</span><b>2026-09-09T16:50:58</b></div></div>
+                <div class="pop-files"><a href="figures/consolidation_trajectory.png" target="_blank" rel="noopener">consolidation_trajectory.png</a><a href="figures/consolidation_trajectory.svg" target="_blank" rel="noopener">consolidation_trajectory.svg</a><a href="figures/consolidation_trajectory.html" target="_blank" rel="noopener">consolidation_trajectory.html</a><a href="figures/consolidation_trajectory.gif" target="_blank" rel="noopener">consolidation_trajectory.gif</a><a href="figures/consolidation_trajectory.html" target="_blank" rel="noopener">consolidation_trajectory.html</a></div>
+              </div>
+            </div>
+          </div>
+
+          
+
+          <button type="button" class="fig-inset js-zoom"
+                  aria-label="Open Parameter trajectory under consolidation full size">
+            <img class="fig-img" src="figures/consolidation_trajectory.svg"
+                 alt="Parameter trajectory under consolidation" loading="lazy" decoding="async">
+          </button>
+
+          <p class="fig-caption">Iterates drift out of the shallow local basin into the global one over 24 consolidation steps.</p>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">frames<b>24</b></span><span class="chip">path length<b>3.15</b><i>a.u.</i></span></div>
+
+          <div class="card-actions flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap gap-2"><button type="button" class="mini-btn js-play" data-gif="figures/consolidation_trajectory.gif" aria-pressed="false"><i data-lucide="play"></i><span>Play</span></button><button type="button" class="mini-btn js-interactive" data-src="figures/consolidation_trajectory.html"><i data-lucide="maximize-2"></i><span>Interactive</span></button></div>
+            <div class="ml-auto flex gap-2">
+              <a class="mini-btn js-dl-png" href="figures/consolidation_trajectory.png" download>
+                <i data-lucide="download"></i><span>PNG</span></a>
+              <a class="mini-btn js-dl-svg" href="figures/consolidation_trajectory.svg" download>
+                <i data-lucide="download"></i><span>SVG</span></a>
+            </div>
+          </div>
+        </div>
+      </article>
+      </div>
+    </section>
+    <section id="group-retention" class="group-section scroll-mt-24 mb-16">
+      <header class="mb-6 flex items-center gap-3">
+        <span class="group-icon"><i data-lucide="layers"></i></span>
+        <h2 class="group-title">Retention and forgetting</h2>
+        <span class="group-count">2 figures</span>
+      </header>
+      <div class="bento">
+        
+      <article class="fig-card card" data-figure-id="forgetting_matrix"
+               data-search="forgetting matrix across the task sequence return delta on each earlier task after training every later task; blue is forgetting, red is backward transfer. retention and forgetting retention"
+               data-variants="[{&quot;label&quot;: &quot;Heatmap&quot;, &quot;png&quot;: &quot;figures/forgetting_matrix.png&quot;, &quot;svg&quot;: &quot;figures/forgetting_matrix.svg&quot;, &quot;html&quot;: null}]"
+               style="--stagger:0">
+        <div class="card-body">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="fig-title">Forgetting matrix across the task sequence</h3>
+            <div class="pop-wrap">
+              <button type="button" class="icon-btn js-info" aria-expanded="false"
+                      aria-label="Details for Forgetting matrix across the task sequence">
+                <i data-lucide="info"></i>
+              </button>
+              <div class="popover" role="dialog"
+                   aria-label="Details for Forgetting matrix across the task sequence" hidden>
+                <div class="pop-head">Forgetting matrix across the task sequence</div>
+                <div class="pop-md"><p><strong>Synthetic pipeline check.</strong> Entry (i, j) is the change in return on task j measured after training on task i.</p>
+<ul>
+<li><strong>Scale.</strong> Diverging blue → light → red, centred at zero, so the sign of transfer is readable without a legend lookup. No rainbow.</li>
+<li><strong>What to look for.</strong> Whether forgetting deepens monotonically with task distance or saturates, and any positive (red) entries indicating backward transfer.</li>
+</ul>
+<p>Generated by <code>report/make_sample_figures.py</code>.</p></div>
+                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>MinAtar (synthetic)</b></div><div class="pop-row"><span>Model</span><b>DQN</b></div><div class="pop-row"><span>Created</span><b>2026-09-09T16:51:02</b></div></div>
+                <div class="pop-files"><a href="figures/forgetting_matrix.png" target="_blank" rel="noopener">forgetting_matrix.png</a><a href="figures/forgetting_matrix.svg" target="_blank" rel="noopener">forgetting_matrix.svg</a></div>
+              </div>
+            </div>
+          </div>
+
+          
+
+          <button type="button" class="fig-inset js-zoom"
+                  aria-label="Open Forgetting matrix across the task sequence full size">
+            <img class="fig-img" src="figures/forgetting_matrix.svg"
+                 alt="Forgetting matrix across the task sequence" loading="lazy" decoding="async">
+          </button>
+
+          <p class="fig-caption">Return delta on each earlier task after training every later task; blue is forgetting, red is backward transfer.</p>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">mean forgetting<b>-0.08394</b><i>Δ return</i></span><span class="chip">worst cell<b>-0.1937</b><i>Δ return</i></span></div>
+
+          <div class="card-actions flex flex-wrap items-center gap-2">
+            
+            <div class="ml-auto flex gap-2">
+              <a class="mini-btn js-dl-png" href="figures/forgetting_matrix.png" download>
+                <i data-lucide="download"></i><span>PNG</span></a>
+              <a class="mini-btn js-dl-svg" href="figures/forgetting_matrix.svg" download>
+                <i data-lucide="download"></i><span>SVG</span></a>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="fig-card card" data-figure-id="retention_by_task"
+               data-search="final retention by task retained return per task at the end of the sequence, mean ±1 std over 5 seeds, with the per-seed spread alongside. retention and forgetting retention"
+               data-variants="[{&quot;label&quot;: &quot;Bars&quot;, &quot;png&quot;: &quot;figures/retention_by_task_bars.png&quot;, &quot;svg&quot;: &quot;figures/retention_by_task_bars.svg&quot;, &quot;html&quot;: null}, {&quot;label&quot;: &quot;Distribution&quot;, &quot;png&quot;: &quot;figures/retention_by_task_dist.png&quot;, &quot;svg&quot;: &quot;figures/retention_by_task_dist.svg&quot;, &quot;html&quot;: null}]"
+               style="--stagger:1">
+        <div class="card-body">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="fig-title">Final retention by task</h3>
+            <div class="pop-wrap">
+              <button type="button" class="icon-btn js-info" aria-expanded="false"
+                      aria-label="Details for Final retention by task">
+                <i data-lucide="info"></i>
+              </button>
+              <div class="popover" role="dialog"
+                   aria-label="Details for Final retention by task" hidden>
+                <div class="pop-head">Final retention by task</div>
+                <div class="pop-md"><p><strong>Synthetic pipeline check.</strong> Retention is the fraction of a task's peak return still held once the whole sequence has been trained.</p>
+<ul>
+<li><strong>Variants.</strong> Bars carry the trend and the uncertainty; the box variant shows the distribution the bars summarise. Two views of the same numbers, not two renderings of one view.</li>
+<li><strong>What to look for.</strong> Whether retention decays smoothly with task position or drops at a particular boundary, and whether the spread widens for later tasks.</li>
+</ul>
+<p>Generated by <code>report/make_sample_figures.py</code>.</p></div>
+                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>MinAtar (synthetic)</b></div><div class="pop-row"><span>Model</span><b>DQN</b></div><div class="pop-row"><span>Created</span><b>2026-09-09T16:51:09</b></div></div>
+                <div class="pop-files"><a href="figures/retention_by_task_bars.png" target="_blank" rel="noopener">retention_by_task_bars.png</a><a href="figures/retention_by_task_bars.svg" target="_blank" rel="noopener">retention_by_task_bars.svg</a><a href="figures/retention_by_task_dist.png" target="_blank" rel="noopener">retention_by_task_dist.png</a><a href="figures/retention_by_task_dist.svg" target="_blank" rel="noopener">retention_by_task_dist.svg</a></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="join mb-3" role="tablist" aria-label="Chart variants for Final retention by task"><button type="button" class="join-item vbtn vbtn-active" role="tab" aria-selected="true" tabindex="0" data-variant-index="0">Bars</button><button type="button" class="join-item vbtn" role="tab" aria-selected="false" tabindex="-1" data-variant-index="1">Distribution</button></div>
+
+          <button type="button" class="fig-inset js-zoom"
+                  aria-label="Open Final retention by task full size">
+            <img class="fig-img" src="figures/retention_by_task_bars.svg"
+                 alt="Final retention by task" loading="lazy" decoding="async">
+          </button>
+
+          <p class="fig-caption">Retained return per task at the end of the sequence, mean ±1 std over 5 seeds, with the per-seed spread alongside.</p>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">mean retention<b>0.795</b></span><span class="chip">worst task<b>T6</b></span><span class="chip">seeds<b>5</b></span></div>
+
+          <div class="card-actions flex flex-wrap items-center gap-2">
+            
+            <div class="ml-auto flex gap-2">
+              <a class="mini-btn js-dl-png" href="figures/retention_by_task_bars.png" download>
+                <i data-lucide="download"></i><span>PNG</span></a>
+              <a class="mini-btn js-dl-svg" href="figures/retention_by_task_bars.svg" download>
+                <i data-lucide="download"></i><span>SVG</span></a>
+            </div>
+          </div>
+        </div>
+      </article>
+      </div>
+    </section>
+    <div class="empty-state js-empty">No figures match that filter.</div>
+
+    <footer class="footer">
+      <span>Generated 2026-09-09 16:51:10</span>
+      <span>Manifest <code>report/manifest.json</code></span>
+    </footer>
+  </main>
+</div>
+
+<dialog id="embed-modal" class="modal">
+  <div class="modal-box">
+    <header>
+      <span id="embed-title">Interactive figure</span>
+      <button type="button" class="mini-btn" id="embed-close">
+        <i data-lucide="x"></i><span>Close</span></button>
+    </header>
+    <iframe id="embed-frame" title="Interactive figure" src="about:blank"></iframe>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close">close</button></form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.454.0/dist/umd/lucide.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function drawIcons() {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      try { window.lucide.createIcons(); } catch (e) { /* icon set mismatch is non-fatal */ }
+    }
+  }
+
+  // ── Variant switcher ─────────────────────────────────────────────────
+  function readVariants(card) {
+    try { return JSON.parse(card.getAttribute('data-variants')) || []; }
+    catch (e) { return []; }
+  }
+
+  function selectVariant(card, index) {
+    var variants = readVariants(card);
+    if (!variants[index]) return;
+    var variant = variants[index];
+    var img = card.querySelector('.fig-img');
+    var next = variant.svg || variant.png;
+    var buttons = card.querySelectorAll('.vbtn');
+
+    for (var i = 0; i < buttons.length; i++) {
+      var on = (i === index);
+      buttons[i].classList.toggle('vbtn-active', on);
+      buttons[i].setAttribute('aria-selected', on ? 'true' : 'false');
+      buttons[i].tabIndex = on ? 0 : -1;
+    }
+    card.setAttribute('data-active-variant', String(index));
+
+    var png = card.querySelector('.js-dl-png');
+    var svg = card.querySelector('.js-dl-svg');
+    if (png && variant.png) png.setAttribute('href', variant.png);
+    if (svg && variant.svg) svg.setAttribute('href', variant.svg);
+
+    var play = card.querySelector('.js-play');
+    if (play) {
+      play.setAttribute('aria-pressed', 'false');
+      var span = play.querySelector('span');
+      if (span) span.textContent = 'Play';
+    }
+
+    if (reduceMotion) { img.setAttribute('src', next); return; }
+    img.style.opacity = '0';
+    window.setTimeout(function () {
+      img.setAttribute('src', next);
+      img.style.opacity = '1';
+    }, 200);
+  }
+
+  document.querySelectorAll('.fig-card').forEach(function (card) {
+    var buttons = card.querySelectorAll('.vbtn');
+    buttons.forEach(function (button, index) {
+      button.addEventListener('click', function () { selectVariant(card, index); });
+      button.addEventListener('keydown', function (event) {
+        var delta = event.key === 'ArrowRight' ? 1 : (event.key === 'ArrowLeft' ? -1 : 0);
+        if (!delta) return;
+        event.preventDefault();
+        var next = (index + delta + buttons.length) % buttons.length;
+        buttons[next].focus();
+        selectVariant(card, next);
+      });
+    });
+  });
+
+  // ── Animation: GIF play toggle ───────────────────────────────────────
+  document.querySelectorAll('.js-play').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var card = button.closest('.fig-card');
+      var img = card.querySelector('.fig-img');
+      var label = button.querySelector('span');
+      var playing = button.getAttribute('aria-pressed') === 'true';
+      if (playing) {
+        var index = parseInt(card.getAttribute('data-active-variant') || '0', 10);
+        var variant = readVariants(card)[index] || readVariants(card)[0];
+        img.setAttribute('src', variant.svg || variant.png);
+        button.setAttribute('aria-pressed', 'false');
+        if (label) label.textContent = 'Play';
+      } else {
+        img.setAttribute('src', button.getAttribute('data-gif'));
+        button.setAttribute('aria-pressed', 'true');
+        if (label) label.textContent = 'Stop';
+      }
+    });
+  });
+
+  // ── Interactive embed modal ──────────────────────────────────────────
+  var modal = document.getElementById('embed-modal');
+  var frame = document.getElementById('embed-frame');
+  var modalTitle = document.getElementById('embed-title');
+
+  function openEmbed(card, src, suffix) {
+    var title = card.querySelector('.fig-title');
+    modalTitle.textContent = (title ? title.textContent.trim() : 'Figure') + (suffix || '');
+    frame.setAttribute('src', src);
+    if (typeof modal.showModal === 'function') modal.showModal();
+  }
+
+  document.querySelectorAll('.js-interactive').forEach(function (button) {
+    button.addEventListener('click', function () {
+      openEmbed(button.closest('.fig-card'), button.getAttribute('data-src'), '');
+    });
+  });
+
+  // Clicking the figure opens it full size in the same modal.
+  document.querySelectorAll('.js-zoom').forEach(function (inset) {
+    inset.addEventListener('click', function () {
+      var img = inset.querySelector('.fig-img');
+      if (img) openEmbed(inset.closest('.fig-card'), img.getAttribute('src'), ' · full size');
+    });
+  });
+  document.getElementById('embed-close').addEventListener('click', function () { modal.close(); });
+  modal.addEventListener('close', function () { frame.setAttribute('src', 'about:blank'); });
+
+  // ── Info popover: hover opens, click pins ────────────────────────────
+  var pinned = null;
+
+  function closePopover(button) {
+    var pop = button.parentElement.querySelector('.popover');
+    if (!pop || pinned === button) return;
+    pop.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+  }
+
+  function openPopover(button) {
+    var pop = button.parentElement.querySelector('.popover');
+    if (!pop) return;
+    pop.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+  }
+
+  function unpin() {
+    if (!pinned) return;
+    var button = pinned;
+    pinned = null;
+    closePopover(button);
+  }
+
+  document.querySelectorAll('.js-info').forEach(function (button) {
+    var wrap = button.parentElement;
+    wrap.addEventListener('mouseenter', function () { openPopover(button); });
+    wrap.addEventListener('mouseleave', function () { closePopover(button); });
+    button.addEventListener('focus', function () { openPopover(button); });
+    button.addEventListener('click', function (event) {
+      event.stopPropagation();
+      if (pinned === button) { unpin(); return; }
+      unpin();
+      pinned = button;
+      openPopover(button);
+    });
+  });
+
+  document.addEventListener('click', function (event) {
+    if (pinned && !pinned.parentElement.contains(event.target)) unpin();
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') unpin();
+  });
+
+  // ── Scroll-triggered entrance ────────────────────────────────────────
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.fig-card'));
+  if (reduceMotion || !('IntersectionObserver' in window)) {
+    cards.forEach(function (card) { card.classList.add('reveal', 'in'); });
+  } else {
+    cards.forEach(function (card) { card.classList.add('reveal'); });
+    var revealer = new IntersectionObserver(function (records) {
+      records.forEach(function (record) {
+        if (!record.isIntersecting) return;
+        record.target.classList.add('in');
+        revealer.unobserve(record.target);
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+    cards.forEach(function (card) { revealer.observe(card); });
+  }
+
+  // ── Active section highlighting ──────────────────────────────────────
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('[data-group]'));
+  function setActive(key) {
+    navLinks.forEach(function (link) {
+      link.classList.toggle('active', link.getAttribute('data-group') === key);
+    });
+  }
+  var sections = Array.prototype.slice.call(document.querySelectorAll('.group-section'));
+  if ('IntersectionObserver' in window && sections.length) {
+    var visible = {};
+    var spy = new IntersectionObserver(function (records) {
+      records.forEach(function (record) {
+        visible[record.target.id] = record.isIntersecting ? record.intersectionRatio : 0;
+      });
+      var best = null, bestRatio = 0;
+      sections.forEach(function (section) {
+        var ratio = visible[section.id] || 0;
+        if (ratio > bestRatio) { bestRatio = ratio; best = section; }
+      });
+      if (best) setActive(best.id.replace(/^group-/, ''));
+    }, { rootMargin: '-80px 0px -55% 0px', threshold: [0, 0.15, 0.4, 0.75, 1] });
+    sections.forEach(function (section) { spy.observe(section); });
+    setActive(sections[0].id.replace(/^group-/, ''));
+  }
+
+  // ── Search filter ────────────────────────────────────────────────────
+  var emptyState = document.querySelector('.js-empty');
+  function applyFilter(rawQuery) {
+    var query = (rawQuery || '').trim().toLowerCase();
+    var shown = 0;
+    sections.forEach(function (section) {
+      var visibleInSection = 0;
+      section.querySelectorAll('.fig-card').forEach(function (card) {
+        var match = !query || (card.getAttribute('data-search') || '').indexOf(query) !== -1;
+        card.style.display = match ? '' : 'none';
+        if (match) { visibleInSection++; shown++; }
+      });
+      section.style.display = visibleInSection ? '' : 'none';
+    });
+    if (emptyState) emptyState.style.display = shown ? 'none' : 'block';
+  }
+  document.querySelectorAll('.js-search').forEach(function (input) {
+    input.addEventListener('input', function () {
+      applyFilter(input.value);
+      document.querySelectorAll('.js-search').forEach(function (other) {
+        if (other !== input) other.value = input.value;
+      });
+    });
+  });
+
+  drawIcons();
+  window.addEventListener('load', drawIcons);
+})();
+</script>
+</body>
+</html>
