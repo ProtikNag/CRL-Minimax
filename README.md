@@ -246,10 +246,15 @@ advantages.
   consolidation (an SI⟂Boxing interference). **Current status, results, and roadmap:
   `HANDOFF.md`.**
 - **CLEAR baseline:** `configs/atari5_clear.yaml` (apples-to-apples: same net / games /
-  env, frame-matched). **Joint ceiling:** a budget-matched jointly-trained model (all 5
-  games at once) is the fair upper bound (a single net *can* clear all 5 thresholds);
-  see `HANDOFF.md`. **Roadmap:** order-sensitivity (in progress), joint-vs-consolidated
-  comparison, multi-seed.
+  env, frame-matched). Ours and CLEAR each catastrophically forget a *different* game
+  (ours→Boxing, CLEAR→Breakout). **Joint ceiling:** a budget-matched jointly-trained model
+  (all 5 games at once) is the fair upper bound (a single net *can* clear all 5 thresholds).
+  **Order sensitivity:** reversing the game order roughly doubles ours' mean retention vs
+  the joint ceiling (51%→86%) — the Boxing catastrophe is order-specific. See `HANDOFF.md`.
+- **Figures / dashboard:** `reports/v5_clear_joint/`, `reports/order_sensitivity/` (static
+  PNG/SVG) and the HTML results dashboard `report/index.html` (built by `report/acviz.py`).
+  On this cluster (glibc 2.17) figures need `plotly==5.24.1 + kaleido==0.2.1` and
+  `verify_dashboard.py` (Playwright) must run off-cluster — see `HANDOFF.md` gotchas.
 - **Evaluation rule (binding): greedy (argmax) actions, 100 rollouts, never
   stochastic** (`eval_episodes: 100`, `eval_greedy: true`). The constraint value
   `V_G/V_L` stays on-policy stochastic (it's the constrained quantity, not

@@ -28,15 +28,17 @@ older per-iteration configs were removed in the 2026-09-08 cleanup.)
 
 ---
 
-## ►► CURRENT STATE (2026-09-08)
+## ►► CURRENT STATE (2026-09-11)
 
-### Results so far (seed 0)
-- **Ours (min-max), retention vs the local reference:** Qbert 91%, Pong 99%,
-  SpaceInvaders 68%, Breakout 39%, **Boxing −27%**. The retention gate rescues the
-  oldest task (Qbert), but the final SpaceInvaders consolidation still wipes Boxing —
-  a targeted **SI⟂Boxing interference**, not a global collapse.
-- **CLEAR baseline** retains better and more evenly on this setup (from the V2
-  comparison, seed 0): CLEAR held Qbert ~perfectly across all 5 tasks.
+### Results so far (seed 0, canonical order Qbert→Pong→Breakout→Boxing→SpaceInvaders)
+Per-game final greedy-100 (Qbert,Pong,Breakout,Boxing,SI):
+- **Ours (min-max), `results/atari5_v5_seed0`:** [4075, 19.8, 51.8, **−25.8**, 765.8].
+  Retention vs local: 91/99/39/**−27**/68% (mean 54%). Retention gate rescues Qbert;
+  the final SI consolidation **wipes Boxing** (SI⟂Boxing interference), not a global collapse.
+- **CLEAR (plain-net), `results/atari5_v5_clearA_equal_seed0`:** [4350, 21, **0.0**, 100, 800].
+  CLEAR retains Qbert/Pong/Boxing/SI well but **forgets Breakout entirely (0)**.
+  → **Ours and CLEAR each catastrophically forget a DIFFERENT game** (ours→Boxing, CLEAR→Breakout).
+- Local refs (ours' specialists): [4467.8, 20.0, 132.7, 94.0, 1132.2].
 
 ### Joint ceiling (NEW — the fair upper bound)
 Comparing the consolidated model to single-task **experts** is unfair (experts
@@ -53,12 +55,28 @@ on all games at once." Runs live in the sibling clone (see Infra):
 - The gap between this ceiling and the consolidated models = the true **cost of
   sequential learning / forgetting** — the right thing to normalize retention against.
 
-### Order-sensitivity run (IN PROGRESS)
-`configs/atari5_v5_order2.yaml` (in the clone) = the same min-max method with the
-**reversed** sequence SpaceInvaders→Boxing→Breakout→Pong→Qbert. **Job 21890786** on
-`dgx_aic`. Tests whether the interference is order-driven (does a *different* game get
-wiped when the order flips?). So far SpaceInvaders is fully retained through the
-Boxing consolidation; needs tasks 4–5 to conclude.
+### Order sensitivity (a headline finding) — 2×2 of {ours, CLEAR} × {canonical, reversed}
+Reversed order = SpaceInvaders→Boxing→Breakout→Pong→Qbert. Same games/net/budget.
+- **Ours, reversed (`results/atari5_v5_order2_seed0`, DONE, job 21890786):** by game
+  [Qbert 4270, Pong 21, Breakout 200, Boxing 55.4, SI 712]. **Boxing's canonical
+  catastrophe (−27% of local) becomes +56% when reversed** — no collapse. Retention vs
+  the FIXED joint ceiling: **mean 51% (canonical) → 86% (reversed)**. So ours' forgetting
+  is STRONGLY order-dependent; the Boxing loss is order-specific (Boxing learned 4th then
+  wiped by SI; learned 2nd it survives).
+- **CLEAR, reversed (`results/atari5_clear_order2_seed0`, RUNNING, job 21906243 on dgx-1):**
+  at task 3/5 as of 2026-09-11. So far: after T1 SI 588, after T2 SI 533 + Boxing 100 (SI
+  retained through Boxing). Watch whether Breakout (canonical CLEAR wiped it) is wiped again
+  by a later task, i.e. whether CLEAR is more order-robust than ours. **Resume/monitor:
+  `results/atari5_clear_order2_seed0/logs.jsonl` in the CLONE.**
+
+### Visualization / dashboard (DONE, pushed)
+- **Retention figures** `reports/v5_clear_joint/` and `reports/order_sensitivity/`
+  (visualization-expert: FAITHFUL) — ours vs CLEAR vs joint; retention vs local + vs joint;
+  order-sensitivity canonical vs reversed.
+- **HTML results dashboard** `report/index.html` (commit `799be4c`): 10 figures / 6 groups
+  (method_comparison, retention_forgetting, clear_buffer_sweep, order_sensitivity,
+  training_dynamics, compute_cost), built with `report/acviz.py` (Track F skill) from the
+  real runs, PNG+SVG each. Metrics grounded in `analysis/continual_metrics.py`.
 
 ### The "critic-based retention" variant (V2) — TRIED AND ABANDONED
 A newer formulation (per-task λ_i critic constraints at anchor states, stored critics)
@@ -75,12 +93,13 @@ is NOT the main line. **Do not resume it without an explicit decision.**
 ---
 
 ## ►► NEXT STEPS
-1. **Finish the order-sensitivity run** (job 21890786) → compare its forgetting matrix
-   to the canonical order (is Boxing's collapse order-specific?).
-2. **Assemble the comparison** once the joint runs + order2 are in: joint ceiling vs
-   consolidated (ours) vs CLEAR vs experts, per game; **recompute retention % against
-   the joint ceiling** (not the experts). Gate figures through `visualization-expert`.
-3. **Multi-seed** (≥3) — everything is seed 0; this is the single biggest gap.
+1. **Finish CLEAR reversed** (job 21906243, in the clone) → complete the order-sensitivity
+   2×2 and add a CLEAR-reversed panel to `reports/order_sensitivity/` + the dashboard.
+   Compare per-game to canonical CLEAR (Breakout→0) and to ours-reversed.
+2. **Run `report/verify_dashboard.py`** on a machine with glibc ≥2.27 + Chromium (NOT
+   possible on this cluster — see gotchas). The dashboard was static-verified only.
+3. **Multi-seed** (≥3) — everything is seed 0; this is the single biggest gap, and
+   order-sensitivity showed single-order/seed results can mislead.
 4. (Deferred) longer task sequence; a retention metric that credits competent-but-
    sub-specialist play.
 
@@ -90,14 +109,26 @@ is NOT the main line. **Do not resume it without an explicit decision.**
   resume). Old per-iteration Atari configs (v3/v4/v5, ppo_v3/4/5, atari4_*, CLEAR
   sweep B/C) were **removed** in cleanup; the canonical config is `atari5.yaml`.
 - **Sibling clone `/work/pnag/CRL-Minimax-joint`** (a full clone of this branch) is
-  where the **joint** and **order-sensitivity** runs execute, so they don't disturb
-  this working tree. It has small local edits (`_train_joint` logs progress + saves
+  where the **joint**, **order-sensitivity**, and **CLEAR-reversed** runs execute, so they
+  don't disturb this working tree. Local edits: `_train_joint` logs progress + saves
   `joint_iter{N}.pt`; configs `atari5_joint.yaml`, `atari5_joint_6m.yaml`,
-  `atari5_v5_order2.yaml`; launcher `scripts/hpc_joint.sbatch`). **Retrieve the joint
-  checkpoints/results from the clone, then it can be discarded.**
+  `atari5_v5_order2.yaml`, `atari5_clear_order2.yaml`; launcher `scripts/hpc_joint.sbatch`.
+  Their JSON/log results were also copied into the main repo's `results/` (gitignored) for
+  the dashboard. **Retrieve results from the clone, then it can be discarded.**
 - **Stable GPU partitions:** `AI_Center_L40S` (node493), `dgx_aic` (dgx-1, 8×A100).
   Avoid V100 partitions (preempt/requeue). Atari throughput here is ~800 env-frames/s
   (env-bound), so a full 5-game run is many hours — budget accordingly.
+- **ENVIRONMENT GOTCHAS (cluster is CentOS 7 / glibc 2.17 on every node):**
+  - **Figures:** the viz pipeline (`report/acviz.py`) needs `plotly==5.24.1 + kaleido==0.2.1`
+    here — kaleido 1.x / plotly 7 drive a modern Chrome that CANNOT run on glibc 2.17.
+    (`requirements-viz.txt` allows these pins.) Install `--user`.
+  - **Dashboard verification:** `report/verify_dashboard.py` uses Playwright/Chromium →
+    **impossible anywhere on this cluster** (glibc 2.17, no container runtime). Static-verify
+    (manifest valid, assets non-empty) and run the Playwright check off-cluster.
+  - **Full `/tmp`:** some compute nodes (e.g. node335) have a tiny 2 GB `/tmp` that fills from
+    other jobs, which breaks Claude Code's command-output capture (ENOSPC). Fix: start the
+    session with `export CLAUDE_CODE_TMPDIR=/work/pnag/.claude-tmp` (dir on `/work`, which has
+    space), or land on a node with free `/tmp`. Does NOT affect runs (they're on other nodes → `/work`).
 - **Commits:** author `ProtikNag <protiknag08@gmail.com>`; end messages with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. `results/` and `experts/`
   are gitignored; `reports/`, `diagnostics/`, `pseudocode/` are tracked.
