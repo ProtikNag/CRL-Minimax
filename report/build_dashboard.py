@@ -271,8 +271,12 @@ def format_metric_value(value: Any) -> str:
     if isinstance(value, int):
         return f"{value:,}"
     if isinstance(value, float):
-        if value != 0 and (abs(value) < 1e-3 or abs(value) >= 1e5):
+        if value != 0 and (abs(value) < 1e-3 or abs(value) >= 1e6):
             return f"{value:.3g}"
+        # %g flips to exponential once the exponent reaches the precision, which
+        # turned a plain score of 15350.75 into "1.535e+04".
+        if abs(value) >= 1000:
+            return f"{value:,.0f}"
         return f"{value:.4g}"
     return str(value)
 

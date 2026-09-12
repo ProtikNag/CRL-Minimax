@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CRL-Minimax · Results</title>
+<title>Continual Reinforcement Learning with Minimax Algorithm · Results</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
@@ -290,7 +290,7 @@
 
 <div class="topbar">
   <div class="flex items-center justify-between gap-3 mb-3">
-    <div class="brand">CRL-Minimax<small>Results dashboard</small></div>
+    <div class="brand">Continual Reinforcement Learning with Minimax Algorithm<small>Results dashboard</small></div>
   </div>
   <div class="search-wrap" style="margin:0 0 12px;">
     <i data-lucide="search"></i>
@@ -298,31 +298,31 @@
            aria-label="Filter figures">
   </div>
   <nav class="chiprow" aria-label="Sections (compact)">
-    <a class="chip-nav" href="#group-method_comparison" data-group="method_comparison"><i data-lucide="git-compare"></i>Method Comparison</a><a class="chip-nav" href="#group-retention_forgetting" data-group="retention_forgetting"><i data-lucide="layers"></i>Retention and Forgetting</a><a class="chip-nav" href="#group-clear_buffer_sweep" data-group="clear_buffer_sweep"><i data-lucide="trending-up"></i>CLEAR Buffer Sweep</a><a class="chip-nav" href="#group-order_sensitivity" data-group="order_sensitivity"><i data-lucide="hash"></i>Order Sensitivity</a><a class="chip-nav" href="#group-training_dynamics" data-group="training_dynamics"><i data-lucide="activity"></i>Training Dynamics</a><a class="chip-nav" href="#group-compute_cost" data-group="compute_cost"><i data-lucide="timer"></i>Compute Cost</a>
+    <a class="chip-nav" href="#group-reversed_order" data-group="reversed_order"><i data-lucide="bar-chart-2"></i>Reversed task order: V5 vs CLEAR vs Joint</a><a class="chip-nav" href="#group-method_comparison" data-group="method_comparison"><i data-lucide="git-compare"></i>Method Comparison</a><a class="chip-nav" href="#group-retention_forgetting" data-group="retention_forgetting"><i data-lucide="layers"></i>Retention and Forgetting</a><a class="chip-nav" href="#group-clear_buffer_sweep" data-group="clear_buffer_sweep"><i data-lucide="trending-up"></i>CLEAR Buffer Sweep</a><a class="chip-nav" href="#group-training_dynamics" data-group="training_dynamics"><i data-lucide="activity"></i>Training Dynamics</a><a class="chip-nav" href="#group-compute_cost" data-group="compute_cost"><i data-lucide="timer"></i>Compute Cost</a>
   </nav>
 </div>
 
 <div class="shell">
   <aside class="sidebar" aria-label="Sections">
-    <div class="brand">CRL-Minimax<small>Results dashboard</small></div>
+    <div class="brand">Continual Reinforcement Learning with Minimax Algorithm<small>Results dashboard</small></div>
     <div class="search-wrap">
       <i data-lucide="search"></i>
       <input class="search-input js-search" type="search" placeholder="Filter figures…"
              aria-label="Filter figures">
     </div>
     <div class="nav-label">Groups</div>
-    <nav><a class="nav-link" href="#group-method_comparison" data-group="method_comparison"><i data-lucide="git-compare"></i><span class="truncate">Method Comparison</span><em>2</em></a><a class="nav-link" href="#group-retention_forgetting" data-group="retention_forgetting"><i data-lucide="layers"></i><span class="truncate">Retention and Forgetting</span><em>2</em></a><a class="nav-link" href="#group-clear_buffer_sweep" data-group="clear_buffer_sweep"><i data-lucide="trending-up"></i><span class="truncate">CLEAR Buffer Sweep</span><em>1</em></a><a class="nav-link" href="#group-order_sensitivity" data-group="order_sensitivity"><i data-lucide="hash"></i><span class="truncate">Order Sensitivity</span><em>1</em></a><a class="nav-link" href="#group-training_dynamics" data-group="training_dynamics"><i data-lucide="activity"></i><span class="truncate">Training Dynamics</span><em>3</em></a><a class="nav-link" href="#group-compute_cost" data-group="compute_cost"><i data-lucide="timer"></i><span class="truncate">Compute Cost</span><em>1</em></a></nav>
+    <nav><a class="nav-link" href="#group-reversed_order" data-group="reversed_order"><i data-lucide="bar-chart-2"></i><span class="truncate">Reversed task order: V5 vs CLEAR vs Joint</span><em>5</em></a><a class="nav-link" href="#group-method_comparison" data-group="method_comparison"><i data-lucide="git-compare"></i><span class="truncate">Method Comparison</span><em>1</em></a><a class="nav-link" href="#group-retention_forgetting" data-group="retention_forgetting"><i data-lucide="layers"></i><span class="truncate">Retention and Forgetting</span><em>2</em></a><a class="nav-link" href="#group-clear_buffer_sweep" data-group="clear_buffer_sweep"><i data-lucide="trending-up"></i><span class="truncate">CLEAR Buffer Sweep</span><em>1</em></a><a class="nav-link" href="#group-training_dynamics" data-group="training_dynamics"><i data-lucide="activity"></i><span class="truncate">Training Dynamics</span><em>3</em></a><a class="nav-link" href="#group-compute_cost" data-group="compute_cost"><i data-lucide="timer"></i><span class="truncate">Compute Cost</span><em>1</em></a></nav>
   </aside>
 
   <main class="content">
     <header>
-      <h1 class="page-title">CRL-Minimax</h1>
-      <p class="page-sub">Run 2026-09-11 · generated from
+      <h1 class="page-title">Continual Reinforcement Learning with Minimax Algorithm</h1>
+      <p class="page-sub">Run 2026-09-12 · generated from
         <code class="font-mono">report/manifest.json</code></p>
       <div class="statbar stats stats-vertical sm:stats-horizontal">
         <div class="stat">
           <div class="stat-title">Figures</div>
-          <div class="stat-value">10</div>
+          <div class="stat-value">13</div>
         </div>
         <div class="stat">
           <div class="stat-title">Groups</div>
@@ -337,11 +337,273 @@
 
     <div style="height:40px"></div>
     
+    <section id="group-reversed_order" class="group-section scroll-mt-24 mb-16">
+      <header class="mb-6 flex items-center gap-3">
+        <span class="group-icon"><i data-lucide="bar-chart-2"></i></span>
+        <h2 class="group-title">Reversed task order: V5 vs CLEAR vs Joint</h2>
+        <span class="group-count">5 figures</span>
+      </header>
+      <div class="bento">
+        
+      <article class="fig-card card" data-figure-id="order_contrast"
+               data-search="task order flips which method retains more mean retention on previously learned tasks against the joint ceiling: v5 43% → 83%, clear 88% → 43%. reversed task order: v5 vs clear vs joint reversed_order"
+               data-variants="[{&quot;label&quot;: &quot;Slope&quot;, &quot;png&quot;: &quot;figures/fig1_order_contrast.png&quot;, &quot;svg&quot;: &quot;figures/fig1_order_contrast.svg&quot;, &quot;html&quot;: null}]"
+               style="--stagger:0">
+        <div class="card-body">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="fig-title">Task order flips which method retains more</h3>
+            <div class="pop-wrap">
+              <button type="button" class="icon-btn js-info" aria-expanded="false"
+                      aria-label="Details for Task order flips which method retains more">
+                <i data-lucide="info"></i>
+              </button>
+              <div class="popover" role="dialog"
+                   aria-label="Details for Task order flips which method retains more" hidden>
+                <div class="pop-head">Task order flips which method retains more</div>
+                <div class="pop-md"><p>The one figure here that shows both task orders; every other figure in this group is the reversed order alone.</p>
+<p>Each point is the mean of final-score / Joint over the four tasks learned <em>before</em> the last one. The last task is excluded because nothing was trained after it, so its score measures capacity rather than retention.</p>
+<ul>
+<li><strong>Canonical</strong> Q*bert → Pong → Breakout → Boxing → SpaceInvaders</li>
+<li><strong>Reversed</strong> SpaceInvaders → Boxing → Breakout → Pong → Q*bert</li>
+</ul>
+<p>The lines cross. Neither method is order-robust, and a single-order result would have supported the opposite conclusion.</p>
+<p>Seed 0, greedy-100 evaluation, plain <code>impala_ac_multihead</code> net, five Atari games. <strong>Single seed, so no error bars are drawn and none are invented.</strong> CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO hyperparameters, frame-matched budget, and equal replay buffer. The only difference is CLEAR's replay plus policy/value cloning against V5's min-max dual constraint.</p></div>
+                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>Atari 5-game sequence (greedy-100)</b></div><div class="pop-row"><span>Model</span><b>impala_ac_multihead</b></div><div class="pop-row"><span>Created</span><b>2026-09-12T17:43:31</b></div></div>
+                <div class="pop-files"><a href="figures/fig1_order_contrast.png" target="_blank" rel="noopener">fig1_order_contrast.png</a><a href="figures/fig1_order_contrast.svg" target="_blank" rel="noopener">fig1_order_contrast.svg</a></div>
+              </div>
+            </div>
+          </div>
+
+          
+
+          <button type="button" class="fig-inset js-zoom"
+                  aria-label="Open Task order flips which method retains more full size">
+            <img class="fig-img" src="figures/fig1_order_contrast.svg"
+                 alt="Task order flips which method retains more" loading="lazy" decoding="async">
+          </button>
+
+          <p class="fig-caption">Mean retention on previously learned tasks against the Joint ceiling: V5 43% → 83%, CLEAR 88% → 43%.</p>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">V5 canonical<b>0.4276</b></span><span class="chip">V5 reversed<b>0.8304</b></span><span class="chip">CLEAR canonical<b>0.8792</b></span><span class="chip">CLEAR reversed<b>0.4309</b></span></div>
+
+          <div class="card-actions flex flex-wrap items-center gap-2">
+            
+            <div class="ml-auto flex gap-2">
+              <a class="mini-btn js-dl-png" href="figures/fig1_order_contrast.png" download>
+                <i data-lucide="download"></i><span>PNG</span></a>
+              <a class="mini-btn js-dl-svg" href="figures/fig1_order_contrast.svg" download>
+                <i data-lucide="download"></i><span>SVG</span></a>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="fig-card card" data-figure-id="reversed_retention"
+               data-search="reversed order: retention against the joint ceiling on the four previously learned tasks v5 keeps 83% of the joint ceiling and clear keeps 43%. reversed task order: v5 vs clear vs joint reversed_order"
+               data-variants="[{&quot;label&quot;: &quot;Bars&quot;, &quot;png&quot;: &quot;figures/fig2_reversed_retention.png&quot;, &quot;svg&quot;: &quot;figures/fig2_reversed_retention.svg&quot;, &quot;html&quot;: null}]"
+               style="--stagger:1">
+        <div class="card-body">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="fig-title">Reversed order: retention against the Joint ceiling</h3>
+            <div class="pop-wrap">
+              <button type="button" class="icon-btn js-info" aria-expanded="false"
+                      aria-label="Details for Reversed order: retention against the Joint ceiling">
+                <i data-lucide="info"></i>
+              </button>
+              <div class="popover" role="dialog"
+                   aria-label="Details for Reversed order: retention against the Joint ceiling" hidden>
+                <div class="pop-head">Reversed order: retention against the Joint ceiling</div>
+                <div class="pop-md"><p>Final score after the whole reversed sequence, divided by the order-independent Joint ceiling for that game. Tasks run top to bottom in the order they were learned.</p>
+<p>The final task sits in its own panel on its own scale. Q*bert was learned last, so nothing has been trained after it and its score is not a retention measurement. CLEAR reaches 360% of the ceiling there, which is the cell that lifts its five-game mean above V5 while it is forgetting the rest.</p>
+<ul>
+<li><strong>What to look for.</strong> Breakout. V5 holds 70%, CLEAR holds 8%.</li>
+<li>CLEAR is below the ceiling on every previously learned task.</li>
+</ul>
+<p>Seed 0, greedy-100 evaluation, plain <code>impala_ac_multihead</code> net, five Atari games. <strong>Single seed, so no error bars are drawn and none are invented.</strong> CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO hyperparameters, frame-matched budget, and equal replay buffer. The only difference is CLEAR's replay plus policy/value cloning against V5's min-max dual constraint.</p></div>
+                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>Atari 5-game sequence (greedy-100)</b></div><div class="pop-row"><span>Model</span><b>impala_ac_multihead</b></div><div class="pop-row"><span>Created</span><b>2026-09-12T17:43:38</b></div></div>
+                <div class="pop-files"><a href="figures/fig2_reversed_retention.png" target="_blank" rel="noopener">fig2_reversed_retention.png</a><a href="figures/fig2_reversed_retention.svg" target="_blank" rel="noopener">fig2_reversed_retention.svg</a></div>
+              </div>
+            </div>
+          </div>
+
+          
+
+          <button type="button" class="fig-inset js-zoom"
+                  aria-label="Open Reversed order: retention against the Joint ceiling full size">
+            <img class="fig-img" src="figures/fig2_reversed_retention.svg"
+                 alt="Reversed order: retention against the Joint ceiling" loading="lazy" decoding="async">
+          </button>
+
+          <p class="fig-caption">On the four previously learned tasks V5 keeps 83% of the Joint ceiling and CLEAR keeps 43%.</p>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">V5 prior-task mean<b>0.8304</b></span><span class="chip">CLEAR prior-task mean<b>0.4309</b></span><span class="chip">CLEAR final task<b>3.602</b><i>x joint</i></span></div>
+
+          <div class="card-actions flex flex-wrap items-center gap-2">
+            
+            <div class="ml-auto flex gap-2">
+              <a class="mini-btn js-dl-png" href="figures/fig2_reversed_retention.png" download>
+                <i data-lucide="download"></i><span>PNG</span></a>
+              <a class="mini-btn js-dl-svg" href="figures/fig2_reversed_retention.svg" download>
+                <i data-lucide="download"></i><span>SVG</span></a>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="fig-card card" data-figure-id="reversed_raw_scores"
+               data-search="reversed order: raw final scores greedy-100 score on each game after the full reversed sequence, with the local specialist and joint ceiling alongside. own y-axis per game. reversed task order: v5 vs clear vs joint reversed_order"
+               data-variants="[{&quot;label&quot;: &quot;Small multiples&quot;, &quot;png&quot;: &quot;figures/fig3_reversed_raw_scores.png&quot;, &quot;svg&quot;: &quot;figures/fig3_reversed_raw_scores.svg&quot;, &quot;html&quot;: null}]"
+               style="--stagger:2">
+        <div class="card-body">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="fig-title">Reversed order: raw final scores</h3>
+            <div class="pop-wrap">
+              <button type="button" class="icon-btn js-info" aria-expanded="false"
+                      aria-label="Details for Reversed order: raw final scores">
+                <i data-lucide="info"></i>
+              </button>
+              <div class="popover" role="dialog"
+                   aria-label="Details for Reversed order: raw final scores" hidden>
+                <div class="pop-head">Reversed order: raw final scores</div>
+                <div class="pop-md"><p>The absolute numbers behind the retention ratios. Panels run left to right in learning order.</p>
+<ul>
+<li><strong>Own y-axis per panel, always including zero.</strong> Raw scales differ by roughly 700x (Pong around 20, Q*bert around 4000), so a shared axis would flatten four of the five panels. No log scale, no clipping, no normalisation.</li>
+<li><strong>Local</strong> is the single-task specialist and is itself order-dependent, which is why retention elsewhere in this group is measured against Joint instead.</li>
+<li><strong>What to look for.</strong> Q*bert, where CLEAR reaches 15351 against a Joint ceiling of 4262.</li>
+</ul>
+<p>Seed 0, greedy-100 evaluation, plain <code>impala_ac_multihead</code> net, five Atari games. <strong>Single seed, so no error bars are drawn and none are invented.</strong> CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO hyperparameters, frame-matched budget, and equal replay buffer. The only difference is CLEAR's replay plus policy/value cloning against V5's min-max dual constraint.</p></div>
+                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>Atari 5-game sequence (greedy-100)</b></div><div class="pop-row"><span>Model</span><b>impala_ac_multihead</b></div><div class="pop-row"><span>Created</span><b>2026-09-12T17:43:46</b></div></div>
+                <div class="pop-files"><a href="figures/fig3_reversed_raw_scores.png" target="_blank" rel="noopener">fig3_reversed_raw_scores.png</a><a href="figures/fig3_reversed_raw_scores.svg" target="_blank" rel="noopener">fig3_reversed_raw_scores.svg</a></div>
+              </div>
+            </div>
+          </div>
+
+          
+
+          <button type="button" class="fig-inset js-zoom"
+                  aria-label="Open Reversed order: raw final scores full size">
+            <img class="fig-img" src="figures/fig3_reversed_raw_scores.svg"
+                 alt="Reversed order: raw final scores" loading="lazy" decoding="async">
+          </button>
+
+          <p class="fig-caption">Greedy-100 score on each game after the full reversed sequence, with the Local specialist and Joint ceiling alongside. Own y-axis per game.</p>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">CLEAR Q*bert<b>15,351</b><i>score</i></span><span class="chip">Joint Q*bert<b>4,262</b><i>score</i></span><span class="chip">V5 Breakout<b>199.8</b><i>score</i></span><span class="chip">CLEAR Breakout<b>23.9</b><i>score</i></span></div>
+
+          <div class="card-actions flex flex-wrap items-center gap-2">
+            
+            <div class="ml-auto flex gap-2">
+              <a class="mini-btn js-dl-png" href="figures/fig3_reversed_raw_scores.png" download>
+                <i data-lucide="download"></i><span>PNG</span></a>
+              <a class="mini-btn js-dl-svg" href="figures/fig3_reversed_raw_scores.svg" download>
+                <i data-lucide="download"></i><span>SVG</span></a>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="fig-card card" data-figure-id="reversed_trajectories"
+               data-search="reversed order: decay of each task after it is learned retention of each game against the joint ceiling at every later training phase. v5 dips and recovers on breakout; clear does not. reversed task order: v5 vs clear vs joint reversed_order"
+               data-variants="[{&quot;label&quot;: &quot;Small multiples&quot;, &quot;png&quot;: &quot;figures/fig4_reversed_trajectories.png&quot;, &quot;svg&quot;: &quot;figures/fig4_reversed_trajectories.svg&quot;, &quot;html&quot;: null}]"
+               style="--stagger:0">
+        <div class="card-body">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="fig-title">Reversed order: decay of each task after it is learned</h3>
+            <div class="pop-wrap">
+              <button type="button" class="icon-btn js-info" aria-expanded="false"
+                      aria-label="Details for Reversed order: decay of each task after it is learned">
+                <i data-lucide="info"></i>
+              </button>
+              <div class="popover" role="dialog"
+                   aria-label="Details for Reversed order: decay of each task after it is learned" hidden>
+                <div class="pop-head">Reversed order: decay of each task after it is learned</div>
+                <div class="pop-md"><p>One panel per task, in learning order. The x-axis is the absolute training phase, shared across panels, so each line starts on its own diagonal and shortens as the sequence advances.</p>
+<p>This is the same information as the forgetting matrix, read as a trajectory instead of a grid, which is what makes the <em>timing</em> visible. Training phase 1 is SpaceInvaders, 2 Boxing, 3 Breakout, 4 Pong, 5 Q*bert, matching the panel numbering.</p>
+<ul>
+<li><strong>Q*bert is absent.</strong> It is the last task in this order, so there is no later phase to plot.</li>
+<li><strong>What to look for.</strong> Breakout. Both methods leave it near the ceiling, then V5 falls to 55% and recovers to 70% while CLEAR goes 19% and then 8%.</li>
+<li>Boxing shows the opposite shape: CLEAR holds it longer, then drops below V5 at the end.</li>
+</ul>
+<p>Seed 0, greedy-100 evaluation, plain <code>impala_ac_multihead</code> net, five Atari games. <strong>Single seed, so no error bars are drawn and none are invented.</strong> CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO hyperparameters, frame-matched budget, and equal replay buffer. The only difference is CLEAR's replay plus policy/value cloning against V5's min-max dual constraint.</p></div>
+                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>Atari 5-game sequence (greedy-100)</b></div><div class="pop-row"><span>Model</span><b>impala_ac_multihead</b></div><div class="pop-row"><span>Created</span><b>2026-09-12T17:43:54</b></div></div>
+                <div class="pop-files"><a href="figures/fig4_reversed_trajectories.png" target="_blank" rel="noopener">fig4_reversed_trajectories.png</a><a href="figures/fig4_reversed_trajectories.svg" target="_blank" rel="noopener">fig4_reversed_trajectories.svg</a></div>
+              </div>
+            </div>
+          </div>
+
+          
+
+          <button type="button" class="fig-inset js-zoom"
+                  aria-label="Open Reversed order: decay of each task after it is learned full size">
+            <img class="fig-img" src="figures/fig4_reversed_trajectories.svg"
+                 alt="Reversed order: decay of each task after it is learned" loading="lazy" decoding="async">
+          </button>
+
+          <p class="fig-caption">Retention of each game against the Joint ceiling at every later training phase. V5 dips and recovers on Breakout; CLEAR does not.</p>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">V5 Breakout final<b>0.7002</b></span><span class="chip">CLEAR Breakout final<b>0.08374</b></span></div>
+
+          <div class="card-actions flex flex-wrap items-center gap-2">
+            
+            <div class="ml-auto flex gap-2">
+              <a class="mini-btn js-dl-png" href="figures/fig4_reversed_trajectories.png" download>
+                <i data-lucide="download"></i><span>PNG</span></a>
+              <a class="mini-btn js-dl-svg" href="figures/fig4_reversed_trajectories.svg" download>
+                <i data-lucide="download"></i><span>SVG</span></a>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="fig-card card" data-figure-id="forgetting_matrices"
+               data-search="forgetting matrices, both task orders every evaluation as a fraction of the joint ceiling. bold diagonal is the task just consolidated; blank upper triangle is never evaluated. reversed task order: v5 vs clear vs joint reversed_order"
+               data-variants="[{&quot;label&quot;: &quot;Reversed order&quot;, &quot;png&quot;: &quot;figures/fig5_matrices_reversed.png&quot;, &quot;svg&quot;: &quot;figures/fig5_matrices_reversed.svg&quot;, &quot;html&quot;: null}, {&quot;label&quot;: &quot;Canonical order&quot;, &quot;png&quot;: &quot;figures/fig5_matrices_canonical.png&quot;, &quot;svg&quot;: &quot;figures/fig5_matrices_canonical.svg&quot;, &quot;html&quot;: null}]"
+               style="--stagger:1">
+        <div class="card-body">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="fig-title">Forgetting matrices, both task orders</h3>
+            <div class="pop-wrap">
+              <button type="button" class="icon-btn js-info" aria-expanded="false"
+                      aria-label="Details for Forgetting matrices, both task orders">
+                <i data-lucide="info"></i>
+              </button>
+              <div class="popover" role="dialog"
+                   aria-label="Details for Forgetting matrices, both task orders" hidden>
+                <div class="pop-head">Forgetting matrices, both task orders</div>
+                <div class="pop-md"><p>Rows are training phases, columns are tasks in learning order. The <strong>bold diagonal</strong> is each game measured right after its own consolidation; everything below it is retention. The blank upper triangle is never evaluated and never imputed.</p>
+<ul>
+<li><strong>Reversed is the paper figure</strong>; switch variants for the canonical order. Both share one colour scale (-50% to 250% of the ceiling, centred on the ceiling) so switching between them is not misleading.</li>
+<li><strong>Red is below the ceiling, blue above.</strong> CLEAR's reversed Q*bert cell is 360% and saturates at the top of the scale; it keeps its printed number.</li>
+<li><strong>What to look for.</strong> CLEAR's Breakout column in the reversed order walking 106% → 19% → 8% down the rows, against V5's 103% → 55% → 70%. In the canonical order the roles swap and it is V5 that loses Boxing outright, to -38%.</li>
+</ul>
+<p>Seed 0, greedy-100 evaluation, plain <code>impala_ac_multihead</code> net, five Atari games. <strong>Single seed, so no error bars are drawn and none are invented.</strong> CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO hyperparameters, frame-matched budget, and equal replay buffer. The only difference is CLEAR's replay plus policy/value cloning against V5's min-max dual constraint.</p></div>
+                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>Atari 5-game sequence (greedy-100)</b></div><div class="pop-row"><span>Model</span><b>impala_ac_multihead</b></div><div class="pop-row"><span>Created</span><b>2026-09-12T17:44:09</b></div></div>
+                <div class="pop-files"><a href="figures/fig5_matrices_reversed.png" target="_blank" rel="noopener">fig5_matrices_reversed.png</a><a href="figures/fig5_matrices_reversed.svg" target="_blank" rel="noopener">fig5_matrices_reversed.svg</a><a href="figures/fig5_matrices_canonical.png" target="_blank" rel="noopener">fig5_matrices_canonical.png</a><a href="figures/fig5_matrices_canonical.svg" target="_blank" rel="noopener">fig5_matrices_canonical.svg</a></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="join mb-3" role="tablist" aria-label="Chart variants for Forgetting matrices, both task orders"><button type="button" class="join-item vbtn vbtn-active" role="tab" aria-selected="true" tabindex="0" data-variant-index="0">Reversed order</button><button type="button" class="join-item vbtn" role="tab" aria-selected="false" tabindex="-1" data-variant-index="1">Canonical order</button></div>
+
+          <button type="button" class="fig-inset js-zoom"
+                  aria-label="Open Forgetting matrices, both task orders full size">
+            <img class="fig-img" src="figures/fig5_matrices_reversed.svg"
+                 alt="Forgetting matrices, both task orders" loading="lazy" decoding="async">
+          </button>
+
+          <p class="fig-caption">Every evaluation as a fraction of the Joint ceiling. Bold diagonal is the task just consolidated; blank upper triangle is never evaluated.</p>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">CLEAR Breakout (rev, final)<b>0.08374</b></span><span class="chip">colour range<b>-50% to 250%</b></span></div>
+
+          <div class="card-actions flex flex-wrap items-center gap-2">
+            
+            <div class="ml-auto flex gap-2">
+              <a class="mini-btn js-dl-png" href="figures/fig5_matrices_reversed.png" download>
+                <i data-lucide="download"></i><span>PNG</span></a>
+              <a class="mini-btn js-dl-svg" href="figures/fig5_matrices_reversed.svg" download>
+                <i data-lucide="download"></i><span>SVG</span></a>
+            </div>
+          </div>
+        </div>
+      </article>
+      </div>
+    </section>
     <section id="group-method_comparison" class="group-section scroll-mt-24 mb-16">
       <header class="mb-6 flex items-center gap-3">
         <span class="group-icon"><i data-lucide="git-compare"></i></span>
         <h2 class="group-title">Method Comparison</h2>
-        <span class="group-count">2 figures</span>
+        <span class="group-count">1 figure</span>
       </header>
       <div class="bento">
         
@@ -384,50 +646,6 @@
               <a class="mini-btn js-dl-png" href="figures/method_comparison_scores.png" download>
                 <i data-lucide="download"></i><span>PNG</span></a>
               <a class="mini-btn js-dl-svg" href="figures/method_comparison_scores.svg" download>
-                <i data-lucide="download"></i><span>SVG</span></a>
-            </div>
-          </div>
-        </div>
-      </article>
-      <article class="fig-card card" data-figure-id="forgetting_matrices"
-               data-search="forgetting matrices: per-method evaluation over task sequence rows = after task i; cols = game j. blue = above zero, red = below zero (forgetting). single seed. method comparison method_comparison"
-               data-variants="[{&quot;label&quot;: &quot;V5 canonical (Ours)&quot;, &quot;png&quot;: &quot;figures/forgetting_matrix_v5_can.png&quot;, &quot;svg&quot;: &quot;figures/forgetting_matrix_v5_can.svg&quot;, &quot;html&quot;: null}, {&quot;label&quot;: &quot;V5 reversed order (Ours)&quot;, &quot;png&quot;: &quot;figures/forgetting_matrix_v5_rev.png&quot;, &quot;svg&quot;: &quot;figures/forgetting_matrix_v5_rev.svg&quot;, &quot;html&quot;: null}, {&quot;label&quot;: &quot;CLEAR-A standard buffer&quot;, &quot;png&quot;: &quot;figures/forgetting_matrix_clearA.png&quot;, &quot;svg&quot;: &quot;figures/forgetting_matrix_clearA.svg&quot;, &quot;html&quot;: null}]"
-               style="--stagger:1">
-        <div class="card-body">
-          <div class="flex items-start justify-between gap-3">
-            <h3 class="fig-title">Forgetting matrices: per-method evaluation over task sequence</h3>
-            <div class="pop-wrap">
-              <button type="button" class="icon-btn js-info" aria-expanded="false"
-                      aria-label="Details for Forgetting matrices: per-method evaluation over task sequence">
-                <i data-lucide="info"></i>
-              </button>
-              <div class="popover" role="dialog"
-                   aria-label="Details for Forgetting matrices: per-method evaluation over task sequence" hidden>
-                <div class="pop-head">Forgetting matrices: per-method evaluation over task sequence</div>
-                <div class="pop-md"><p>Each cell M[i,j] is the greedy-100 score on game j measured after finishing task i. Diagonal = score right after learning each game. V5 canonical order: Qbert, Pong, Breakout, Boxing, SpaceInvaders. V5 reversed order: SpaceInvaders, Boxing, Breakout, Pong, Qbert. CLEAR-A uses standard replay buffer (batches=4, canonical order). Blue=positive score, red=negative (below zero). Diverging scale centred at 0.</p></div>
-                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>Atari-5</b></div><div class="pop-row"><span>Model</span><b>impala_ac_multihead</b></div><div class="pop-row"><span>Created</span><b>2026-09-11T00:22:30</b></div></div>
-                <div class="pop-files"><a href="figures/forgetting_matrix_v5_can.png" target="_blank" rel="noopener">forgetting_matrix_v5_can.png</a><a href="figures/forgetting_matrix_v5_can.svg" target="_blank" rel="noopener">forgetting_matrix_v5_can.svg</a><a href="figures/forgetting_matrix_v5_rev.png" target="_blank" rel="noopener">forgetting_matrix_v5_rev.png</a><a href="figures/forgetting_matrix_v5_rev.svg" target="_blank" rel="noopener">forgetting_matrix_v5_rev.svg</a><a href="figures/forgetting_matrix_clearA.png" target="_blank" rel="noopener">forgetting_matrix_clearA.png</a><a href="figures/forgetting_matrix_clearA.svg" target="_blank" rel="noopener">forgetting_matrix_clearA.svg</a></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="join mb-3" role="tablist" aria-label="Chart variants for Forgetting matrices: per-method evaluation over task sequence"><button type="button" class="join-item vbtn vbtn-active" role="tab" aria-selected="true" tabindex="0" data-variant-index="0">V5 canonical (Ours)</button><button type="button" class="join-item vbtn" role="tab" aria-selected="false" tabindex="-1" data-variant-index="1">V5 reversed order (Ours)</button><button type="button" class="join-item vbtn" role="tab" aria-selected="false" tabindex="-1" data-variant-index="2">CLEAR-A standard buffer</button></div>
-
-          <button type="button" class="fig-inset js-zoom"
-                  aria-label="Open Forgetting matrices: per-method evaluation over task sequence full size">
-            <img class="fig-img" src="figures/forgetting_matrix_v5_can.svg"
-                 alt="Forgetting matrices: per-method evaluation over task sequence" loading="lazy" decoding="async">
-          </button>
-
-          <p class="fig-caption">Rows = after task i; cols = game j. Blue = above zero, red = below zero (forgetting). Single seed.</p>
-          
-
-          <div class="card-actions flex flex-wrap items-center gap-2">
-            
-            <div class="ml-auto flex gap-2">
-              <a class="mini-btn js-dl-png" href="figures/forgetting_matrix_v5_can.png" download>
-                <i data-lucide="download"></i><span>PNG</span></a>
-              <a class="mini-btn js-dl-svg" href="figures/forgetting_matrix_v5_can.svg" download>
                 <i data-lucide="download"></i><span>SVG</span></a>
             </div>
           </div>
@@ -587,60 +805,6 @@
       </article>
       </div>
     </section>
-    <section id="group-order_sensitivity" class="group-section scroll-mt-24 mb-16">
-      <header class="mb-6 flex items-center gap-3">
-        <span class="group-icon"><i data-lucide="hash"></i></span>
-        <h2 class="group-title">Order Sensitivity</h2>
-        <span class="group-count">1 figure</span>
-      </header>
-      <div class="bento">
-        
-      <article class="fig-card card" data-figure-id="order_sensitivity"
-               data-search="order sensitivity: per-game retention vs joint ceiling for v5 canonical vs reversed retention = final ÷ joint-6m score. reversed order substantially recovers breakout. mean shown as rightmost bar. single seed. order sensitivity order_sensitivity"
-               data-variants="[{&quot;label&quot;: &quot;Retention vs joint&quot;, &quot;png&quot;: &quot;figures/order_sensitivity.png&quot;, &quot;svg&quot;: &quot;figures/order_sensitivity.svg&quot;, &quot;html&quot;: null}]"
-               style="--stagger:0">
-        <div class="card-body">
-          <div class="flex items-start justify-between gap-3">
-            <h3 class="fig-title">Order sensitivity: per-game retention vs joint ceiling for V5 canonical vs reversed</h3>
-            <div class="pop-wrap">
-              <button type="button" class="icon-btn js-info" aria-expanded="false"
-                      aria-label="Details for Order sensitivity: per-game retention vs joint ceiling for V5 canonical vs reversed">
-                <i data-lucide="info"></i>
-              </button>
-              <div class="popover" role="dialog"
-                   aria-label="Details for Order sensitivity: per-game retention vs joint ceiling for V5 canonical vs reversed" hidden>
-                <div class="pop-head">Order sensitivity: per-game retention vs joint ceiling for V5 canonical vs reversed</div>
-                <div class="pop-md"><p>Joint 6M score is the order-independent ceiling (joint training, 6M frames/game). Canonical order: Qbert, Pong, Breakout, Boxing, SpaceInvaders. Reversed order: SpaceInvaders, Boxing, Breakout, Pong, Qbert. Local (single-task) references are order-dependent and therefore not used here as the common denominator; Joint 6M provides a clean cross-order reference. Reversed-order Breakout retention = 199.8/285.4 ≈ 0.70 vs canonical 51.8/285.4 ≈ 0.18.</p></div>
-                <div class="pop-meta"><div class="pop-row"><span>Seed</span><b>0</b></div><div class="pop-row"><span>Dataset</span><b>Atari-5</b></div><div class="pop-row"><span>Model</span><b>impala_ac_multihead</b></div><div class="pop-row"><span>Created</span><b>2026-09-11T00:22:31</b></div></div>
-                <div class="pop-files"><a href="figures/order_sensitivity.png" target="_blank" rel="noopener">order_sensitivity.png</a><a href="figures/order_sensitivity.svg" target="_blank" rel="noopener">order_sensitivity.svg</a></div>
-              </div>
-            </div>
-          </div>
-
-          
-
-          <button type="button" class="fig-inset js-zoom"
-                  aria-label="Open Order sensitivity: per-game retention vs joint ceiling for V5 canonical vs reversed full size">
-            <img class="fig-img" src="figures/order_sensitivity.svg"
-                 alt="Order sensitivity: per-game retention vs joint ceiling for V5 canonical vs reversed" loading="lazy" decoding="async">
-          </button>
-
-          <p class="fig-caption">Retention = final ÷ Joint-6M score. Reversed order substantially recovers Breakout. Mean shown as rightmost bar. Single seed.</p>
-          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">Canonical mean ret (vs joint)<b>0.511</b></span><span class="chip">Reversed mean ret (vs joint)<b>0.864</b></span><span class="chip">Breakout canon ret<b>0.182</b></span><span class="chip">Breakout rev ret<b>0.7</b></span></div>
-
-          <div class="card-actions flex flex-wrap items-center gap-2">
-            
-            <div class="ml-auto flex gap-2">
-              <a class="mini-btn js-dl-png" href="figures/order_sensitivity.png" download>
-                <i data-lucide="download"></i><span>PNG</span></a>
-              <a class="mini-btn js-dl-svg" href="figures/order_sensitivity.svg" download>
-                <i data-lucide="download"></i><span>SVG</span></a>
-            </div>
-          </div>
-        </div>
-      </article>
-      </div>
-    </section>
     <section id="group-training_dynamics" class="group-section scroll-mt-24 mb-16">
       <header class="mb-6 flex items-center gap-3">
         <span class="group-icon"><i data-lucide="activity"></i></span>
@@ -680,7 +844,7 @@
           </button>
 
           <p class="fig-caption">Joint training ceiling (6M frames/game). All five games trained simultaneously. Single seed; no CI band.</p>
-          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">Qbert final<b>4262</b><i>score</i></span><span class="chip">Pong final<b>20.7</b><i>score</i></span><span class="chip">Breakout final<b>285.4</b><i>score</i></span><span class="chip">Boxing final<b>67.5</b><i>score</i></span><span class="chip">SpaceInvaders final<b>905.8</b><i>score</i></span></div>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">Qbert final<b>4,262</b><i>score</i></span><span class="chip">Pong final<b>20.7</b><i>score</i></span><span class="chip">Breakout final<b>285.4</b><i>score</i></span><span class="chip">Boxing final<b>67.5</b><i>score</i></span><span class="chip">SpaceInvaders final<b>905.8</b><i>score</i></span></div>
 
           <div class="card-actions flex flex-wrap items-center gap-2">
             
@@ -724,7 +888,7 @@
           </button>
 
           <p class="fig-caption">Run stopped early at ~46M frames (step 4500); no joint_result.json. Last probe used. Single seed; no CI.</p>
-          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">SI at stop<b>1375</b><i>score</i></span><span class="chip">Qbert at stop<b>4430</b><i>score</i></span><span class="chip">Frames at stop<b>46.08</b><i>M</i></span></div>
+          <div class="mt-3 flex flex-wrap gap-2"><span class="chip">SI at stop<b>1,375</b><i>score</i></span><span class="chip">Qbert at stop<b>4,430</b><i>score</i></span><span class="chip">Frames at stop<b>46.08</b><i>M</i></span></div>
 
           <div class="card-actions flex flex-wrap items-center gap-2">
             
@@ -840,7 +1004,7 @@
     <div class="empty-state js-empty">No figures match that filter.</div>
 
     <footer class="footer">
-      <span>Generated 2026-09-11 00:22:46</span>
+      <span>Generated 2026-09-12 17:47:31</span>
       <span>Manifest <code>report/manifest.json</code></span>
     </footer>
   </main>

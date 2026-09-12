@@ -1,539 +1,702 @@
 #!/usr/bin/env python3
-"""
-Order-sensitivity figure suite: Local vs V5 (ours, min-max) vs CLEAR vs Joint
-across two task orders (canonical and reversed) for a 5-game continual-RL Atari
-result.
+"""Order-sensitivity figures: V5 (min-max) vs CLEAR against the Joint ceiling.
 
-Provenance: seed 0, greedy-100 eval, plain impala_ac_multihead net, same 5
-games. X-axis game order is fixed for comparability:
-    Qbert, Pong, Breakout, Boxing, SpaceInvaders.
+The report is focused on the **reversed** task order. The canonical order appears
+only in Figure 1, which is the order-contrast itself.
 
-Series:
-  Local : single-task specialist reference per game. ORDER-DEPENDENT
-          (task-1 games have no local phase -> ref is the task-1 diagonal;
-          later tasks' locals start from the evolving global). So
-          Local-Canonical != Local-Reversed.
-  V5    : min-max consolidation FINAL score on each game after learning all 5
-          (last row of the forgetting matrix). Reported for both orders.
-  CLEAR : the CLEAR baseline (replay + policy/value cloning), frame-matched and
-          apples-to-apples with V5 (identical net, task set, thresholds, PPO
-          hyperparameters; equal buffer snapshot_batches=4, replay=8). FINAL
-          score on each game after learning all 5 (last row of its forgetting
-          matrix). Reported for both orders.
-          Source: results/atari5_v5_clearA_equal_seed0/eval_matrix.json
-          (canonical) and CRL-Minimax-joint results/atari5_clear_order2_seed0/
-          eval_matrix.json (reversed).
-  Joint : one budget-matched model trained on all games at once ->
-          ORDER-INDEPENDENT (same numbers in both orders). The fair, fixed
-          cross-order reference.
+Why the Joint ceiling is the denominator everywhere. Joint is one budget-matched
+model trained on all five games at once, so it is *order-independent* and gives
+the same reference in both orders. The Local specialist is order-dependent (a
+task-1 game has no local phase, and later locals start from the evolving global),
+so retention against Local mixes forgetting with reference drift. Local is kept
+as a raw-score reference in Figure 3 and nowhere else.
 
-Orders:
-  Canonical = Qbert->Pong->Breakout->Boxing->SpaceInvaders
-  Reversed  = SpaceInvaders->Boxing->Breakout->Pong->Qbert
+Why "previously learned tasks" is the headline statistic. The last task in a
+sequence has had nothing trained after it, so its final score measures capacity,
+not retention. Including it lets a method that simply overfits the final task
+post a high mean. In the reversed order CLEAR does exactly that: Q*bert runs to
+15350.8, which is 3.6x the Joint ceiling, and that single cell lifts CLEAR's
+five-game mean above V5's while it is forgetting everything else.
 
-Faithfulness notes / transforms:
-  - Boxing can be NEGATIVE (V5-Canonical = -25.8: forgot Boxing, worse than
-    random ~0). Negatives are drawn as bars below 0; a zero line is always
-    drawn; y-limits always include 0. Never clipped.
-  - CLEAR-Reversed Qbert = 15350.8 is a genuine OUTLIER: Qbert is the LAST task
-    in the reversed order, so CLEAR (weak cloning constraint) lets it run far
-    above every other model/reference (Joint ~4261). It is shown honestly, not
-    clipped; the retention-vs-Joint bar for that cell reaches ~360% and is
-    labelled. This compresses the other bars -- called out in the fig note.
-  - Single seed => NO error bars are invented.
-  - Fig 1: small multiples, INDEPENDENT linear y-axis per game (raw scales
-    differ ~200x: Pong ~20 vs Qbert ~4000). No log, no clip, no normalization.
-  - Figs 2/3: retention = V5_score / reference_score. Plain ratio, no
-    smoothing/clipping. Dashed line at 1.0 = "matches reference". Ratios can be
-    negative (Boxing), or >1 (retention above the reference); shown honestly.
-  - Fig 2 denominator (Local) is order-dependent, so it mixes retention with
-    local-reference differences. Fig 3 denominator (Joint) is fixed, so it is
-    the cleaner cross-order comparison.
+Renders with Plotly + Kaleido through report/acviz.py, so the academic template,
+palette, and PNG/SVG export contract are applied. Single seed, so no bands or
+error bars are drawn anywhere.
+
+Usage::
+
+    python reports/order_sensitivity/make_figures.py [--no-dashboard]
 """
 
-import os
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
 import numpy as np
-import matplotlib as mpl
-mpl.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch, Rectangle
-from matplotlib.colors import TwoSlopeNorm
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
-# ---------------------------------------------------------------------------
-# Data (seed 0, greedy-100, plain impala_ac_multihead net)
-# ---------------------------------------------------------------------------
-GAMES = ["Qbert", "Pong", "Breakout", "Boxing", "SpaceInvaders"]
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parent.parent
+sys.path.insert(0, str(REPO / "report"))
 
-# Per game, indexed by GAMES order above.
-SCORES = {
-    "Local_C": np.array([4467.8, 20.0, 132.7,  94.0, 1132.2]),
-    "Local_R": np.array([4341.0, 21.0, 363.9,  98.9,  588.5]),
-    "V5_C":    np.array([4075.0, 19.8,  51.8, -25.8,  765.8]),
-    "V5_R":    np.array([4270.2, 21.0, 199.8,  55.4,  711.7]),
-    # CLEAR final scores = last row of each order's eval_matrix, re-indexed to
-    # the fixed GAMES column order [Qbert, Pong, Breakout, Boxing, SpaceInv].
-    #   canonical last row (cols Qbert,Pong,Breakout,Boxing,SpaceInv):
-    #       [4350.0, 21.0, 0.0, 100.0, 800.0]
-    #   reversed last row (cols SpaceInv,Boxing,Breakout,Pong,Qbert):
-    #       [505.85, 36.8, 23.9, 11.1, 15350.75]  -> reindexed below
-    "CLEAR_C": np.array([4350.0, 21.0,  0.0, 100.0,  800.0]),
-    "CLEAR_R": np.array([15350.75, 11.1, 23.9, 36.8, 505.85]),
-    "Joint":   np.array([4261.5, 20.7, 285.4,  67.5,  905.8]),
+from acviz import (  # noqa: E402
+    AC, DIVERGING, FONT_MONO, FONT_UI, W_FULL, W_ONE_HALF,
+    add_callout, add_end_labels, append_manifest_entry, export_figure,
+    height_for, hex_to_rgba, install_template,
+)
+
+# ── Series identity, fixed across every figure ──────────────────────────────
+# Academic palette in series order: ours is primary, the baseline is secondary,
+# the ceiling is tertiary, the specialist is neutral because it is a reference.
+COLOR = {
+    "V5": AC["blue"],
+    "CLEAR": AC["amber"],
+    "Joint": AC["green"],
+    "Local": AC["text_muted"],
+}
+NAME = {
+    "V5": "V5 (min-max)",
+    "CLEAR": "CLEAR",
+    "Joint": "Joint ceiling",
+    "Local": "Local specialist",
 }
 
-# Series order for the bars per game in Fig 1.
-FIG1_ORDER = ["Local_C", "Local_R", "V5_C", "V5_R",
-              "CLEAR_C", "CLEAR_R", "Joint"]
+PNG_DIR = HERE / "png"
+SVG_DIR = HERE / "svg"
+DASH_FIGURES = REPO / "report" / "figures"
+DASH_MANIFEST = REPO / "report" / "manifest.json"
 
-# ---------------------------------------------------------------------------
-# Forgetting / retention matrices (Figs 4-6). V5 min-max, seed 0, greedy-100.
-#
-# Rows  = training phase (score of the consolidated model AFTER learning task k).
-# Cols  = tasks in the LEARNING order of that run (diagonal = the just-learned
-#         game right after its consolidation; upper triangle = not-yet-seen,
-#         left blank -- eval_all_tasks=false, we never evaluate a future task).
-# Source: results/atari5_v5_seed0/eval_matrix.json (canonical) and
-#         results/atari5_v5_order2_seed0/eval_matrix.json (reversed).
-# NaN marks the unobserved upper triangle; it is masked (grey), never imputed.
-_NAN = np.nan
-
-# Canonical learning order: Qbert -> Pong -> Breakout -> Boxing -> SpaceInvaders
-GAMES_C = ["Qbert", "Pong", "Breakout", "Boxing", "SpaceInv"]
-ROWS_C = ["after Qbert", "after Pong", "after Breakout",
-          "after Boxing", "after SpaceInv"]
-MAT_C = np.array([
-    [4467.75,   _NAN,   _NAN,   _NAN,   _NAN],
-    [4145.50,  19.75,   _NAN,   _NAN,   _NAN],
-    [5448.00,  20.00,  90.45,   _NAN,   _NAN],
-    [ 729.00,  18.96,  44.08,  97.00,   _NAN],
-    [4075.00,  19.75,  51.81, -25.76, 765.85],
-])
-# References in the SAME (canonical) column order.
-LOCAL_C = np.array([4467.8, 20.0, 132.7,  94.0, 1132.2])   # order-dependent
-JOINT_C = np.array([4261.5, 20.7, 285.4,  67.5,  905.8])   # order-independent
-
-# Reversed learning order: SpaceInvaders -> Boxing -> Breakout -> Pong -> Qbert
-GAMES_R = ["SpaceInv", "Boxing", "Breakout", "Pong", "Qbert"]
-ROWS_R = ["after SpaceInv", "after Boxing", "after Breakout",
-          "after Pong", "after Qbert"]
-MAT_R = np.array([
-    [588.50,   _NAN,   _NAN,  _NAN,    _NAN],
-    [587.50,  96.85,   _NAN,  _NAN,    _NAN],
-    [595.50,  21.72, 293.58,  _NAN,    _NAN],
-    [702.40,  74.19, 156.73, 21.00,    _NAN],
-    [711.65,  55.44, 199.83, 21.00, 4270.25],
-])
-# References in the SAME (reversed) column order (Joint is the canonical Joint
-# values re-indexed to this column order -- it is order-independent).
-LOCAL_R = np.array([588.5, 98.9, 363.9, 21.0, 4341.0])
-JOINT_R = np.array([905.8, 67.5, 285.4, 20.7, 4261.5])
-
-# CLEAR forgetting matrices (same layout as MAT_C / MAT_R above): rows = phase,
-# cols = tasks in that run's LEARNING order, diagonal outlined, upper triangle
-# NaN (unobserved). Verbatim from each run's eval_matrix.json (greedy-100).
-#   canonical: results/atari5_v5_clearA_equal_seed0/eval_matrix.json
-#   reversed : CRL-Minimax-joint/results/atari5_clear_order2_seed0/eval_matrix.json
-MAT_CLEAR_C = np.array([
-    [4375.00,   _NAN,   _NAN,   _NAN,   _NAN],
-    [4350.00,  21.00,   _NAN,   _NAN,   _NAN],
-    [4296.00,  21.00,   0.00,   _NAN,   _NAN],
-    [4306.00,  14.33,  30.85, 100.00,   _NAN],
-    [4350.00,  21.00,   0.00, 100.00, 800.00],
-])
-MAT_CLEAR_R = np.array([
-    [588.50,   _NAN,   _NAN,  _NAN,     _NAN],
-    [532.60, 100.00,   _NAN,  _NAN,     _NAN],
-    [484.80,  88.00, 303.63,  _NAN,     _NAN],
-    [529.90,  69.94,  54.92, 21.00,     _NAN],
-    [505.85,  36.80,  23.90, 11.10, 15350.75],
-])
-
-# Colorblind-safe palette (Wong 2011). Color encodes the SERIES (Local/V5/Joint).
-# Order (canonical vs reversed) is encoded by shade + hatch:
-#   canonical = solid darker fill, no hatch
-#   reversed  = lighter fill, "//" hatch
-COL_LOCAL = "#000000"   # black  (specialist reference)
-COL_V5    = "#0072B2"   # blue   (ours, min-max)
-COL_JOINT = "#009E73"   # green  (multi-task ceiling, order-independent)
-COL_LOCAL_R = "#7f7f7f"  # grey (lighter local for reversed)
-COL_V5_R    = "#56B4E9"  # light blue for reversed V5
-COL_CLEAR   = "#D55E00"  # vermillion (CLEAR baseline, canonical)
-COL_CLEAR_R = "#E69F00"  # orange     (CLEAR baseline, reversed)
-
-STYLE = {
-    "Local_C": dict(color=COL_LOCAL,   hatch=None,  label="Local (canonical)"),
-    "Local_R": dict(color=COL_LOCAL_R, hatch="//",  label="Local (reversed)"),
-    "V5_C":    dict(color=COL_V5,      hatch=None,  label="V5 (canonical)"),
-    "V5_R":    dict(color=COL_V5_R,    hatch="//",  label="V5 (reversed)"),
-    "CLEAR_C": dict(color=COL_CLEAR,   hatch=None,  label="CLEAR (canonical)"),
-    "CLEAR_R": dict(color=COL_CLEAR_R, hatch="//",  label="CLEAR (reversed)"),
-    "Joint":   dict(color=COL_JOINT,   hatch=None,  label="Joint (order-independent)"),
-}
-
-OUT = "/work/pnag/CRL-Minimax/reports/order_sensitivity"
-PNG = os.path.join(OUT, "png")
-SVG = os.path.join(OUT, "svg")
-for d in (PNG, SVG):
-    os.makedirs(d, exist_ok=True)
-
-CAPTION = ("seed 0, greedy-100, plain impala net; "
-           "Joint is order-independent, Local is order-dependent")
-
-plt.rcParams.update({
-    "font.size": 10,
-    "axes.titlesize": 11,
-    "axes.labelsize": 10,
-    "legend.fontsize": 9,
-    "xtick.labelsize": 9,
-    "ytick.labelsize": 9,
-    "axes.spines.top": False,
-    "axes.spines.right": False,
-    "figure.dpi": 150,
-    "savefig.dpi": 200,
-    "hatch.linewidth": 0.6,
-})
+GROUP = "reversed_order"
+GROUP_TITLE = "Reversed task order: V5 vs CLEAR vs Joint"
+PROVENANCE = (
+    "Seed 0, greedy-100 evaluation, plain `impala_ac_multihead` net, five Atari "
+    "games. **Single seed, so no error bars are drawn and none are invented.** "
+    "CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO "
+    "hyperparameters, frame-matched budget, and equal replay buffer. The only "
+    "difference is CLEAR's replay plus policy/value cloning against V5's min-max "
+    "dual constraint."
+)
 
 
-def save(fig, name):
-    fig.savefig(os.path.join(PNG, name + ".png"), dpi=200, bbox_inches="tight")
-    fig.savefig(os.path.join(SVG, name + ".svg"), bbox_inches="tight")
-    plt.close(fig)
+# ── Data ────────────────────────────────────────────────────────────────────
+def load_data() -> dict:
+    """Read the cached numbers transcribed from each run's eval matrix."""
+    return json.loads((HERE / "data.json").read_text(encoding="utf-8"))
 
 
-# ---------------------------------------------------------------------------
-# Figure 1 -- Actual per-game scores, small multiples (own y-axis per game)
-# ---------------------------------------------------------------------------
-def figure1():
-    fig, axes = plt.subplots(1, 5, figsize=(17.5, 4.0))
-    x = np.arange(len(FIG1_ORDER))
-    tick_labels = ["Local-C", "Local-R", "V5-C", "V5-R",
-                   "CLEAR-C", "CLEAR-R", "Joint"]
-    for gi, (ax, game) in enumerate(zip(axes, GAMES)):
-        vals = [SCORES[s][gi] for s in FIG1_ORDER]
-        for bi, s in enumerate(FIG1_ORDER):
-            st = STYLE[s]
-            ax.bar(x[bi], vals[bi], width=0.72, color=st["color"],
-                   hatch=st["hatch"], edgecolor="black", linewidth=0.5)
-        ax.set_title(game)
-        ax.set_xticks(x)
-        ax.set_xticklabels(tick_labels, rotation=45, ha="right")
-        ax.axhline(0, color="black", linewidth=0.8)  # zero line always drawn
-
-        vmin, vmax = min(vals), max(vals)
-        rng = vmax - vmin if vmax != vmin else abs(vmax) + 1
-        lo = min(0, vmin) - 0.18 * rng   # always include 0
-        hi = max(0, vmax) + 0.30 * rng   # headroom for rotated value labels
-        ax.set_ylim(lo, hi)
-
-        span = hi - lo
-        for xi, v in zip(x, vals):
-            offs = 0.02 * span
-            if v >= 0:
-                ax.text(xi, v + offs, f"{v:g}", ha="center", va="bottom",
-                        fontsize=7.5, rotation=90)
-            else:
-                ax.text(xi, v - offs, f"{v:g}", ha="center", va="top",
-                        fontsize=7.5, rotation=90)
-        if gi == 0:
-            ax.set_ylabel("Raw greedy-100 score")
-
-    legend_handles = [
-        Patch(facecolor=STYLE[s]["color"], edgecolor="black",
-              hatch=STYLE[s]["hatch"], label=STYLE[s]["label"])
-        for s in FIG1_ORDER
-    ]
-    fig.legend(handles=legend_handles, ncol=7, loc="upper center",
-               bbox_to_anchor=(0.5, 1.08), frameon=False)
-    fig.suptitle("Figure 1 -- Actual per-game scores "
-                 "(independent y-axis per game; each includes 0)",
-                 y=1.17, fontsize=12)
-    fig.text(0.5, -0.12, CAPTION, ha="center", fontsize=8, style="italic")
-    fig.tight_layout()
-    save(fig, "fig1_per_game_scores")
+def reference_in_order(data: dict, key: str, order: list[str]) -> np.ndarray:
+    """Re-index a reference vector from the fixed game order into a task order."""
+    index = data["references"]["_index"]
+    values = data["references"][key]
+    return np.array([values[index.index(game)] for game in order], dtype=float)
 
 
-# ---------------------------------------------------------------------------
-# Figures 2 & 3 -- Retention (V5 / reference), canonical vs reversed
-# ---------------------------------------------------------------------------
-def _retention_figure(ref_c, ref_r, ref_name, fig_no, fname, note):
-    """Per game, FOUR bars -- {V5,CLEAR} x {canonical,reversed} -- each divided
-    by its own-order reference. Plus a MEAN group. Ratios shown honestly:
-    negatives (Boxing V5-C) draw below 0; >1 (CLEAR-R Qbert ~360%) not clipped.
+def matrix(data: dict, key: str) -> np.ndarray:
+    """Load one forgetting matrix, unobserved upper triangle as NaN."""
+    rows = data["matrices"][key]
+    return np.array([[np.nan if v is None else v for v in row] for row in rows],
+                    dtype=float)
+
+
+def retention_matrix(scores: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    """Elementwise score / reference, reference broadcast across training phases."""
+    return scores / reference[None, :]
+
+
+def prior_task_mean(scores: np.ndarray, reference: np.ndarray) -> float:
+    """Mean final retention over every task except the last one learned.
+
+    The final task has had nothing trained after it, so its score is not a
+    retention measurement and is excluded from the headline statistic.
     """
-    # (score_key, ref_key, style_key, label) -- one entry per drawn bar series.
-    series = [
-        ("V5_C",    ref_c, "V5_C",    f"V5 / {ref_name} (canonical)"),
-        ("V5_R",    ref_r, "V5_R",    f"V5 / {ref_name} (reversed)"),
-        ("CLEAR_C", ref_c, "CLEAR_C", f"CLEAR / {ref_name} (canonical)"),
-        ("CLEAR_R", ref_r, "CLEAR_R", f"CLEAR / {ref_name} (reversed)"),
-    ]
-    labels = GAMES + ["MEAN"]
-    x = np.arange(len(labels))
-    nser = len(series)
-    width = 0.80 / nser
-
-    fig, ax = plt.subplots(figsize=(11.0, 4.8))
-    ratios_out = {}
-    all_vals = []
-    for si, (score_key, rkey, style_key, lab) in enumerate(series):
-        ratio = SCORES[score_key] / SCORES[rkey]
-        vals = list(ratio) + [float(np.mean(ratio))]
-        ratios_out[score_key] = ratio
-        st = STYLE[style_key]
-        offset = (si - (nser - 1) / 2) * width
-        bars = ax.bar(x + offset, vals, width=width, color=st["color"],
-                      hatch=st["hatch"], edgecolor="black", linewidth=0.5,
-                      label=lab)
-        all_vals.extend(vals)
-        for b, r in zip(bars, vals):
-            va = "bottom" if r >= 0 else "top"
-            off = 0.02 if r >= 0 else -0.02
-            ax.text(b.get_x() + b.get_width() / 2, r + off,
-                    f"{r*100:.0f}%", ha="center", va=va, fontsize=6.5,
-                    rotation=90)
-
-    # Distinguish the MEAN group with a subtle boundary.
-    ax.axvline(len(GAMES) - 0.5, color="0.7", linestyle=":", linewidth=1.0)
-    ax.axhline(1.0, color="0.35", linestyle="--", linewidth=1.1,
-               label=f"1.0 = matches {ref_name}")
-    ax.axhline(0.0, color="black", linewidth=0.8)
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels, rotation=25, ha="right")
-    ax.set_ylabel(f"Retention  (method score / {ref_name})")
-    ax.set_title(f"Figure {fig_no} -- Retention vs {ref_name.upper()}: "
-                 "V5 vs CLEAR (canonical vs reversed)")
-    ax.legend(frameon=False, fontsize=7.5, loc="upper left", ncol=2)
-
-    lo = min(0.0, min(all_vals))
-    hi = max(1.0, max(all_vals))
-    pad = 0.12 * (hi - lo)
-    ax.set_ylim(lo - pad, hi + pad + 0.12)
-
-    fig.text(0.5, -0.16, CAPTION + "\n" + note, ha="center", fontsize=8,
-             style="italic")
-    fig.tight_layout()
-    save(fig, fname)
-    # Preserve the original return contract (V5 ratios + means) for the audit.
-    rc, rr = ratios_out["V5_C"], ratios_out["V5_R"]
-    return rc, rr, float(np.mean(rc)), float(np.mean(rr))
+    final = scores[-1, :-1] / reference[:-1]
+    return float(np.mean(final))
 
 
-def figure2():
-    note = ("Denominator (Local) is ORDER-DEPENDENT, so this mixes retention "
-            "with local-reference differences.")
-    return _retention_figure("Local_C", "Local_R", "Local", 2,
-                             "fig2_retention_vs_local", note)
+# ── Figure 1: the order contrast ────────────────────────────────────────────
+def figure_order_contrast(data: dict) -> dict:
+    """Slope chart: mean retention on previously learned tasks, by task order."""
+    series = {}
+    for method, keys in (("V5", ("v5_canonical", "v5_reversed")),
+                         ("CLEAR", ("clear_canonical", "clear_reversed"))):
+        values = []
+        for key, order_name in zip(keys, ("canonical", "reversed")):
+            order = data["orders"][order_name]
+            joint = reference_in_order(data, "joint", order)
+            values.append(prior_task_mean(matrix(data, key), joint))
+        series[method] = values
+
+    fig = go.Figure()
+    x = [0, 1]
+    for method in ("V5", "CLEAR"):
+        color = COLOR[method]
+        fig.add_trace(go.Scatter(
+            x=x, y=series[method], mode="lines+markers+text",
+            line=dict(color=color, width=2.2),
+            marker=dict(color=color, size=9, line=dict(color=AC["bg"], width=1.5)),
+            text=[f"{v:.0%}" for v in series[method]],
+            # Right-hand values go above their marker so the end labels have room.
+            textposition=["middle left", "top center"],
+            textfont=dict(family=FONT_MONO, size=12, color=color),
+            cliponaxis=False, hoverinfo="skip",
+        ))
+
+    add_end_labels(fig, [
+        (NAME[m], 1, series[m][1], COLOR[m]) for m in ("V5", "CLEAR")
+    ], xshift=34, min_gap=0.09)
+
+    # The crossing is the whole point of the report. Tail placed in data
+    # coordinates (axref/ayref) rather than pixel offsets, which is the only way
+    # to guarantee the text lands inside the plot area at any export scale.
+    fig.add_annotation(
+        x=0.5, y=0.653, ax=0.12, ay=0.945, axref="x", ayref="y",
+        text="the order flips which<br>method retains more",
+        showarrow=True, arrowhead=0, arrowwidth=1.0, arrowcolor=AC["axis"],
+        xanchor="center", yanchor="bottom", align="left",
+        font=dict(family=FONT_UI, size=11, color=AC["text_primary"]),
+        bgcolor="rgba(255,255,255,0.86)", borderpad=3,
+    )
+
+    fig.update_layout(
+        title=dict(text="Retention depends on the task order"),
+        xaxis=dict(
+            title=dict(text="Task order"),
+            tickmode="array", tickvals=x,
+            ticktext=["Canonical<br>Q*bert → … → SpaceInv",
+                      "Reversed<br>SpaceInv → … → Q*bert"],
+            range=[-0.28, 1.28], showgrid=False, ticklen=0,
+        ),
+        yaxis=dict(
+            title=dict(text="Mean retention vs Joint ceiling"),
+            range=[0.28, 1.02], tickformat=".0%", nticks=5,
+        ),
+        margin=dict(l=76, r=150, t=52, b=76),
+    )
+
+    stem = "fig1_order_contrast"
+    width = W_ONE_HALF
+    variant = export_pair(fig, stem, width, height_for(width, 1.28), "Slope")
+    return dict(
+        id="order_contrast",
+        title="Task order flips which method retains more",
+        caption=(
+            f"Mean retention on previously learned tasks against the Joint "
+            f"ceiling: V5 {series['V5'][0]:.0%} → {series['V5'][1]:.0%}, "
+            f"CLEAR {series['CLEAR'][0]:.0%} → {series['CLEAR'][1]:.0%}."
+        ),
+        details=(
+            "The one figure here that shows both task orders; every other figure "
+            "in this group is the reversed order alone.\n\n"
+            "Each point is the mean of final-score / Joint over the four tasks "
+            "learned *before* the last one. The last task is excluded because "
+            "nothing was trained after it, so its score measures capacity rather "
+            "than retention.\n\n"
+            "- **Canonical** Q\\*bert → Pong → Breakout → Boxing → SpaceInvaders\n"
+            "- **Reversed** SpaceInvaders → Boxing → Breakout → Pong → Q\\*bert\n\n"
+            "The lines cross. Neither method is order-robust, and a single-order "
+            "result would have supported the opposite conclusion.\n\n" + PROVENANCE
+        ),
+        variants=[variant],
+        metrics=[
+            {"name": "V5 canonical", "value": series["V5"][0], "unit": ""},
+            {"name": "V5 reversed", "value": series["V5"][1], "unit": ""},
+            {"name": "CLEAR canonical", "value": series["CLEAR"][0], "unit": ""},
+            {"name": "CLEAR reversed", "value": series["CLEAR"][1], "unit": ""},
+        ],
+    )
 
 
-def figure3():
-    note = ("Denominator (Joint) is the FIXED, order-independent reference -> "
-            "the cleaner cross-order comparison. CLEAR-reversed Qbert ~360% "
-            "(last-task, uncapped) sets the y-scale and compresses other bars.")
-    return _retention_figure("Joint", "Joint", "Joint", 3,
-                             "fig3_retention_vs_joint", note)
+# ── Figure 2: reversed-order retention per game ─────────────────────────────
+def figure_reversed_retention(data: dict) -> dict:
+    """Horizontal bars: per-game retention vs Joint, final task split out."""
+    order = data["orders"]["reversed"]
+    short = data["short_labels"]
+    joint = reference_in_order(data, "joint", order)
+    v5 = matrix(data, "v5_reversed")[-1] / joint
+    clear = matrix(data, "clear_reversed")[-1] / joint
+
+    prior = list(range(len(order) - 1))
+    # y reversed so the first task learned sits at the top of the panel.
+    labels = [short[order[i]] for i in prior][::-1]
+    v5_prior = [v5[i] for i in prior][::-1]
+    clear_prior = [clear[i] for i in prior][::-1]
+
+    fig = make_subplots(
+        rows=1, cols=2, column_widths=[0.74, 0.26], horizontal_spacing=0.10,
+        subplot_titles=("Previously learned tasks", "Final task"),
+    )
+
+    for column, (names, v5_values, clear_values) in enumerate(
+        [(labels, v5_prior, clear_prior),
+         ([short[order[-1]]], [v5[-1]], [clear[-1]])], start=1
+    ):
+        for method, values in (("CLEAR", clear_values), ("V5", v5_values)):
+            fig.add_trace(go.Bar(
+                y=names, x=values, orientation="h", name=NAME[method],
+                marker=dict(color=hex_to_rgba(COLOR[method], 0.88),
+                            line=dict(color=COLOR[method], width=1.0)),
+                text=[f"{v:.0%}" for v in values],
+                textposition="outside", cliponaxis=False,
+                textfont=dict(family=FONT_MONO, size=11, color=COLOR[method]),
+                hovertemplate="%{y}: %{x:.1%}<extra>" + NAME[method] + "</extra>",
+                showlegend=False,
+            ), row=1, col=column)
+        fig.add_vline(x=1.0, line=dict(color=AC["green"], width=1.2, dash="dash"),
+                      row=1, col=column)
+
+    for annotation in fig.layout.annotations:
+        annotation.font = dict(family=FONT_UI, size=12, color=AC["text_primary"])
+
+    # Every annotation below avoids a numeric y on these categorical axes and
+    # avoids leader lines: Plotly grows the autorange to fit an arrow, which
+    # collapses the bars into a corner. Categories are addressed by name and
+    # nudged in pixels, and the y range is pinned explicitly.
+    fig.add_annotation(
+        x=1.0, xref="x", y=1.0, yref="paper", text="Joint ceiling",
+        showarrow=False, xanchor="center", yanchor="top", yshift=-6,
+        font=dict(family=FONT_UI, size=10, color=AC["green"]),
+    )
+    fig.add_annotation(
+        x=1.07, xref="x", y=labels[1], yref="y",
+        text="CLEAR keeps 8%<br>of Breakout", showarrow=False,
+        xanchor="left", yanchor="middle", align="left",
+        font=dict(family=FONT_UI, size=10, color=AC["amber"]),
+    )
+
+    # Direct series labels, inside the bars of the top group.
+    for method, shift in (("V5", 11), ("CLEAR", -11)):
+        fig.add_annotation(
+            x=0.02, xref="x", y=labels[-1], yref="y", yshift=shift,
+            text=f"<b>{NAME[method]}</b>", showarrow=False,
+            xanchor="left", yanchor="middle",
+            font=dict(family=FONT_UI, size=11, color=AC["bg"]),
+        )
+
+    fig.update_xaxes(tickformat=".0%", showgrid=True, gridcolor=AC["grid"],
+                     zeroline=False, nticks=5)
+    fig.update_xaxes(range=[0, 1.46], title=dict(text="Retention vs Joint ceiling"),
+                     row=1, col=1)
+    fig.update_xaxes(range=[0, 4.3], nticks=4,
+                     title=dict(text="× Joint ceiling (own scale)"), row=1, col=2)
+    fig.update_yaxes(showgrid=False, ticklen=0)
+    fig.update_yaxes(range=[-0.62, len(labels) - 0.38], row=1, col=1)
+    fig.update_yaxes(range=[-0.62, 0.62], row=1, col=2)
+    fig.update_layout(
+        title=dict(text="Reversed order: what survives to the end of the sequence"),
+        barmode="group", bargap=0.34, bargroupgap=0.16, showlegend=False,
+        margin=dict(l=92, r=28, t=68, b=68),
+    )
+
+    stem = "fig2_reversed_retention"
+    width = W_FULL
+    variant = export_pair(fig, stem, width, height_for(width, 2.0), "Bars")
+    prior_v5 = float(np.mean(v5[:-1]))
+    prior_clear = float(np.mean(clear[:-1]))
+    return dict(
+        id="reversed_retention",
+        title="Reversed order: retention against the Joint ceiling",
+        caption=(
+            f"On the four previously learned tasks V5 keeps {prior_v5:.0%} of the "
+            f"Joint ceiling and CLEAR keeps {prior_clear:.0%}."
+        ),
+        details=(
+            "Final score after the whole reversed sequence, divided by the "
+            "order-independent Joint ceiling for that game. Tasks run top to "
+            "bottom in the order they were learned.\n\n"
+            "The final task sits in its own panel on its own scale. Q\\*bert was "
+            "learned last, so nothing has been trained after it and its score is "
+            "not a retention measurement. CLEAR reaches "
+            f"{clear[-1]:.0%} of the ceiling there, which is the cell that lifts "
+            "its five-game mean above V5 while it is forgetting the rest.\n\n"
+            "- **What to look for.** Breakout. V5 holds "
+            f"{v5[2]:.0%}, CLEAR holds {clear[2]:.0%}.\n"
+            "- CLEAR is below the ceiling on every previously learned task.\n\n"
+            + PROVENANCE
+        ),
+        variants=[variant],
+        metrics=[
+            {"name": "V5 prior-task mean", "value": prior_v5, "unit": ""},
+            {"name": "CLEAR prior-task mean", "value": prior_clear, "unit": ""},
+            {"name": "CLEAR final task", "value": float(clear[-1]), "unit": "x joint"},
+        ],
+    )
 
 
-# ---------------------------------------------------------------------------
-# Figures 4-6 -- Retention / forgetting MATRICES (task x training-phase).
-#   Fig 4: raw greedy-100 scores (color = per-column fraction-of-max, since raw
-#          scales differ ~200x across games; cell text = the RAW score).
-#   Fig 5: normalized by LOCAL reference (retention).
-#   Fig 6: normalized by JOINT reference (retention).
-# Normalized cells use a diverging colormap centered at 1.0 (= matches the
-# reference); a shared color scale spans BOTH orders so the two panels are
-# directly comparable. Negative cells (Boxing canonical) are shown honestly.
-# ---------------------------------------------------------------------------
-def _lower_mask(M):
-    """True where a cell is unobserved (upper triangle / NaN)."""
-    return ~np.isfinite(M)
+# ── Figure 3: reversed-order raw scores ─────────────────────────────────────
+def figure_reversed_raw(data: dict) -> dict:
+    """Small multiples of raw final scores, one panel per game, own y-axis."""
+    order = data["orders"]["reversed"]
+    labels = data["short_labels"]
+    joint = reference_in_order(data, "joint", order)
+    local = reference_in_order(data, "local_reversed", order)
+    v5 = matrix(data, "v5_reversed")[-1]
+    clear = matrix(data, "clear_reversed")[-1]
+
+    methods = ["Local", "V5", "CLEAR", "Joint"]
+    per_game = {"Local": local, "V5": v5, "CLEAR": clear, "Joint": joint}
+
+    # Each panel carries its own y-axis, so panels need real space between them
+    # or one panel's tick labels land on the previous panel's bars.
+    short_names = {"Local": "Local", "V5": "V5", "CLEAR": "CLEAR", "Joint": "Joint"}
+    fig = make_subplots(
+        rows=1, cols=len(order), horizontal_spacing=0.075,
+        subplot_titles=[f"{i + 1}. {labels[g]}" for i, g in enumerate(order)],
+    )
+    for column, _game in enumerate(order, start=1):
+        values = [per_game[m][column - 1] for m in methods]
+        fig.add_trace(go.Bar(
+            x=[short_names[m] for m in methods], y=values,
+            marker=dict(color=[hex_to_rgba(COLOR[m], 0.88) for m in methods],
+                        line=dict(color=[COLOR[m] for m in methods], width=1.0)),
+            text=[f"{v:,.0f}" if abs(v) >= 100 else f"{v:.1f}" for v in values],
+            textposition="outside", cliponaxis=False,
+            textfont=dict(family=FONT_MONO, size=9, color=AC["text_muted"]),
+            hovertemplate="%{x}: %{y:,.1f}<extra></extra>", showlegend=False,
+        ), row=1, col=column)
+        # Raw scales differ by ~700x, so every panel gets headroom of its own.
+        top = max(values) * 1.30
+        fig.update_yaxes(range=[0, top], row=1, col=column)
+
+    for annotation in fig.layout.annotations:
+        annotation.font = dict(family=FONT_UI, size=11, color=AC["text_primary"])
+
+    # Parked in the empty upper-left of the Q*bert panel. A leader line would
+    # have to leave the panel to find clear space.
+    fig.add_annotation(
+        x="Local", y=float(clear[-1]) * 0.74, xref="x5", yref="y5",
+        text="3.6×<br>ceiling", showarrow=False,
+        xanchor="left", yanchor="middle", align="left", xshift=-12,
+        font=dict(family=FONT_UI, size=10, color=AC["amber"]),
+    )
+
+    fig.update_xaxes(tickfont=dict(size=9), showgrid=False, ticklen=0)
+    fig.update_yaxes(showgrid=True, gridcolor=AC["grid"], nticks=5, zeroline=False)
+    fig.update_yaxes(title=dict(text="Greedy-100 score"), row=1, col=1)
+    fig.update_layout(
+        title=dict(text="Reversed order: raw final scores, panels in learning order"),
+        showlegend=False, margin=dict(l=76, r=24, t=72, b=56),
+    )
+
+    stem = "fig3_reversed_raw_scores"
+    width = W_FULL
+    variant = export_pair(fig, stem, width, height_for(width, 1.85), "Small multiples")
+    return dict(
+        id="reversed_raw_scores",
+        title="Reversed order: raw final scores",
+        caption=(
+            "Greedy-100 score on each game after the full reversed sequence, with "
+            "the Local specialist and Joint ceiling alongside. Own y-axis per game."
+        ),
+        details=(
+            "The absolute numbers behind the retention ratios. Panels run left to "
+            "right in learning order.\n\n"
+            "- **Own y-axis per panel, always including zero.** Raw scales differ "
+            "by roughly 700x (Pong around 20, Q\\*bert around 4000), so a shared "
+            "axis would flatten four of the five panels. No log scale, no "
+            "clipping, no normalisation.\n"
+            "- **Local** is the single-task specialist and is itself "
+            "order-dependent, which is why retention elsewhere in this group is "
+            "measured against Joint instead.\n"
+            "- **What to look for.** Q\\*bert, where CLEAR reaches 15351 against a "
+            "Joint ceiling of 4262.\n\n" + PROVENANCE
+        ),
+        variants=[variant],
+        metrics=[
+            {"name": "CLEAR Q*bert", "value": float(clear[-1]), "unit": "score"},
+            {"name": "Joint Q*bert", "value": float(joint[-1]), "unit": "score"},
+            {"name": "V5 Breakout", "value": float(v5[2]), "unit": "score"},
+            {"name": "CLEAR Breakout", "value": float(clear[2]), "unit": "score"},
+        ],
+    )
 
 
-def _draw_matrix(ax, M, row_labels, col_labels, kind,
-                 ref=None, norm=None, cmap=None):
-    """Draw one heatmap. kind in {'raw','norm'}.
+# ── Figure 4: reversed-order forgetting trajectories ────────────────────────
+def figure_reversed_trajectories(data: dict) -> dict:
+    """Small multiples: each game's retention across the training phases after it."""
+    order = data["orders"]["reversed"]
+    labels = data["short_labels"]
+    joint = reference_in_order(data, "joint", order)
+    tracks = {
+        "V5": retention_matrix(matrix(data, "v5_reversed"), joint),
+        "CLEAR": retention_matrix(matrix(data, "clear_reversed"), joint),
+    }
 
-    raw : color = value / column-max (per-column, purely a visual aid because
-          raw game scales differ ~200x); annotated with the RAW score.
-    norm: color-array = value / ref (broadcast over columns); TwoSlopeNorm
-          centered at 1.0; annotated with the retention percentage.
-    Unobserved cells (upper triangle) are masked grey and left blank.
-    """
-    n = M.shape[0]
-    mask = _lower_mask(M)
-    if kind == "raw":
-        with np.errstate(invalid="ignore"):
-            colmax = np.nanmax(np.where(mask, np.nan, M), axis=0)
-        C = M / colmax                      # per-column [.,1]
-        cmap = cmap or plt.cm.viridis.copy()
-        vmin, vmax = 0.0, 1.0
-        cmap.set_bad("0.9")
-        im = ax.imshow(np.ma.array(C, mask=mask), cmap=cmap,
-                       vmin=vmin, vmax=vmax, aspect="auto")
-    else:                                    # normalized retention
-        C = M / ref                          # broadcast ref over columns
-        cmap = cmap or plt.cm.RdBu.copy()
-        cmap.set_bad("0.9")
-        im = ax.imshow(np.ma.array(C, mask=mask), cmap=cmap,
-                       norm=norm, aspect="auto")
+    # Only the tasks with a phase after them have a trajectory to draw.
+    columns = list(range(len(order) - 1))
+    phase_labels = [labels[g] for g in order]
 
-    # Cell annotations (white bbox for legibility over any color).
-    for i in range(n):
-        for j in range(n):
-            if mask[i, j]:
-                continue
-            if kind == "raw":
-                txt = f"{M[i, j]:g}"
-            else:
-                txt = f"{C[i, j] * 100:.0f}%"
-            ax.text(j, i, txt, ha="center", va="center", fontsize=8,
-                    color="black",
-                    bbox=dict(boxstyle="round,pad=0.12", facecolor="white",
-                              alpha=0.60, edgecolor="none"))
+    fig = make_subplots(
+        rows=1, cols=len(columns), shared_yaxes=True, horizontal_spacing=0.028,
+        subplot_titles=[f"{i + 1}. {labels[order[i]]}" for i in columns],
+    )
+    for column_position, task in enumerate(columns, start=1):
+        phases = list(range(task, len(order)))
+        for method in ("CLEAR", "V5"):
+            values = [tracks[method][p, task] for p in phases]
+            fig.add_trace(go.Scatter(
+                x=phases, y=values, mode="lines+markers",
+                line=dict(color=COLOR[method], width=2.0 if method == "V5" else 1.4),
+                marker=dict(color=COLOR[method], size=6,
+                            line=dict(color=AC["bg"], width=1.2)),
+                hovertemplate=(f"{NAME[method]}<br>after %{{text}}: %{{y:.1%}}"
+                               "<extra></extra>"),
+                text=[phase_labels[p] for p in phases], showlegend=False,
+            ), row=1, col=column_position)
+        fig.add_hline(y=1.0, line=dict(color=AC["green"], width=1.0, dash="dash"),
+                      row=1, col=column_position)
 
-    # Outline the diagonal (the just-learned game before later interference).
-    for d in range(n):
-        ax.add_patch(Rectangle((d - 0.5, d - 0.5), 1, 1, fill=False,
-                               edgecolor="black", linewidth=1.6))
+    for annotation in fig.layout.annotations:
+        annotation.font = dict(family=FONT_UI, size=11, color=AC["text_primary"])
 
-    ax.set_xticks(range(n))
-    ax.set_xticklabels(col_labels, rotation=35, ha="right")
-    ax.set_yticks(range(n))
-    ax.set_yticklabels(row_labels)
-    ax.set_xlabel("evaluated on task (learning order ->)")
-    ax.tick_params(length=0)
-    return im
+    # Series labelled directly in the first panel, parked in its empty upper band
+    # so neither label sits on a line.
+    for method, y_position in (("V5", 1.40), ("CLEAR", 1.24)):
+        fig.add_annotation(
+            x=0.5, y=y_position, xref="x", yref="y",
+            text=f"<b>{NAME[method]}</b>", showarrow=False,
+            xanchor="left", yanchor="middle",
+            font=dict(family=FONT_UI, size=11, color=COLOR[method]),
+        )
+    fig.add_annotation(
+        x=0.15, y=1.0, xref="x", yref="y", text="Joint ceiling", showarrow=False,
+        xanchor="left", yanchor="bottom",
+        font=dict(family=FONT_UI, size=9.5, color=AC["green"]),
+    )
+    # xref/yref must name the third panel's axes or the callout lands on panel 1.
+    # No leader line: every path from clear space to the 8% point would cross a
+    # series line, and the panel it sits in is unambiguous.
+    fig.add_annotation(
+        x=-0.2, y=0.46, xref="x3", yref="y3",
+        text="Breakout collapses<br>once Pong arrives", showarrow=False,
+        xanchor="left", yanchor="middle", align="left",
+        font=dict(family=FONT_UI, size=10, color=AC["amber"]),
+    )
+
+    fig.update_xaxes(
+        tickmode="array", tickvals=list(range(len(order))),
+        ticktext=[str(p + 1) for p in range(len(order))],
+        range=[-0.35, len(order) - 0.65], showgrid=False, zeroline=False,
+        title=dict(text="training phase", font=dict(size=10)),
+    )
+    fig.update_yaxes(range=[0, 1.55], tickformat=".0%", nticks=5,
+                     showgrid=True, gridcolor=AC["grid"], zeroline=False)
+    fig.update_yaxes(title=dict(text="Retention vs Joint ceiling"), row=1, col=1)
+    fig.update_layout(
+        title=dict(text="Reversed order: how each task decays after it is learned"),
+        showlegend=False, margin=dict(l=80, r=24, t=72, b=64),
+    )
+
+    stem = "fig4_reversed_trajectories"
+    width = W_FULL
+    variant = export_pair(fig, stem, width, height_for(width, 2.15), "Small multiples")
+    return dict(
+        id="reversed_trajectories",
+        title="Reversed order: decay of each task after it is learned",
+        caption=(
+            "Retention of each game against the Joint ceiling at every later "
+            "training phase. V5 dips and recovers on Breakout; CLEAR does not."
+        ),
+        details=(
+            "One panel per task, in learning order. The x-axis is the absolute "
+            "training phase, shared across panels, so each line starts on its own "
+            "diagonal and shortens as the sequence advances.\n\n"
+            "This is the same information as the forgetting matrix, read as a "
+            "trajectory instead of a grid, which is what makes the *timing* "
+            "visible. Training phase 1 is SpaceInvaders, 2 Boxing, 3 Breakout, "
+            "4 Pong, 5 Q\\*bert, matching the panel numbering.\n\n"
+            "- **Q\\*bert is absent.** It is the last task in this order, so there "
+            "is no later phase to plot.\n"
+            "- **What to look for.** Breakout. Both methods leave it near the "
+            "ceiling, then V5 falls to 55% and recovers to 70% while CLEAR goes "
+            "19% and then 8%.\n"
+            "- Boxing shows the opposite shape: CLEAR holds it longer, then drops "
+            "below V5 at the end.\n\n" + PROVENANCE
+        ),
+        variants=[variant],
+        metrics=[
+            {"name": "V5 Breakout final", "value": float(tracks["V5"][4, 2]), "unit": ""},
+            {"name": "CLEAR Breakout final", "value": float(tracks["CLEAR"][4, 2]), "unit": ""},
+        ],
+    )
 
 
-def figure4_raw():
-    """Raw forgetting matrices: rows = method (V5 / CLEAR), cols = order."""
-    fig, axes = plt.subplots(2, 2, figsize=(12.5, 9.2))
-    _draw_matrix(axes[0, 0], MAT_C,       ROWS_C, GAMES_C, "raw")
-    _draw_matrix(axes[0, 1], MAT_R,       ROWS_R, GAMES_R, "raw")
-    _draw_matrix(axes[1, 0], MAT_CLEAR_C, ROWS_C, GAMES_C, "raw")
-    _draw_matrix(axes[1, 1], MAT_CLEAR_R, ROWS_R, GAMES_R, "raw")
-    axes[0, 0].set_title("V5 (min-max) -- Canonical order")
-    axes[0, 1].set_title("V5 (min-max) -- Reversed order")
-    axes[1, 0].set_title("CLEAR -- Canonical order")
-    axes[1, 1].set_title("CLEAR -- Reversed order")
-    axes[0, 0].set_ylabel("training phase")
-    axes[1, 0].set_ylabel("training phase")
-    fig.suptitle("Figure 4 -- Forgetting matrix: RAW greedy-100 score "
-                 "(diagonal = just-learned game); V5 (top) vs CLEAR (bottom)",
-                 y=1.01, fontsize=12)
-    fig.text(0.5, -0.04,
-             CAPTION + "\ncolor = fraction of each column's max, computed "
-             "PER-PANEL (raw scales differ ~200x); cell text = raw score; "
-             "grey = task not yet seen.",
-             ha="center", fontsize=8, style="italic")
-    fig.tight_layout()
-    save(fig, "fig4_retention_matrix_raw")
+# ── Figure 5: forgetting matrices, both orders ──────────────────────────────
+# Shared across both variants so a reader switching between them is not misled
+# by a shifting colour meaning. Symmetric about the ceiling; the reversed
+# Q*bert cell (3.6x) saturates but keeps its printed number.
+MATRIX_ZMIN, MATRIX_ZMAX = -0.5, 2.5
 
 
-def _norm_matrix_figure(ref_c, ref_r, ref_name, fig_no, fname, note):
-    """Normalized (retention) matrices, shared color scale across ALL four
-    panels: rows = method (V5 / CLEAR), cols = order (canonical / reversed).
-    """
+def _matrix_panel(data: dict, order_name: str) -> go.Figure:
+    """Build the V5-vs-CLEAR retention matrix pair for one task order."""
+    order = data["orders"][order_name]
+    labels = data["short_labels"]
+    joint = reference_in_order(data, "joint", order)
     panels = [
-        (MAT_C,       ref_c, ROWS_C, GAMES_C),
-        (MAT_R,       ref_r, ROWS_R, GAMES_R),
-        (MAT_CLEAR_C, ref_c, ROWS_C, GAMES_C),
-        (MAT_CLEAR_R, ref_r, ROWS_R, GAMES_R),
+        ("V5 (min-max)", retention_matrix(
+            matrix(data, f"v5_{order_name}"), joint)),
+        ("CLEAR", retention_matrix(
+            matrix(data, f"clear_{order_name}"), joint)),
     ]
-    finite = np.concatenate([(M / r)[np.isfinite(M / r)]
-                             for (M, r, _, _) in panels])
-    vmin = min(finite.min(), 0.0)          # include negatives if present
-    vmax = max(finite.max(), 1.0)          # include 1.0 (the reference line)
-    # Keep 1.0 strictly inside (vmin, vmax) for TwoSlopeNorm.
-    vmin = min(vmin, 0.999)
-    vmax = max(vmax, 1.001)
-    norm = TwoSlopeNorm(vcenter=1.0, vmin=vmin, vmax=vmax)
-    cmap = plt.cm.RdBu.copy()
+    columns = [labels[g] for g in order]
+    rows = [labels[g] for g in order]
 
-    fig, axes = plt.subplots(2, 2, figsize=(12.5, 9.2))
-    flat = axes.ravel()
-    im = None
-    for ax, (M, r, rows, cols) in zip(flat, panels):
-        im = _draw_matrix(ax, M, rows, cols, "norm", ref=r, norm=norm, cmap=cmap)
-    axes[0, 0].set_title("V5 (min-max) -- Canonical order")
-    axes[0, 1].set_title("V5 (min-max) -- Reversed order")
-    axes[1, 0].set_title("CLEAR -- Canonical order")
-    axes[1, 1].set_title("CLEAR -- Reversed order")
-    axes[0, 0].set_ylabel("training phase")
-    axes[1, 0].set_ylabel("training phase")
+    # Red is *below* the ceiling. acviz.DIVERGING runs blue -> light -> red,
+    # which would paint total forgetting in the primary series colour.
+    scale = [[stop, color] for stop, color in zip(
+        [s for s, _ in DIVERGING], [c for _, c in reversed(DIVERGING)])]
 
-    cbar = fig.colorbar(im, ax=axes, fraction=0.035, pad=0.02)
-    cbar.set_label(f"retention  (method / {ref_name})")
-    cbar.ax.axhline(1.0, color="black", linewidth=1.0)  # 1.0 = matches ref
+    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.17,
+                        subplot_titles=[name for name, _ in panels])
+    for column, (_name, values) in enumerate(panels, start=1):
+        fig.add_trace(go.Heatmap(
+            z=values, x=columns, y=rows, colorscale=scale,
+            zmid=1.0, zmin=MATRIX_ZMIN, zmax=MATRIX_ZMAX, xgap=2, ygap=2,
+            hoverongaps=False, showscale=(column == 2),
+            hovertemplate="%{y}<br>%{x}: %{z:.1%} of ceiling<extra></extra>",
+            colorbar=dict(
+                title=dict(text="vs ceiling", font=dict(family=FONT_UI, size=11)),
+                tickformat=".0%", thickness=10, len=0.74, outlinewidth=0,
+                tickfont=dict(family=FONT_MONO, size=10, color=AC["text_muted"]),
+            ),
+        ), row=1, col=column)
 
-    fig.suptitle(f"Figure {fig_no} -- Forgetting matrix: retention vs "
-                 f"{ref_name.upper()} (blue >= reference, red < reference; "
-                 "white = 1.0); V5 (top) vs CLEAR (bottom)", y=1.01,
-                 fontsize=12)
-    fig.text(0.5, -0.04, CAPTION + "\n" + note, ha="center", fontsize=8,
-             style="italic")
-    save(fig, fname)
+        for row_index in range(values.shape[0]):
+            for column_index in range(row_index + 1):
+                value = values[row_index, column_index]
+                on_diagonal = row_index == column_index
+                fig.add_annotation(
+                    x=columns[column_index], y=rows[row_index],
+                    xref=f"x{column if column > 1 else ''}",
+                    yref=f"y{column if column > 1 else ''}",
+                    text=(f"<b>{value:.0%}</b>" if on_diagonal else f"{value:.0%}"),
+                    showarrow=False,
+                    font=dict(family=FONT_MONO, size=10,
+                              color=AC["bg"] if (value < 0.10 or value > 1.95)
+                              else AC["text_primary"]),
+                )
+
+    for annotation in fig.layout.annotations[:2]:
+        annotation.font = dict(family=FONT_UI, size=12, color=AC["text_primary"])
+
+    fig.update_xaxes(title=dict(text="evaluated on (learning order →)"),
+                     showgrid=False, ticklen=0, side="bottom")
+    fig.update_yaxes(autorange="reversed", showgrid=False, ticklen=0)
+    fig.update_yaxes(title=dict(text="training phase (task just consolidated)"),
+                     row=1, col=1)
+    fig.update_layout(
+        title=dict(text=f"{order_name.capitalize()} order: full forgetting matrices"),
+        margin=dict(l=124, r=96, t=68, b=72),
+    )
+    return fig
 
 
-def figure5_vs_local():
-    note = ("Denominator (Local specialist) is ORDER-DEPENDENT; diagonal < 1 "
-            "means consolidation already trades off the just-learned game. "
-            "Cells can be negative (Boxing canonical) or > 1.")
-    _norm_matrix_figure(LOCAL_C, LOCAL_R, "Local", 5,
-                        "fig5_retention_matrix_vs_local", note)
+def figure_matrices(data: dict) -> dict:
+    """Forgetting matrices for both orders, reversed first as the paper figure."""
+    order = data["orders"]["reversed"]
+    joint = reference_in_order(data, "joint", order)
+    reversed_values = retention_matrix(matrix(data, "clear_reversed"), joint)
+
+    width = W_FULL
+    height = height_for(width, 1.72)
+    variants = [
+        export_pair(_matrix_panel(data, "reversed"), "fig5_matrices_reversed",
+                    width, height, "Reversed order"),
+        export_pair(_matrix_panel(data, "canonical"), "fig5_matrices_canonical",
+                    width, height, "Canonical order"),
+    ]
+
+    return dict(
+        id="forgetting_matrices",
+        title="Forgetting matrices, both task orders",
+        caption=(
+            "Every evaluation as a fraction of the Joint ceiling. Bold diagonal is "
+            "the task just consolidated; blank upper triangle is never evaluated."
+        ),
+        details=(
+            "Rows are training phases, columns are tasks in learning order. The "
+            "**bold diagonal** is each game measured right after its own "
+            "consolidation; everything below it is retention. The blank upper "
+            "triangle is never evaluated and never imputed.\n\n"
+            "- **Reversed is the paper figure**; switch variants for the canonical "
+            "order. Both share one colour scale "
+            f"({MATRIX_ZMIN:.0%} to {MATRIX_ZMAX:.0%} of the ceiling, centred on "
+            "the ceiling) so switching between them is not misleading.\n"
+            "- **Red is below the ceiling, blue above.** CLEAR's reversed Q\\*bert "
+            "cell is 360% and saturates at the top of the scale; it keeps its "
+            "printed number.\n"
+            "- **What to look for.** CLEAR's Breakout column in the reversed order "
+            "walking 106% → 19% → 8% down the rows, against V5's 103% → 55% → 70%. "
+            "In the canonical order the roles swap and it is V5 that loses Boxing "
+            "outright, to -38%.\n\n" + PROVENANCE
+        ),
+        variants=variants,
+        metrics=[
+            {"name": "CLEAR Breakout (rev, final)",
+             "value": float(reversed_values[4, 2]), "unit": ""},
+            {"name": "colour range",
+             "value": f"{MATRIX_ZMIN:.0%} to {MATRIX_ZMAX:.0%}", "unit": ""},
+        ],
+    )
 
 
-def figure6_vs_joint():
-    note = ("Denominator (Joint ceiling) is FIXED / order-independent -> the "
-            "cleaner comparison. Same shared color scale as Fig 5's panels.")
-    _norm_matrix_figure(JOINT_C, JOINT_R, "Joint", 6,
-                        "fig6_retention_matrix_vs_joint", note)
+# ── Export plumbing ─────────────────────────────────────────────────────────
+def export_pair(fig: go.Figure, stem: str, width: int, height: int,
+                label: str) -> dict:
+    """Export one figure into the report folder and the dashboard figure folder.
+
+    Returns the manifest variant dict, whose paths are relative to ``report/``.
+    """
+    PNG_DIR.mkdir(parents=True, exist_ok=True)
+    SVG_DIR.mkdir(parents=True, exist_ok=True)
+    DASH_FIGURES.mkdir(parents=True, exist_ok=True)
+
+    # Standalone report keeps the repository's png/ and svg/ split.
+    export_figure(fig, PNG_DIR / stem, width, height, label=label)
+    svg_source = (PNG_DIR / stem).with_suffix(".svg")
+    svg_source.replace(SVG_DIR / f"{stem}.svg")
+
+    # Dashboard copy, exported from the same figure object.
+    return export_figure(fig, DASH_FIGURES / stem, width, height, label=label)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Render every order-sensitivity figure."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--no-dashboard", action="store_true",
+                        help="skip updating report/manifest.json")
+    args = parser.parse_args(argv)
+
+    install_template()
+    data = load_data()
+
+    print("order sensitivity | seed 0, greedy-100, reversed-order focus")
+    builders = [
+        figure_order_contrast,
+        figure_reversed_retention,
+        figure_reversed_raw,
+        figure_reversed_trajectories,
+        figure_matrices,
+    ]
+    for builder in builders:
+        entry = builder(data)
+        print(f"  {entry['id']}")
+        if not args.no_dashboard:
+            append_manifest_entry(
+                DASH_MANIFEST, group=GROUP, group_title=GROUP_TITLE,
+                seed=0, dataset="Atari 5-game sequence (greedy-100)",
+                model="impala_ac_multihead", **entry,
+            )
+
+    print(f"png: {PNG_DIR}")
+    print(f"svg: {SVG_DIR}")
+    if not args.no_dashboard:
+        print(f"manifest: {DASH_MANIFEST}")
+    return 0
 
 
 if __name__ == "__main__":
-    figure1()
-    rc_l, rr_l, mc_l, mr_l = figure2()
-    rc_j, rr_j, mc_j, mr_j = figure3()
-    figure4_raw()
-    figure5_vs_local()
-    figure6_vs_joint()
-
-    print("\n=== Forgetting matrix -- CANONICAL (rows=after task, cols=game) ===")
-    print("cols:", GAMES_C)
-    for lbl, row in zip(ROWS_C, MAT_C):
-        print(f"{lbl:16s}", " ".join("   .  " if not np.isfinite(v)
-                                     else f"{v:7.1f}" for v in row))
-    print("--- vs LOCAL (%) ---")
-    for lbl, row in zip(ROWS_C, MAT_C / LOCAL_C):
-        print(f"{lbl:16s}", " ".join("  .  " if not np.isfinite(v)
-                                     else f"{v*100:5.0f}" for v in row))
-    print("--- vs JOINT (%) ---")
-    for lbl, row in zip(ROWS_C, MAT_C / JOINT_C):
-        print(f"{lbl:16s}", " ".join("  .  " if not np.isfinite(v)
-                                     else f"{v*100:5.0f}" for v in row))
-    print("\n=== Forgetting matrix -- REVERSED ===")
-    print("cols:", GAMES_R)
-    for lbl, row in zip(ROWS_R, MAT_R):
-        print(f"{lbl:16s}", " ".join("   .  " if not np.isfinite(v)
-                                     else f"{v:7.1f}" for v in row))
-    print("--- vs LOCAL (%) ---")
-    for lbl, row in zip(ROWS_R, MAT_R / LOCAL_R):
-        print(f"{lbl:16s}", " ".join("  .  " if not np.isfinite(v)
-                                     else f"{v*100:5.0f}" for v in row))
-    print("--- vs JOINT (%) ---")
-    for lbl, row in zip(ROWS_R, MAT_R / JOINT_R):
-        print(f"{lbl:16s}", " ".join("  .  " if not np.isfinite(v)
-                                     else f"{v*100:5.0f}" for v in row))
-    print()
-
-    # Self-audit correspondence table.
-    print("=== Raw scores (Qbert Pong Breakout Boxing SpaceInvaders) ===")
-    for s in FIG1_ORDER:
-        print(f"{s:8s}", " ".join(f"{v:8.1f}" for v in SCORES[s]))
-    print("\n=== Retention vs Local (%) ===")
-    print("canon ", " ".join(f"{v*100:6.0f}" for v in rc_l), f" | MEAN {mc_l*100:.0f}")
-    print("rev   ", " ".join(f"{v*100:6.0f}" for v in rr_l), f" | MEAN {mr_l*100:.0f}")
-    print("\n=== Retention vs Joint (%) ===")
-    print("canon ", " ".join(f"{v*100:6.0f}" for v in rc_j), f" | MEAN {mc_j*100:.0f}")
-    print("rev   ", " ".join(f"{v*100:6.0f}" for v in rr_j), f" | MEAN {mr_j*100:.0f}")
-    print("\nWrote figures to", PNG, "and", SVG)
+    raise SystemExit(main())

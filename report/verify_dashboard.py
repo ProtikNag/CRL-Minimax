@@ -364,6 +364,13 @@ def main(argv: list[str] | None = None) -> int:
             # Drop focus rings left by the interaction checks so the review
             # screenshot shows the resting state of the page.
             page.evaluate("() => document.activeElement && document.activeElement.blur()")
+            # Chromium renders a position:sticky element at its *scrolled*
+            # position in a full-page screenshot, which parks the sidebar
+            # halfway down a long page and makes the review artefact look
+            # broken when the page is fine. Pin it for the capture only.
+            page.add_style_tag(content=(
+                ".sidebar, .topbar { position: static !important; }"
+            ))
             settle_page(page)
             shot_path = report_dir / "verification" / "dashboard.png"
             shot_path.parent.mkdir(parents=True, exist_ok=True)

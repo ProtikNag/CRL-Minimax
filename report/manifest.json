@@ -1,6 +1,202 @@
 {
   "figures": [
     {
+      "id": "order_contrast",
+      "group": "reversed_order",
+      "group_title": "Reversed task order: V5 vs CLEAR vs Joint",
+      "title": "Task order flips which method retains more",
+      "caption": "Mean retention on previously learned tasks against the Joint ceiling: V5 43% → 83%, CLEAR 88% → 43%.",
+      "details": "The one figure here that shows both task orders; every other figure in this group is the reversed order alone.\n\nEach point is the mean of final-score / Joint over the four tasks learned *before* the last one. The last task is excluded because nothing was trained after it, so its score measures capacity rather than retention.\n\n- **Canonical** Q\\*bert → Pong → Breakout → Boxing → SpaceInvaders\n- **Reversed** SpaceInvaders → Boxing → Breakout → Pong → Q\\*bert\n\nThe lines cross. Neither method is order-robust, and a single-order result would have supported the opposite conclusion.\n\nSeed 0, greedy-100 evaluation, plain `impala_ac_multihead` net, five Atari games. **Single seed, so no error bars are drawn and none are invented.** CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO hyperparameters, frame-matched budget, and equal replay buffer. The only difference is CLEAR's replay plus policy/value cloning against V5's min-max dual constraint.",
+      "seed": 0,
+      "dataset": "Atari 5-game sequence (greedy-100)",
+      "model": "impala_ac_multihead",
+      "variants": [
+        {
+          "label": "Slope",
+          "png": "figures/fig1_order_contrast.png",
+          "svg": "figures/fig1_order_contrast.svg",
+          "html": null
+        }
+      ],
+      "animation": null,
+      "metrics": [
+        {
+          "name": "V5 canonical",
+          "value": 0.42756185145827474,
+          "unit": ""
+        },
+        {
+          "name": "V5 reversed",
+          "value": 0.8304150913898576,
+          "unit": ""
+        },
+        {
+          "name": "CLEAR canonical",
+          "value": 0.8791853926374839,
+          "unit": ""
+        },
+        {
+          "name": "CLEAR reversed",
+          "value": 0.4309039496274889,
+          "unit": ""
+        }
+      ],
+      "created": "2026-09-12T17:43:31"
+    },
+    {
+      "id": "reversed_retention",
+      "group": "reversed_order",
+      "group_title": "Reversed task order: V5 vs CLEAR vs Joint",
+      "title": "Reversed order: retention against the Joint ceiling",
+      "caption": "On the four previously learned tasks V5 keeps 83% of the Joint ceiling and CLEAR keeps 43%.",
+      "details": "Final score after the whole reversed sequence, divided by the order-independent Joint ceiling for that game. Tasks run top to bottom in the order they were learned.\n\nThe final task sits in its own panel on its own scale. Q\\*bert was learned last, so nothing has been trained after it and its score is not a retention measurement. CLEAR reaches 360% of the ceiling there, which is the cell that lifts its five-game mean above V5 while it is forgetting the rest.\n\n- **What to look for.** Breakout. V5 holds 70%, CLEAR holds 8%.\n- CLEAR is below the ceiling on every previously learned task.\n\nSeed 0, greedy-100 evaluation, plain `impala_ac_multihead` net, five Atari games. **Single seed, so no error bars are drawn and none are invented.** CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO hyperparameters, frame-matched budget, and equal replay buffer. The only difference is CLEAR's replay plus policy/value cloning against V5's min-max dual constraint.",
+      "seed": 0,
+      "dataset": "Atari 5-game sequence (greedy-100)",
+      "model": "impala_ac_multihead",
+      "variants": [
+        {
+          "label": "Bars",
+          "png": "figures/fig2_reversed_retention.png",
+          "svg": "figures/fig2_reversed_retention.svg",
+          "html": null
+        }
+      ],
+      "animation": null,
+      "metrics": [
+        {
+          "name": "V5 prior-task mean",
+          "value": 0.8304150913898576,
+          "unit": ""
+        },
+        {
+          "name": "CLEAR prior-task mean",
+          "value": 0.4309039496274889,
+          "unit": ""
+        },
+        {
+          "name": "CLEAR final task",
+          "value": 3.6021940631233136,
+          "unit": "x joint"
+        }
+      ],
+      "created": "2026-09-12T17:43:38"
+    },
+    {
+      "id": "reversed_raw_scores",
+      "group": "reversed_order",
+      "group_title": "Reversed task order: V5 vs CLEAR vs Joint",
+      "title": "Reversed order: raw final scores",
+      "caption": "Greedy-100 score on each game after the full reversed sequence, with the Local specialist and Joint ceiling alongside. Own y-axis per game.",
+      "details": "The absolute numbers behind the retention ratios. Panels run left to right in learning order.\n\n- **Own y-axis per panel, always including zero.** Raw scales differ by roughly 700x (Pong around 20, Q\\*bert around 4000), so a shared axis would flatten four of the five panels. No log scale, no clipping, no normalisation.\n- **Local** is the single-task specialist and is itself order-dependent, which is why retention elsewhere in this group is measured against Joint instead.\n- **What to look for.** Q\\*bert, where CLEAR reaches 15351 against a Joint ceiling of 4262.\n\nSeed 0, greedy-100 evaluation, plain `impala_ac_multihead` net, five Atari games. **Single seed, so no error bars are drawn and none are invented.** CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO hyperparameters, frame-matched budget, and equal replay buffer. The only difference is CLEAR's replay plus policy/value cloning against V5's min-max dual constraint.",
+      "seed": 0,
+      "dataset": "Atari 5-game sequence (greedy-100)",
+      "model": "impala_ac_multihead",
+      "variants": [
+        {
+          "label": "Small multiples",
+          "png": "figures/fig3_reversed_raw_scores.png",
+          "svg": "figures/fig3_reversed_raw_scores.svg",
+          "html": null
+        }
+      ],
+      "animation": null,
+      "metrics": [
+        {
+          "name": "CLEAR Q*bert",
+          "value": 15350.75,
+          "unit": "score"
+        },
+        {
+          "name": "Joint Q*bert",
+          "value": 4261.5,
+          "unit": "score"
+        },
+        {
+          "name": "V5 Breakout",
+          "value": 199.83,
+          "unit": "score"
+        },
+        {
+          "name": "CLEAR Breakout",
+          "value": 23.9,
+          "unit": "score"
+        }
+      ],
+      "created": "2026-09-12T17:43:46"
+    },
+    {
+      "id": "reversed_trajectories",
+      "group": "reversed_order",
+      "group_title": "Reversed task order: V5 vs CLEAR vs Joint",
+      "title": "Reversed order: decay of each task after it is learned",
+      "caption": "Retention of each game against the Joint ceiling at every later training phase. V5 dips and recovers on Breakout; CLEAR does not.",
+      "details": "One panel per task, in learning order. The x-axis is the absolute training phase, shared across panels, so each line starts on its own diagonal and shortens as the sequence advances.\n\nThis is the same information as the forgetting matrix, read as a trajectory instead of a grid, which is what makes the *timing* visible. Training phase 1 is SpaceInvaders, 2 Boxing, 3 Breakout, 4 Pong, 5 Q\\*bert, matching the panel numbering.\n\n- **Q\\*bert is absent.** It is the last task in this order, so there is no later phase to plot.\n- **What to look for.** Breakout. Both methods leave it near the ceiling, then V5 falls to 55% and recovers to 70% while CLEAR goes 19% and then 8%.\n- Boxing shows the opposite shape: CLEAR holds it longer, then drops below V5 at the end.\n\nSeed 0, greedy-100 evaluation, plain `impala_ac_multihead` net, five Atari games. **Single seed, so no error bars are drawn and none are invented.** CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO hyperparameters, frame-matched budget, and equal replay buffer. The only difference is CLEAR's replay plus policy/value cloning against V5's min-max dual constraint.",
+      "seed": 0,
+      "dataset": "Atari 5-game sequence (greedy-100)",
+      "model": "impala_ac_multihead",
+      "variants": [
+        {
+          "label": "Small multiples",
+          "png": "figures/fig4_reversed_trajectories.png",
+          "svg": "figures/fig4_reversed_trajectories.svg",
+          "html": null
+        }
+      ],
+      "animation": null,
+      "metrics": [
+        {
+          "name": "V5 Breakout final",
+          "value": 0.7001751927119833,
+          "unit": ""
+        },
+        {
+          "name": "CLEAR Breakout final",
+          "value": 0.08374211632796076,
+          "unit": ""
+        }
+      ],
+      "created": "2026-09-12T17:43:54"
+    },
+    {
+      "id": "forgetting_matrices",
+      "group": "reversed_order",
+      "group_title": "Reversed task order: V5 vs CLEAR vs Joint",
+      "title": "Forgetting matrices, both task orders",
+      "caption": "Every evaluation as a fraction of the Joint ceiling. Bold diagonal is the task just consolidated; blank upper triangle is never evaluated.",
+      "details": "Rows are training phases, columns are tasks in learning order. The **bold diagonal** is each game measured right after its own consolidation; everything below it is retention. The blank upper triangle is never evaluated and never imputed.\n\n- **Reversed is the paper figure**; switch variants for the canonical order. Both share one colour scale (-50% to 250% of the ceiling, centred on the ceiling) so switching between them is not misleading.\n- **Red is below the ceiling, blue above.** CLEAR's reversed Q\\*bert cell is 360% and saturates at the top of the scale; it keeps its printed number.\n- **What to look for.** CLEAR's Breakout column in the reversed order walking 106% → 19% → 8% down the rows, against V5's 103% → 55% → 70%. In the canonical order the roles swap and it is V5 that loses Boxing outright, to -38%.\n\nSeed 0, greedy-100 evaluation, plain `impala_ac_multihead` net, five Atari games. **Single seed, so no error bars are drawn and none are invented.** CLEAR is apples-to-apples with V5: identical net, task set, thresholds, PPO hyperparameters, frame-matched budget, and equal replay buffer. The only difference is CLEAR's replay plus policy/value cloning against V5's min-max dual constraint.",
+      "seed": 0,
+      "dataset": "Atari 5-game sequence (greedy-100)",
+      "model": "impala_ac_multihead",
+      "variants": [
+        {
+          "label": "Reversed order",
+          "png": "figures/fig5_matrices_reversed.png",
+          "svg": "figures/fig5_matrices_reversed.svg",
+          "html": null
+        },
+        {
+          "label": "Canonical order",
+          "png": "figures/fig5_matrices_canonical.png",
+          "svg": "figures/fig5_matrices_canonical.svg",
+          "html": null
+        }
+      ],
+      "animation": null,
+      "metrics": [
+        {
+          "name": "CLEAR Breakout (rev, final)",
+          "value": 0.08374211632796076,
+          "unit": ""
+        },
+        {
+          "name": "colour range",
+          "value": "-50% to 250%",
+          "unit": ""
+        }
+      ],
+      "created": "2026-09-12T17:44:09"
+    },
+    {
       "id": "method_comparison_scores",
       "group": "method_comparison",
       "group_title": "Method Comparison",
@@ -37,40 +233,6 @@
         }
       ],
       "created": "2026-09-11T00:22:29"
-    },
-    {
-      "id": "forgetting_matrices",
-      "group": "method_comparison",
-      "group_title": "Method Comparison",
-      "title": "Forgetting matrices: per-method evaluation over task sequence",
-      "caption": "Rows = after task i; cols = game j. Blue = above zero, red = below zero (forgetting). Single seed.",
-      "details": "Each cell M[i,j] is the greedy-100 score on game j measured after finishing task i. Diagonal = score right after learning each game. V5 canonical order: Qbert, Pong, Breakout, Boxing, SpaceInvaders. V5 reversed order: SpaceInvaders, Boxing, Breakout, Pong, Qbert. CLEAR-A uses standard replay buffer (batches=4, canonical order). Blue=positive score, red=negative (below zero). Diverging scale centred at 0.",
-      "seed": 0,
-      "dataset": "Atari-5",
-      "model": "impala_ac_multihead",
-      "variants": [
-        {
-          "label": "V5 canonical (Ours)",
-          "png": "figures/forgetting_matrix_v5_can.png",
-          "svg": "figures/forgetting_matrix_v5_can.svg",
-          "html": null
-        },
-        {
-          "label": "V5 reversed order (Ours)",
-          "png": "figures/forgetting_matrix_v5_rev.png",
-          "svg": "figures/forgetting_matrix_v5_rev.svg",
-          "html": null
-        },
-        {
-          "label": "CLEAR-A standard buffer",
-          "png": "figures/forgetting_matrix_clearA.png",
-          "svg": "figures/forgetting_matrix_clearA.svg",
-          "html": null
-        }
-      ],
-      "animation": null,
-      "metrics": [],
-      "created": "2026-09-11T00:22:30"
     },
     {
       "id": "cl_metrics_bars",
@@ -193,49 +355,6 @@
         {
           "name": "CLEAR-C norm AP",
           "value": 0.935,
-          "unit": ""
-        }
-      ],
-      "created": "2026-09-11T00:22:31"
-    },
-    {
-      "id": "order_sensitivity",
-      "group": "order_sensitivity",
-      "group_title": "Order Sensitivity",
-      "title": "Order sensitivity: per-game retention vs joint ceiling for V5 canonical vs reversed",
-      "caption": "Retention = final ÷ Joint-6M score. Reversed order substantially recovers Breakout. Mean shown as rightmost bar. Single seed.",
-      "details": "Joint 6M score is the order-independent ceiling (joint training, 6M frames/game). Canonical order: Qbert, Pong, Breakout, Boxing, SpaceInvaders. Reversed order: SpaceInvaders, Boxing, Breakout, Pong, Qbert. Local (single-task) references are order-dependent and therefore not used here as the common denominator; Joint 6M provides a clean cross-order reference. Reversed-order Breakout retention = 199.8/285.4 ≈ 0.70 vs canonical 51.8/285.4 ≈ 0.18.",
-      "seed": 0,
-      "dataset": "Atari-5",
-      "model": "impala_ac_multihead",
-      "variants": [
-        {
-          "label": "Retention vs joint",
-          "png": "figures/order_sensitivity.png",
-          "svg": "figures/order_sensitivity.svg",
-          "html": null
-        }
-      ],
-      "animation": null,
-      "metrics": [
-        {
-          "name": "Canonical mean ret (vs joint)",
-          "value": 0.511,
-          "unit": ""
-        },
-        {
-          "name": "Reversed mean ret (vs joint)",
-          "value": 0.864,
-          "unit": ""
-        },
-        {
-          "name": "Breakout canon ret",
-          "value": 0.182,
-          "unit": ""
-        },
-        {
-          "name": "Breakout rev ret",
-          "value": 0.7,
           "unit": ""
         }
       ],
