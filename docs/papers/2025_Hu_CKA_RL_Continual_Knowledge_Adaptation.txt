@@ -1,0 +1,2324 @@
+Continual Knowledge Adaptation for
+Reinforcement Learning
+
+Jinwu Hu1 2∗ Zihao Lian1∗ Zhiquan Wen1∗ Chenghao Li1 2
+Guohao Chen1 2 Xutao Wen1 Bin Xiao3† Mingkui Tan1 4†
+1
+
+South China University of Technology, 2 Pazhou Laboratory,
+3
+Chongqing University of Posts and Telecommunications
+4
+Key Laboratory of Big Data and Intelligent Robot, Ministry of Education,
+
+Abstract
+Reinforcement Learning enables agents to learn optimal behaviors through interactions with environments. However, real-world environments are typically
+non-stationary, requiring agents to continuously adapt to new tasks and changing
+conditions. Although Continual Reinforcement Learning facilitates learning across
+multiple tasks, existing methods often suffer from catastrophic forgetting and inefficient knowledge utilization. To address these challenges, we propose Continual
+Knowledge Adaptation for Reinforcement Learning (CKA-RL), which enables
+the accumulation and effective utilization of historical knowledge. Specifically, we
+introduce a Continual Knowledge Adaptation strategy, which involves maintaining
+a task-specific knowledge vector pool and dynamically using historical knowledge
+to adapt the agent to new tasks. This process mitigates catastrophic forgetting and
+enables efficient knowledge transfer across tasks by preserving and adapting critical
+model parameters. Additionally, we propose an Adaptive Knowledge Merging
+mechanism that combines similar knowledge vectors to address scalability challenges, reducing memory requirements while ensuring the retention of essential
+knowledge. Experiments on three benchmarks demonstrate that the proposed CKARL outperforms state-of-the-art methods, achieving an improvement of 4.20% in
+overall performance and 8.02% in forward transfer. The source code is available at
+https://github.com/Fhujinwu/CKA-RL.
+
+1
+
+Introduction
+
+Reinforcement Learning (RL) has emerged as a powerful paradigm in machine learning, enabling
+agents to learn optimal behaviors through interactions with dynamic environments [24, 11, 45]. RL
+has achieved significant success in fields such as robotic control [23, 35], embodied intelligence
+[7, 15], and natural language processing [17, 10, 18]. However, traditional RL usually assumes a static
+environment where tasks and data distributions remain fixed, intending to solve a single, well-defined
+problem [32]. In contrast, real-world environments are typically non-stationary, requiring agents to
+continuously adapt to new tasks and evolving conditions. In light of this, Continual Reinforcement
+Learning (CRL) [25] has been introduced to enable agents to adapt and maintain performance across
+multiple tasks, facilitating more robust decision-making in dynamic environments [14, 2, 50].
+Unfortunately, CRL still faces several challenges, which are as follows. 1) Cross-task conflict: In
+continual learning, tasks may share certain structures or knowledge while also having incompatible
+goals or constraints. This interplay complicates the direct reuse of previously learned information [27].
+∗
+†
+
+Equal contribution. Email: fhujinwu@gmail.com, lianzihaolzh@gmail.com, sewenzhiquan@gmail.com
+Corresponding author. Email: mingkuitan@scut.edu.cn, xiaobin@cqupt.edu.cn
+
+39th Conference on Neural Information Processing Systems (NeurIPS 2025).
+
+2) Catastrophic forgetting: When learning new tasks, the agent may overwrite or distort previously
+acquired knowledge, leading to a loss of performance on earlier tasks [32, 50].
+Recently, several attempts have been proposed to enable agents to continuously learn across multiple
+tasks while maintaining or enhancing their performance on previously acquired tasks [60, 19]. The
+existing methods can be broadly categorized into four main groups [50]. The regularization-based
+methods [20, 37] introduce regularization terms into the learning objective that penalize large updates
+to important parameters for previously learned tasks. The rehearsal-based methods [9, 59, 58]
+mitigate forgetting by storing previous experiences in memory and periodically replaying them
+during the learning of new tasks. By leveraging past experiences, these methods help reduce shortterm biases and improve task performance across the sequence. The architecture-based methods
+[49, 32, 5, 39] focus on learning a shared structure, such as modularity or composition, to facilitate
+continual learning. They reuse parts of previous solutions by forming abstract concepts or skills. The
+meta-learning based methods [40, 12, 30, 8] improve the learning efficiency of agents by utilizing
+past successes and failures to refine their optimization processes. This creates an inductive bias that
+enhances sample efficiency and adaptability in acquiring new behaviors.
+Although there has been significant progress in existing methods, they still face several limitations
+as follows. Firstly, existing methods, such as PackNet [33], often fail to effectively address task
+dependencies and conflicts, which makes it challenging to transfer knowledge across tasks without interference or degradation in performance. Secondly, most methods still exhibit substantial
+performance degradation on previously learned tasks upon acquisition of new ones. This issue is
+particularly pronounced in methods that rely on regularization, as they may struggle to efficiently
+retain knowledge from earlier tasks as the task sequence lengthens. Lastly, many methods face
+scalability issues, especially as the number of tasks grows significantly, leading to increased memory
+and computational costs, such as CompoNet [32].
+To address these limitations, we propose Continual Knowledge Adaptation for Reinforcement
+Learning (CKA-RL), which enables the accumulation and effective utilization of historical knowledge, thereby accelerating learning in new tasks and explicitly reducing performance degradation
+on previous tasks. Specifically, we assume that the agent acquires a unique knowledge vector for
+each task during continual learning. Based on this, we propose a Continual Knowledge Adaptation
+strategy, which involves maintaining a task-specific knowledge vector pool and dynamically using
+historical knowledge to adapt the agent to a new task. This method mitigates catastrophic forgetting
+and facilitates the efficient transfer of knowledge across tasks by preserving and adapting crucial
+model parameters. Furthermore, we introduce an Adaptive Knowledge Merging mechanism that
+clusters and consolidates similar knowledge vectors to address scalability issues, reducing memory
+requirements while ensuring the retention of essential information.
+Main novelty and contributions. 1) We propose a novel continual reinforcement learning method,
+called CKA-RL. It enables agents to reuse knowledge from previously learned tasks, mitigating
+catastrophic forgetting, and leveraging this historical knowledge to enhance the learning efficiency.
+2) We propose Continual Knowledge Adaptation strategy, which dynamically adapts historical
+knowledge to a new task. To reduce storage requirements, we introduce an Adaptive Knowledge
+Merging mechanism that combines similar knowledge vectors, addressing scalability issues. 3)
+Experiments demonstrate that the proposed method outperforms state-of-the-art methods on three
+benchmarks, achieving an improvement of 4.20% in performance and 8.02% in forward transfer.
+
+2
+
+Related Work
+
+Continual Reinforcement Learning (CRL) aims to enable agents to continuously learn and optimize
+strategies in dynamic environments, improving their ability to adapt to environmental changes and
+achieve goals more efficiently. The existing methods can be broadly categorized into four main
+types [50]: regularization-based methods, rehearsal-based methods, architecture-based methods, and
+meta-learning-based methods, each of which is detailed as:
+Regularization-based Methods. These methods [20, 37] add regularization terms to the training
+process to balance learning new and old tasks without storing models of old tasks. ITER [20]
+periodically distills the current policy and value function into a newly initialized network during
+training and imitates the teacher network using a linear combination of loss terms to enhance model
+generalization. TRAC [37] adaptively adjusts the regularization strength based on online convex
+2
+
+optimization theory to prevent excessive weight drift, thereby reducing plasticity loss and enabling
+rapid adaptation to new distribution changes. Anand et al. [3] propose a method that decomposes the
+value function into permanent and transient components to address the stability-plasticity dilemma in
+continual reinforcement learning, enabling efficient adaptation and control in dynamic environments.
+Rehearsal-based Methods. These methods [9, 59, 58, 13] utilize experience replay, generation
+replay, parameter replay, etc., to store past experiences and prevent catastrophic forgetting in agents.
+RECALL [58] focuses on improving plasticity and stability in continuous reinforcement learning
+through multi-head neural network training, coupled with adaptive normalization and policy distillation techniques. IQ [59] employs a context partitioning strategy based on online clustering, combined
+with multi-head networks and knowledge distillation technology, to reduce interference between
+different state distributions. DRAGO [13] leverages synthetic experience replay and explorationbased memory recovery to retain knowledge across tasks, mitigating catastrophic forgetting without
+requiring the storage of past task data.
+Architecture-based Methods. These methods [49, 32, 5, 39, 34] concentrate on learning a policy
+with a set of shared parameters to handle all incremental tasks, including parameter allocation, model
+reorganization, and modular networks. For example, MaskNet [5] employs a learnable modulation
+mask to isolate the parameters of different tasks on a fixed neural network and accelerates learning new
+tasks by linearly combining masks from previous tasks. CompoNet [32] uses a modular architecture
+with self-composing policies to enable efficient knowledge transfer and scalable learning in continual
+reinforcement learning. COMP [34] decomposes complex tasks into multiple subtasks corresponding
+to different neural modules. These modules can be combined to form a complete policy. REWIRE
+[46] redefines the connection methods of the neural network and reorders the neurons in each layer to
+achieve additional plasticity in unstable environments.
+Meta-Learning based Methods. These methods [40, 12, 30, 8] assist agents in rapidly adapting to
+new tasks by simulating the reasoning phase during training. MB-MPO [8] is a model-based method
+that meta-learns policies robust to ensemble dynamics, reducing reliance on accurate models. MAML
+[12] is a model-agnostic meta-learning algorithm that explicitly trains models to achieve strong
+generalization from a small number of gradient updates. ESCP [30] enhances the robustness and
+responsiveness of context encoding, significantly accelerating adaptation in reinforcement learning
+involving sudden environmental changes.
+
+3
+
+Problem Formulation
+
+The standard Reinforcement Learning (RL) problem [47] is modeled as a Markov Decision
+Process (MDP), with tuple M = ⟨S, A, p, r, γ⟩, where S is state space, A is action space, p :
+S × A × S → [0, 1] is the state transition probability function, r : S × A → R is the reward function,
+and γ ∈ [0, 1] is the discount factor. At each time step t ∈ N, the agent observes the current state
+st ∈ S and takes an action at ∼ π(·|st ), where π : S × A → [0, 1] is the policy. The environment
+transitions to a new state st+1 ∼ p(·|st , at ), and the agent receives a reward r(st , at ). The goal of
+RL is to find an optimal policy π ∗ that maximizes the expected discounted return as follows:
+∞
+X
+max Eπ,p [
+γ t r(st , at )],
+(1)
+π
+
+t=0
+
+where the expectation is over trajectories generated by policy π and state transitions p. The discount
+factor γ controls the trade-off between immediate and future rewards.
+Given N tasks, the agent is expected to maximize the RL objective for each task in T =
+{τ1 , τ2 , . . . , τN }. Each task τi is associated with a distinct MDP Mi = ⟨Si , Ai , pi , ri , γi ⟩. An
+RL problem is considered an instance of Continual Reinforcement Learning (CRL) if agents
+are required to continuously learn. Following the definition presented by Abel et al. [2], we have
+the following concept: an RL problem defined by a tuple (e, ν, Λ), where e is the environment,
+ν is the performance function, and Λ is the set of all agents, the problem is a CRL problem if
+e
+∀λ∗ ∈Λ∗ λ∗ ̸⇝ (never reaches) ΛB , where ΛB ⊂ Λ is a basis such that ΛB ⊢e (generates) Λ (in e) and
+∗
+Λ = arg maxλ∈Λ ν(λ, e). In other words, the best agents continue to search indefinitely over the
+basis ΛB and do not converge to a fixed policy. According to our CKA-RL, whenever the number
+of tasks |T | increases, particularly when τN +1 is added, a new knowledge vector vN +1 will be
+e
+introduced. Therefore, the new task will ensure that λ ̸⇝ ΛB , and thus continues to learn.
+3
+
++
+
+Task Sequence
+
++
+
+𝒗𝒗𝒌𝒌
+
+𝒗𝒗𝟏𝟏 𝒗𝒗𝟐𝟐
+
+𝒗𝒗𝒌𝒌−𝟏𝟏
+
+…
+
+task 𝜏𝜏𝑘𝑘
+
+𝜽𝜽𝒃𝒃𝒃𝒃𝒃𝒃𝒃𝒃
+
+…
+
+task 𝜏𝜏𝑘𝑘−1
+
+…
+
+task 𝜏𝜏𝑘𝑘+1
+
+Adaptation
+
+New Knowledge
+
+Knowledge Vector Pool
+
+×
+
+𝛼𝛼1
+
+𝛼𝛼2
+
+…
+
+Frozen
+
+𝜋𝜋𝑘𝑘
+
+𝛼𝛼𝑘𝑘−1
+
+𝑻𝑻
+
+𝒗𝒗𝟏𝟏 𝒗𝒗𝟐𝟐 𝒗𝒗𝒌𝒌−𝟏𝟏 𝒗𝒗𝒌𝒌 𝒗𝒗merge
+…
+
+…
+
+Learnable
+
+𝒗𝒗𝒎𝒎
+
+𝒗𝒗𝒏𝒏
+
+Merge by Eq. (7)
+
+𝒗𝒗merge
+
+Historical Knowledge
+
+(a) Continual Knowledge Adaptation
+
+(b) Adaptive Knowledge Merging
+
+Figure 1: An illustration of the CKA-RL. When learning a new task τk , the agent πk adapts by using
+historical knowledge vectors V = {v1 , . . . , vk−1 } with |V| ≤ Kmax , and learning a new task-specific
+knowledge vector vk , while the base parameter θbase remains fixed. After training, the new knowledge
+vector vk is added to a knowledge vector pool V. To maintain memory efficiency, we merge the
+most similar pairs of knowledge vectors (vm , vn ) in V into vmerge when |V| > Kmax , thus ensuring
+essential knowledge is retained while supporting scalable continual learning across sequential tasks.
+
+4
+
+Continual Knowledge Adaptation for Reinforcement Learning
+
+In this paper, we propose Continual Knowledge Adaptation for Reinforcement Learning (CKA-RL),
+which enables the accumulation and effective utilization of historical knowledge, thereby accelerating
+learning in new tasks while mitigating catastrophic forgetting. As shown in Figure 1, our proposed
+CKA-RL is composed of three key components: 1) Knowledge Vectors: These vectors capture
+task-specific knowledge that is used to adapt the model to new tasks, as detailed in Sec. 4.1. 2)
+Continual Knowledge Adaptation: This component dynamically uses historical knowledge to adapt
+the agent to a new task, enabling efficient transfer and retention of knowledge (see in Sec. 4.2).
+3) Adaptive Knowledge Merging: This component merges similar knowledge vectors to address
+scalability issues, reducing memory requirements while ensuring the retention of essential knowledge
+(see in Sec. 4.3). The pseudo-code of CKA-RL is summarized in Algorithm 1.
+4.1
+
+Knowledge Vectors
+
+In continual reinforcement learning, leveraging knowledge from previous tasks in dynamic environments is crucial to enhance agent performance in subsequent tasks and mitigate catastrophic
+forgetting. Therefore, we introduce the concept of knowledge vectors to facilitate continual learning,
+inspired by model editing techniques [21]. Specifically, the knowledge vector, denoted as vk ∈ Rd ,
+represents the learned parameters that adapt the pre-trained model to a specific task τk , where d
+denotes the dimensionality of the model parameter. These vectors can be combined linearly with
+historical knowledge vectors to enable cross-task knowledge transfer.
+Formally, given the pre-trained model weights θbase ∈ Rd , the knowledge vector vk is optimized
+during task-specific training to capture incremental adaptations. The final task-specific parameter
+θk is generated through a combination of the base parameter θbase , historical knowledge matrix
+Vk−1 = [v1 , v2 , . . . , vk−1 ], and the current task vector vk , which is as follows:
+θk = θbase +
+
+k−1
+X
+
+vi + vk ,
+
+(2)
+
+i=1
+
+A linear combination of multiple knowledge vectors enables the model to reuse knowledge from
+previous tasks [26, 6]. This highlights the potential of knowledge vectors to facilitate continual
+knowledge adaptation, effectively tackling key challenges in continual learning.
+4.2
+
+Continual Knowledge Adaptation
+
+The knowledge vector stores task-specific knowledge, and the knowledge from historical tasks
+facilitates the transfer of policies to new tasks. Under the Continual RL setting, assuming that the
+4
+
+policy π shares a consistent observation space O and action space A, the policy can be represented
+using a unified architecture parameterized by θ. To achieve cross-task knowledge transfer, we propose
+Continual Knowledge Adaptation strategy. Specifically, it is first necessary to construct shared
+base model parameter θbase . The policy parameter is initialized as θ1 and trained on the initial
+task τ1 , with the optimization objective being to maximize the expected discounted return. The
+optimized parameter θ1 is then used as the base parameter θbase , which encompasses general feature
+representations and serves as the foundation for subsequent knowledge adaptation.
+The knowledge from previous tasks is stored as knowledge vectors in a knowledge vector pool
+V = {v1 , . . . , vk−1 }, where each vi represents the knowledge vector for task τi . For flexibility, we
+define the null knowledge as v1 = θ1 − θbase = 0 and include it in V. When learning a new task τk ,
+the model parameter is generated by adapting the historical knowledge vectors in V with the new
+task-specific knowledge vk , which is as follows:
+θk = θbase +
+
+k−1
+X
+
+αjk vj + vk ,
+
+where
+
+j=1
+
+k−1
+X
+
+αjk = 1.
+
+(3)
+
+j=1
+
+k
+The αk = [α1k , . . . , αk−1
+] represents the normalized adaptation factors for task τk , where
+Pk−1 k
+k
+k
+j=1 αj = 1. These factors are derived from learnable parameter βk = [β1 , . . . , βk−1 ] through the
+softmax function:
+exp βjk
+αjk = Pk−1
+.
+(4)
+k
+i=1 exp(βi )
+Here, βk controls the contribution of each historical knowledge vector vj to the new task τk , and vk
+is the optimizable knowledge vector for the current task. Notably, we initialize vk to 0 to allow the
+model to gradually learn the task-specific knowledge vector. This prevents large initial adjustments,
+ensuring stable learning without disrupting previously learned tasks. By setting α1 = 1, the model
+can disregard previously learned knowledge when it is not beneficial for learning new tasks. This
+design enables continual adaptation of historical knowledge while preserving task-specific knowledge.
+During the task training, the base parameter θbase is fixed to maintain the foundation for knowledge
+adaptation, and only the adaptation factors αk (derived from βk ) and the current task knowledge
+vector vk are optimized. Upon the completion of the training process, the obtained knowledge vector
+vk is added to the knowledge vector pool V, thereby facilitating efficient knowledge transfer within
+dynamic environments.
+
+4.3
+
+Adaptive Knowledge Merging
+
+Although the proposed Continual Knowledge Adaptation strategy can accelerate the agent learning
+process and mitigate catastrophic forgetting by utilizing knowledge vectors from previous tasks,
+maintaining all vectors becomes impractical as the number of stored knowledge vectors increases.
+Therefore, we propose Adaptive Knowledge Merging to address scalability issues while preserving
+essential knowledge. Specifically, we merge similar knowledge vectors into compact representations,
+ensuring that the memory footprint remains manageable. The pairwise similarity between knowledge
+vectors is measured using normalized cosine similarity as follows:
+vi · v j
+Sij =
+,
+(5)
+∥vi ∥∥vj ∥
+where Sij ∈ [−1, 1] measures the directional alignment between vectors vi and vj . A value of
+Sij = −1 indicates that the two knowledge vectors are in direct conflict. Conversely, a value closer
+to 1 signifies strong alignment, suggesting consistency in the knowledge they encode. This similarity
+metric effectively captures the functional similarities in how vectors modify the base policy. When
+the number of knowledge vectors exceeds the maximum capacity Kmax , which serves as a hyperparameter for controlling memory usage, we compute the pairwise similarity matrix S across all
+stored knowledge vectors. Then, we identify the most similar pair (vm , vn ) by finding the pair with
+the highest similarity score, which is as follows:
+(vm , vn ) = arg maxi,j Si,j .
+These vectors vm and vn are merged by averaging:
+1
+vmerge = (vm + vn ),
+2
+5
+
+(6)
+
+(7)
+
+Algorithm 1 The Pipeline of the Proposed CKA-RL
+Input: Task sequence T = {τ1 , . . . , τN }, Initial 
+model
+θ1 ,Knowledge pool V = {0}
+P∞parameters
+t
+1: Base Policy Learning: θbase ← arg max Eπθ
+t=0 γ r1 (st , at )
+θ
+
+2: for k ← 2, . . . , N do
+3:
+Task Initialization: vk ← 0, βk ∼ N (0, 1), αk ← softmax(βk )
+P
+k
+4:
+Policy Construction: θ ′ ← θbase + k−1
+j=1 αj vj + vk
+
+P
+∞
+t
+5:
+Policy Optimization: arg max Eπθ′
+t=0 γ rk (st , at )
+vk ,βk
+
+6:
+Knowledge Preservation: θk ← θ ′ , V ← V ∪ {vk }
+7:
+if |V| > Kmax then
+8:
+Compute similarity matrix S using Eq.(5)
+9:
+(vm , vn ) ← arg maxi,j Si,j
+10:
+Merge vm and vn into vmerge using Eq.(7)
+11:
+Update V: V ← (V \ {vm , vn }) ∪ {vmerge }
+Output: Learned policies {πθ1 , . . . , πθN }
+
+where vmerge is added to the knowledge vector pool V. The merged vector vmerge replaces vm and vn ,
+reducing memory requirement while maintaining the knowledge from both vectors. It ensures that
+the knowledge vector pool remains compact and efficient while preserving knowledge from previous
+tasks. Through iterative merging, this strategy dynamically maintains a balance between memory
+efficiency and knowledge retention, addressing scalability issues in dynamic environments.
+Remark: For a detailed mathematical analysis supporting the performance and stability of the
+proposed method, please refer to Appendix A.
+
+5
+
+Experiments
+
+5.1
+
+Experimental Settings
+
+Benchmarks. We follow the experimental settings established in prior work [32] and compare
+CKA-RL with SOTA CRL methods across three distinct dynamic task sequences, including 1)
+Meta-World [57], 2) Freeway [31], and 3) SpaceInvaders [31]. These sequences are designed to
+evaluate the robustness and generalization capabilities of different methods under varying levels of
+task complexity and action space characteristics. More details can be seen in Appendix C.
+Metrics. Following standard evaluation metrics in CRL [55], we report key metrics, including
+average performance and forward transfer. The average performance at step t, denoted as P (t):
+N
+
+P (t) =
+
+1 X
+pi (t).
+N i=1
+
+(8)
+
+where pi (t) ∈ [0, 1] is the success rate on task i at step t, and each of the N tasks is trained for ∆
+steps, where N is the number of tasks, so the total number of steps is T = N · ∆. Its final value
+P (T ), serving as a conventional evaluation metric in CRL [32, 53], effectively captures the model’s
+stable performance across dynamic environments. The forward transfer measures the extent to
+which a CRL method is able to transfer knowledge across tasks. It is computed as the normalized
+area between the training curve of the measured run and the training curve of a reference model
+trained from scratch. Let pbi ∈ [0, 1] denote the reference performance. The forward transfer on task
+i, denoted as F Ti , is defined as follows:
+Z
+Z
+1 i·∆
+1 ∆ b
+AU Ci − AU Cib
+b
+(9)
+F Ti =
+,
+AU
+C
+=
+p
+(t)
+dt,
+AU
+C
+=
+p (t) dt.
+i
+i
+i
+∆ (i−1)·∆
+∆ 0 i
+1 − AU Cib
+The average forward transfer for all tasks F T is defined as:
+N
+
+FT =
+
+1 X
+F Ti .
+N i=1
+6
+
+(10)
+
+Table 1: Experimental results comparing the proposed method with nine SOTA methods across MetaWorld, SpaceInvaders, and Freeway environments. We report the results for average performance
+(PERF.) and forward transfer (FWT.), with the best results highlighted in bold. The proposed
+CKA-RL achieves superior performance and forward transfer in all three sequences.
+Method
+
+Meta-World
+PERF.
+FWT.
+
+SpaceInvaders
+PERF.
+FWT.
+
+Freeway
+PERF.
+FWT.
+
+Average
+PERF.
+FWT.
+
+Baseline 0.4191±0.49 0.0000±0.00 0.6314±0.27 0.0000±0.00 0.1247±0.24 0.0000±0.00 0.3917±0.35 0.0000±0.00
+FT-1
+0.0313±0.09 -0.2142±0.38 0.4412±0.50 0.6864±0.25 0.1512±0.36 0.6935±0.09 0.2079±0.36 0.3886±0.27
+FT-N
+0.3774±0.48 -0.2142±0.38 0.9785±0.04 0.6864±0.32 0.7532±0.16 0.6935±0.15 0.7030±0.29 0.3886±0.30
+ProgNet 0.4157±0.49 -0.0379±0.13 0.3757±0.27 -0.0075±0.22 0.3125±0.27 0.1938±0.31 0.3680±0.36 0.0495±0.23
+PackNet 0.2523±0.40 -0.6721±1.40 0.2299±0.30 -0.0750±0.13 0.2767±0.36 0.1970±0.32 0.2530±0.36 -0.1834±0.83
+MaskNet 0.3263±0.47 -0.3695±0.45 0.0000±0.00 -0.3866±0.53 0.0644±0.17 -0.0503±0.12 0.1302±0.29 -0.2688±0.41
+CReLUs 0.3789±0.47 -0.0089±0.24 0.8873±0.10 0.5308±0.29 0.7835±0.13 0.7303±0.12 0.6832±0.29 0.4174±0.23
+CompoNet 0.4131±0.50 -0.0055±0.20 0.9828±0.02 0.6963±0.32 0.7629±0.12 0.7115±0.10 0.7196±0.30 0.4674±0.23
+CbpNet
+0.4368±0.50 -0.0826±0.22 0.8392±0.11 0.4844±0.28 0.7678±0.10 0.7201±0.07 0.6813±0.30 0.3740±0.21
+CKA-RL 0.4642±0.50 -0.0032±0.21 0.9928±0.01 0.7749±0.20 0.7923±0.10 0.7429±0.07 0.7498±0.29 0.5049±0.17
+
+Methods. We compare the CKA-RL with nine SOTA methods. 1) Baseline. 2) FT-1 (Fine-Tuning
+Single Model) [53]. 3) FT-N (Fine-Tuning with Model Preservation) [53]. 4) ProgNet [39]. 5)
+PackNet [33]. 6) MaskNet [5]. 7) CReLUs [1]. 8) CompoNet [32]. 9) CbpNet [11].
+Implementation Details. We follow the prior work [32], employing SAC [16] for Meta-World and
+PPO [42] for Freeway and SpaceInvaders. For high-dimensional Atari inputs (210×160 RGB), a
+CNN encoder maps images to compact latent features. All tasks are trained for ∆ = 1M steps. We
+use Adam (momentum 0.9, second moment 0.999), with batch sizes 1024/128 and learning rates
+2.5 × 10−4 /1 × 10−3 for PPO/SAC. The discount factor is γ = 0.99. For SAC, the action standard
+deviation is constrained to [e−20 , e2 ], with target smoothing coefficient 5 × 10−3 , auto-tuned entropy
+coefficient 0.2, and action noise clipped to 0.5. Learning starts after 5 × 103 steps using 104 random
+actions for exploration. Policy and target networks are updated every 2 and 1 steps, respectively,
+using 3-layer MLPs with 256 hidden units. For PPO, we apply GAE with λ = 0.95 across 8 parallel
+environments, gradient clipping at 0.5, PPO clip of 0.2, entropy coefficient 0.01, and 128 rollout steps.
+The agent uses a 2-layer MLP with 512 units, and advantage normalization is employed. Following
+[54, 32, 55], CRL is applied only to the actor, while the critic is reinitialized at each task. We conduct
+experiments using 10 different random seeds to ensure the robustness and reliability of the results.
+Comparison Experiments
+
+We compare the proposed CKA-RL with SOTA methods to demonstrate its superior performance and
+knowledge transfer capability. Experiments are conducted on three distinct task sequences, including
+Meta-World, Freeway, and SpaceInvaders, as summarized in Table 1 and Figure 2.
+
+   
+ $ Y H U D J H  3 H U I R U P D Q F H
+
+5.2
+
+   
+   
+
+ & . $  5 /  2 X U V 
+ & R P S R 1 H W 
+    
+ & E S 1 H W 
+    
+ & 5 H / 8 V 
+    
+
+   
+   
+
+ 3 U R J 1 H W 
+    
+
+Consistent superiority of CKA-RL across diverse
+   
+ 3 D F N 1 H W 
+    
+environments. The comparative results across three
+ % H W W H U
+     0 D V N 1 H W 
+    
+environments, as shown in Table 1, demonstrate the
+   
+exceptional performance of CKA-RL. Notably, the
+   
+   
+   
+   
+   
+   
+CKA-RL consistently surpasses SOTA CRL meth $ Y H U D J H  ) R U Z D U G  7 U D Q V I H U
+ods in all environments. Specifically, when averaged
+across three environments, the proposed CKA-RL Figure 2: Comparison of SOTA methods with
+achieves an improvement of at least 4.20% in per- the proposed CKA-RL in terms of average
+formance (0.7196 → 0.7498) and 8.02% in forward forward transfer and average performance.
+transfer (0.4674 → 0.5049) compared to CompoNet,
+demonstrating its superior capability in handling diverse task sequences.
+Robust performance in dynamic environments. As shown in Table 1, our CKA-RL maintains
+consistent superiority over existing CRL methods across various dynamic environments. In Meta7
+
+   
+
+ ( S L V R G L F  5 H W X U Q
+
+ 3 H U I R U P D Q F H    ) R U Z D U G  7 U D Q V I H U
+
+   
+
+    
+    
+    
+ ) R U Z D U G  7 U D Q V I H U    2 X U V 
+ ) R U Z D U G  7 U D Q V I H U   ) 7  1 
+ 3 H U I R U P D Q F H    2 X U V 
+ 3 H U I R U P D Q F H   ) 7  1 
+
+    
+    
+ 
+
+ 
+
+ 
+
+ 
+
+ 6 L ] H  R I  . Q R Z O H G J H  9 H F W R U  3 R R O
+
+ 2 X U V
+ % D V H O L Q H
+
+ & E S 1 H W
+ & R P S R 1 H W
+
+ ) 7  1  ) 7  
+ 0 D V N 1 H W
+
+ 3 D F N 1 H W
+ 3 U R J 1 H W
+
+ & 5 H / 8 V
+
+   
+   
+   
+   
+   
+
+ 
+
+Figure 3: Effects of different pool size Kmax in
+Adaptive Knowledge Merging in the Freeway
+sequence. Our proposed CKA-RL achieves excellent performance when Kmax = 5.
+
+   N
+
+   N
+
+ * O R E D O  6 W H S
+
+   N
+
+   N
+
+Figure 4: Reward curve comparison in the
+SpaceInvaders sequence. CKA-RL attains a
+higher initial reward and converges faster, underscoring superior use of historical vectors.
+
+World sequence, CKA-RL achieves a significant performance improvement of 6.27% compared
+to CbpNet (0.4368 → 0.4642). Similarly, it achieves a performance improvement of 1.02% over
+CompoNet (0.9828 → 0.9928) in SpaceInvaders sequence and a performance improvement of 1.12%
+over CReLUs (0.7835 → 0.7923) in Freeway sequence. These consistent improvements across
+different environments highlight the robustness and stability of our method in dynamic environments.
+Superior knowledge transfer capability. From Table 1, our CKA-RL consistently achieves superior
+forward transfer performance across all three environments, demonstrating its exceptional knowledge
+transfer ability. In Meta-World sequence, CKA-RL shows an improvement of 41.82% compared to
+CompoNet. Similarly, it outperforms CompoNet (0.6963 → 0.7749) by 11.29% in SpaceInvaders
+sequence and surpasses CReLUs by 1.73% in Freeway sequence. These results substantiate that our
+method enables more efficient knowledge transfer compared to existing CRL methods.
+Superior model plasticity. As shown in Table 1, our method outperforms SOTA plasticity enhancement techniques [11, 1], across all evaluation metrics, including CbpNet and CReLUs. Notably,
+in SpaceInvaders sequence, our method achieves a significant improvement of 18.30% in average
+performance (0.8392 → 0.9928) and an 59.97% increase in forward transfer (0.4844 → 0.7749)
+compared to CbpNet. These comprehensive experimental results demonstrate that our approach
+surpasses existing plasticity enhancement methods, by effectively leveraging historical knowledge
+for adaptation. This highlights the potential of adaptive processing to improve model plasticity.
+5.3
+
+Ablation Studies
+
+Effectiveness of Components in CKA- Table 2: Effectiveness of components in CKA-RL in
+RL. Our CKA-RL enhances the learn- Freeway task sequence. ‘Avg’ is averaging knowledge
+ing process by effectively using historical vectors, ‘Adapt’ is the Continual Knowledge Adaptation,
+knowledge vectors and merging redundant and ‘Merge’ is the Adaptive Knowledge Merging.
+vectors. We ablate both components in Table 2. Compared with the base method Method
+Extra Memory PERF. FWT.
+(FT-N), simply averaging knowledge vec0
+0.7532 0.6935
+tors without adaptive weighting actually Base
+performs worse than the baseline (0.7437), Base + Avg
+N
+0.7437 0.7127
+indicating that naive merging without adap- Base + Adapt
+N
+0.7821 0.7321
+tation harms performance. In contrast, in- Base + Adapt + Merge
+5
+0.7923 0.7429
+troducing the Continual Knowledge Adaptation strategy achieves higher performance
+and forward transfer (e.g., 0.7532 (0.6935) vs. 0.7821 (0.7321) on Freeway). This confirms the
+effectiveness of utilizing historical knowledge vectors for enhancing knowledge transfer across
+dynamic environments. When further merging redundant knowledge vectors that are similar, our
+method achieves comparable performance (e.g., 0.7821 → 0.7923 on Freeway), improves the forward
+transfer (e.g., 0.7321 → 0.7429), and reduces memory requirements (e.g., N → 5), demonstrating the effectiveness of Adaptive Knowledge Merging strategy in addressing scalability issues and
+maintaining the stable performance on dynamic environments.
+8
+
+  
+
+ , Q I H U H Q F H  7 L P H   V 
+
+ 3 D U D P H W H U  0 H P R U \   0 % 
+
+ & R P S R 1 H W
+ 3 U R J 1 H W
+ & . $  5 /
+
+   
+
+  
+  
+  
+ 
+
+ 
+
+ 
+ 7 D V N  , '
+
+ 
+
+ 
+
+(a) Total parameter memory consumption across an
+increasing number of sequential tasks.
+
+     
+     
+     
+     
+     
+     
+     
+     
+     
+
+ & R P S R 1 H W
+ 3 U R J 1 H W
+ & . $  5 /
+
+ 
+
+ 
+
+ 
+ 7 D V N  , '
+
+ 
+
+ 
+
+(b) Inference latency across an increasing number of
+sequential tasks in SpaceInvaders environment.
+
+Figure 5: Analysis of Total Parameter Memory Consumption and Inference Latency: (a) demonstrates
+that CKA-RL maintains nearly constant parameter and activation size through vector merging, while
+others grow linearly; (b) shows that CKA-RL maintains nearly constant inference latency, while
+others suffer from increasing computational overhead. More details can be found in Appendix E.
+
+Effects of Pool Size in Adaptive Knowledge Merging. The size of the knowledge vector pool plays
+a crucial role in controlling the preservation of historical knowledge. We conduct experiments with
+Kmax values set to {3, 4, 5, 6, 7}. From Figure 3, our CKA-RL achieves excellent performance when
+Kmax equals 5. Either a smaller or larger Kmax hampers the performance. The reasons are as follows.
+When Kmax is small, CKA-RL removes too many knowledge vectors during adaptive knowledge
+merging, thus being unable to utilize enough knowledge. When Kmax is too large, redundant or even
+conflicting knowledge may slow down the knowledge adaptation process, resulting in performance
+degradation. Since a larger Kmax leads to higher memory requirements, we set Kmax to 5 for Freeway
+and SpaceInvaders experiments, and to 8 for Meta-World, which has a larger number of tasks.
+5.4
+
+More Discussions
+
+Superior Initial Performance and Faster Convergence. One of the key advantages of our proposed
+CKA-RL is its superior initial performance and rapid convergence, as shown in Figure 4. The reward
+curve of our CKA-RL demonstrates a higher starting point compared to existing CRL methods,
+indicating that our method effectively utilizes the historical knowledge vectors. Furthermore, the
+curve exhibits a steeper ascent, reaching convergence much faster than the competing methods. This
+not only highlights the efficiency of our CKA-RL but also underscores its effectiveness in utilizing
+historical knowledge vectors.
+Cross-task Performance of CKA-RL. To Table 3: Cross-task performance comparison evaluated
+assess how well the final policy consoli- with the final policy πθN .
+dates information acquired throughout the
+Pub.’Year Average Performance
+learning process, we freeze the model af- Method
+ter the last task and evaluate its perforBaseline
+–
+0.2833
+mance on all previously seen tasks, reFT-N
+[53]
+–
+0.3733
+porting the average performance across
+ProgNet
+[39]
+–
+0.2966
+three environments in Table 3. CKA-RL
+CVPR’2018
+0.1900
+achieves the highest average performance PackNet [33]
+MaskNet
+[5]
+TMLR’2023
+0.2266
+(0.3966), slightly surpassing the closest
+competitor CbpNet (0.3933) and clearly CReLUs [1]
+CoLLAs’2023
+0.3666
+outperforming FT-N (0.3733) and CReLUs CompoNet [32] ICML’2024
+0.3900
+(0.3666). These results indicate that CKA- CbpNet [11]
+Nature’2024
+0.3933
+RL, which combines knowledge adaptation CKA-RL (Ours)
+–
+0.3966
+with adaptive merging, results in a more
+effective final policy that performs better
+across multiple tasks.
+Memory Efficiency of CKA-RL. We evaluate the memory efficiency of CKA-RL by comparing
+the growth of model parameters across tasks from SpaceInvaders. As shown in Figure 5a, the total
+9
+
+parameter memory of CKA-RL remains nearly constant beyond the fifth task due to our use of the
+adaptive knowledge merging, which maintains a bounded knowledge vector pool. This ensures that
+model complexity does not scale linearly with the number of tasks.
+Inference Efficiency of CKA-RL. From Figure 5b, CKA-RL achieves the highest performance
+and forward transfer with an average inference time of only 0.0012s per input. Notably, CKA-RL
+latency remains essentially constant regardless of the number of tasks, since it consolidates historical
+knowledge into a fixed-size policy parameter during the parameter construction phase, eliminating
+the need for complex runtime composition. In contrast, existing architectures such as CompoNet and
+ProgNet exhibit significant increases in inference cost as the number of tasks grows.
+Effectiveness of CKA-RL in Miti- Table 4: Forgetting analysis on Freeway. We report overall
+gating Catastrophic Forgetting. We performance (PERF.), forward transfer (FWT.), and forgetuse the standard forgetting metric ting, computed as pre–post performance on each prior task
+[58], which evaluates performance after learning a new task (lower is better).
+degradation after training on new
+tasks. As shown in Table 4, CKA- Method
+Pub.’Year PERF. FWT. Forgetting
+RL achieves a relatively low forget–
+0.3125 01938
+0.36
+ting rate (0.45), demonstrating its ef- ProgNet [39]
+fective retention of previously learned PackNet [33]
+CVPR’2018 0.2767 0.1970 0.04
+knowledge while continuing to adapt MaskNet [5]
+TMLR’2023 0.0644 -0.0503 0.04
+to new tasks. In contrast, PackNet, CReLUs [1]
+CoLLAs’2023 0.7835 0.7303 0.52
+which shows the lowest forgetting rate CompoNet [32] ICML’2024 0.7629 0.7115 0.49
+(0.04), sacrifices significant overall perCbpNet [11]
+Nature’2024 0.7678 0.7201 0.46
+formance (0.2767). In contrast, CKACKA-RL
+(Ours)
+–
+0.7923 0.7429 0.45
+RL achieves the highest performance
+(0.7923) and forward transfer (0.7429)
+across all methods, with a balanced forgetting rate, highlighting its robustness in preventing catastrophic forgetting while maintaining strong performance.
+
+6
+
+Conclusion
+
+In this paper, we propose Continual Knowledge Adaptation for Reinforcement Learning (CKA-RL),
+which enables the accumulation and effective utilization of historical knowledge, thereby accelerating
+learning in new tasks and explicitly reducing performance degradation on previous tasks. Specifically,
+we assume that the agent acquires a unique knowledge vector for each task during continual learning.
+Based on this, we develop a Continual Knowledge Adaptation strategy that enhances knowledge
+transfer from previously learned tasks. Furthermore, we introduce an Adaptive Knowledge Merging
+mechanism that combines similar knowledge vectors to address scalability challenges. The CKA-RL
+outperforms SOTA methods, with a 4.20% overall gain and an 8.02% boost in forward transfer.
+
+Acknowledgements
+This work was partially supported by the Joint Funds of the National Natural Science Foundation of
+China (Grant No.U24A20327, No.U23B2013).
+
+References
+[1] Z. Abbas, R. Zhao, J. Modayil, A. White, and M. C. Machado. Loss of plasticity in continual
+deep reinforcement learning. In S. Chandar, R. Pascanu, H. Sedghi, and D. Precup, editors,
+Conference on Lifelong Learning Agents, 22-25 August 2023, McGill University, Montréal,
+Québec, Canada, volume 232 of Proceedings of Machine Learning Research, pages 620–636.
+PMLR, 2023.
+[2] D. Abel, A. Barreto, B. V. Roy, D. Precup, H. P. van Hasselt, and S. Singh. A definition of
+continual reinforcement learning. In A. Oh, T. Naumann, A. Globerson, K. Saenko, M. Hardt,
+and S. Levine, editors, Advances in Neural Information Processing Systems 36: Annual Conference on Neural Information Processing Systems 2023, NeurIPS 2023, New Orleans, LA, USA,
+December 10 - 16, 2023, 2023.
+10
+
+[3] N. Anand and D. Precup. Prediction and control in continual reinforcement learning. In A. Oh,
+T. Naumann, A. Globerson, K. Saenko, M. Hardt, and S. Levine, editors, Advances in Neural
+Information Processing Systems 36: Annual Conference on Neural Information Processing
+Systems 2023, NeurIPS 2023, New Orleans, LA, USA, December 10 - 16, 2023, 2023.
+[4] M. G. Bellemare, Y. Naddaf, J. Veness, and M. Bowling. The arcade learning environment: An
+evaluation platform for general agents. J. Artif. Intell. Res., 47:253–279, 2013.
+[5] E. Ben-Iwhiwhu, S. Nath, P. K. Pilly, S. Kolouri, and A. Soltoggio. Lifelong reinforcement
+learning with modulating masks. Trans. Mach. Learn. Res., 2023, 2023.
+[6] G. Chen, S. Niu, D. Chen, S. Zhang, C. Li, Y. Li, and M. Tan. Cross-device collaborative
+test-time adaptation. In A. Globersons, L. Mackey, D. Belgrave, A. Fan, U. Paquet, J. M.
+Tomczak, and C. Zhang, editors, Advances in Neural Information Processing Systems 38:
+Annual Conference on Neural Information Processing Systems 2024, NeurIPS 2024, Vancouver,
+BC, Canada, December 10 - 15, 2024, 2024.
+[7] P. Chen, D. Ji, K. Lin, W. Hu, W. Huang, T. H. Li, M. Tan, and C. Gan. Learning active camera
+for multi-object navigation. In S. Koyejo, S. Mohamed, A. Agarwal, D. Belgrave, K. Cho, and
+A. Oh, editors, Advances in Neural Information Processing Systems 35: Annual Conference on
+Neural Information Processing Systems 2022, NeurIPS 2022, New Orleans, LA, USA, November
+28 - December 9, 2022, 2022.
+[8] I. Clavera, J. Rothfuss, J. Schulman, Y. Fujita, T. Asfour, and P. Abbeel. Model-based reinforcement learning via meta-policy optimization. In 2nd Annual Conference on Robot Learning,
+CoRL 2018, Zürich, Switzerland, 29-31 October 2018, Proceedings, volume 87 of Proceedings
+of Machine Learning Research, pages 617–629. PMLR, 2018.
+[9] Z. A. Daniels, A. Raghavan, J. Hostetler, A. Rahman, I. Sur, M. R. Piacentino, A. Divakaran,
+R. Corizzo, K. Faber, N. Japkowicz, M. Baron, J. S. Smith, S. P. Joshi, Z. Kira, C. E. Taylor,
+M. B. Gurbuz, C. Dovrolis, T. L. Hayes, C. Kanan, and J. Gallardo. Model-free generative
+replay for lifelong reinforcement learning: Application to starcraft-2. In S. Chandar, R. Pascanu,
+and D. Precup, editors, Conference on Lifelong Learning Agents, CoLLAs 2022, 22-24 August
+2022, McGill University, Montréal, Québec, Canada, volume 199 of Proceedings of Machine
+Learning Research, pages 1120–1145. PMLR, 2022.
+[10] DeepSeek-AI. Deepseek-r1: Incentivizing reasoning capability in llms via reinforcement
+learning. CoRR, abs/2501.12948, 2025.
+[11] S. Dohare, J. F. Hernandez-Garcia, Q. Lan, P. Rahman, A. R. Mahmood, and R. S. Sutton. Loss
+of plasticity in deep continual learning. Nat., 632(8026):768–774, 2024.
+[12] C. Finn, P. Abbeel, and S. Levine. Model-agnostic meta-learning for fast adaptation of deep
+networks. In D. Precup and Y. W. Teh, editors, Proceedings of the 34th International Conference
+on Machine Learning, ICML 2017, Sydney, NSW, Australia, 6-11 August 2017, volume 70 of
+Proceedings of Machine Learning Research, pages 1126–1135. PMLR, 2017.
+[13] H. Fu, Y. Sun, M. Littman, and G. Konidaris. Knowledge retention in continual model-based
+reinforcement learning. In Forty-second International Conference on Machine Learning, ICML
+2025, Vancouver, BC, Canada, July 13-19, 2025. OpenReview.net, 2025.
+[14] J. Gaya, T. Doan, L. Caccia, L. Soulier, L. Denoyer, and R. Raileanu. Building a subspace of
+policies for scalable continual learning. In The Eleventh International Conference on Learning
+Representations, ICLR 2023, Kigali, Rwanda, May 1-5, 2023. OpenReview.net, 2023.
+[15] A. Gupta, S. Savarese, S. Ganguli, and L. Fei-Fei. Embodied intelligence via learning and
+evolution. CoRR, abs/2102.02202, 2021.
+[16] T. Haarnoja, A. Zhou, P. Abbeel, and S. Levine. Soft actor-critic: Off-policy maximum
+entropy deep reinforcement learning with a stochastic actor. In J. G. Dy and A. Krause,
+editors, Proceedings of the 35th International Conference on Machine Learning, ICML 2018,
+Stockholmsmässan, Stockholm, Sweden, July 10-15, 2018, volume 80 of Proceedings of Machine
+Learning Research, pages 1856–1865. PMLR, 2018.
+11
+
+[17] J. Hu, Y. Wang, S. Zhang, K. Zhou, G. Chen, Y. Hu, B. Xiao, and M. Tan. Efficient dynamic
+ensembling for multiple LLM experts. In Proceedings of the Thirty-Fourth International Joint
+Conference on Artificial Intelligence, IJCAI 2025, Montreal, Canada, August 16-22, 2025,
+pages 8095–8103. ijcai.org, 2025.
+[18] J. Hu, W. Zhang, Y. Wang, Y. Hu, B. Xiao, M. Tan, and Q. Du. Dynamic compressing prompts
+for efficient inference of large language models. CoRR, abs/2504.11004, 2025.
+[19] S. Hu, Y. Zhou, Z. Fan, J. Hu, L. Shen, Y. Zhang, and D. Tao. Continual task learning through
+adaptive policy self-composition. CoRR, abs/2411.11364, 2024.
+[20] M. Igl, G. Farquhar, J. Luketina, W. Boehmer, and S. Whiteson. Transient non-stationarity and
+generalisation in deep reinforcement learning. In 9th International Conference on Learning
+Representations, ICLR 2021, Virtual Event, Austria, May 3-7, 2021. OpenReview.net, 2021.
+[21] G. Ilharco, M. T. Ribeiro, M. Wortsman, L. Schmidt, H. Hajishirzi, and A. Farhadi. Editing models with task arithmetic. In The Eleventh International Conference on Learning Representations,
+ICLR 2023, Kigali, Rwanda, May 1-5, 2023. OpenReview.net, 2023.
+[22] M. Janner, J. Fu, M. Zhang, and S. Levine. When to trust your model: Model-based policy
+optimization. pages 12498–12509, 2019.
+[23] T. Johannink, S. Bahl, A. Nair, J. Luo, A. Kumar, M. Loskyll, J. A. Ojea, E. Solowjow, and
+S. Levine. Residual reinforcement learning for robot control. In International Conference
+on Robotics and Automation, ICRA 2019, Montreal, QC, Canada, May 20-24, 2019, pages
+6023–6029. IEEE, 2019.
+[24] L. P. Kaelbling, M. L. Littman, and A. W. Moore. Reinforcement learning: A survey. J. Artif.
+Intell. Res., 4:237–285, 1996.
+[25] K. Khetarpal, M. Riemer, I. Rish, and D. Precup. Towards continual reinforcement learning: A
+review and perspectives. J. Artif. Intell. Res., 75:1401–1476, 2022.
+[26] B. Kim, C. Ahn, W. J. Baddar, K. Kim, H. Lee, S. Ahn, S. Han, S. Suh, and E. Yang. Testtime ensemble via linear mode connectivity: A path to better adaptation. In The Thirteenth
+International Conference on Learning Representations, ICLR 2025, Singapore, April 24-28,
+2025. OpenReview.net, 2025.
+[27] D. Kumaran, D. Hassabis, and J. L. McClelland. What learning systems do intelligent agents
+need? complementary learning systems theory updated. Trends in cognitive sciences, 20(7):512–
+534, 2016.
+[28] T. P. Lillicrap, J. J. Hunt, A. Pritzel, N. Heess, T. Erez, Y. Tassa, D. Silver, and D. Wierstra.
+Continuous control with deep reinforcement learning. arXiv preprint arXiv:1509.02971, 2015.
+[29] K. Lin, Y. Wang, P. Chen, R. Zeng, Y. Lei, S. Zhou, Q. Du, M. Tan, and C. Gan. When to
+align: Dynamic behavior consistency for multiagent systems via intrinsic rewards. IEEE Trans.
+Neural Networks Learn. Syst., 36(12):20105–20119, 2025.
+[30] F. Luo, S. Jiang, Y. Yu, Z. Zhang, and Y. Zhang. Adapt to environment sudden changes by
+learning a context sensitive policy. In Thirty-Sixth AAAI Conference on Artificial Intelligence,
+AAAI 2022, Thirty-Fourth Conference on Innovative Applications of Artificial Intelligence, IAAI
+2022, The Twelveth Symposium on Educational Advances in Artificial Intelligence, EAAI 2022
+Virtual Event, February 22 - March 1, 2022, pages 7637–7646. AAAI Press, 2022.
+[31] M. C. Machado, M. G. Bellemare, E. Talvitie, J. Veness, M. J. Hausknecht, and M. Bowling.
+Revisiting the arcade learning environment: Evaluation protocols and open problems for general
+agents. J. Artif. Intell. Res., 61:523–562, 2018.
+[32] M. Malagón, J. Ceberio, and J. A. Lozano. Self-composing policies for scalable continual
+reinforcement learning. In Forty-first International Conference on Machine Learning, ICML
+2024, Vienna, Austria, July 21-27, 2024. OpenReview.net, 2024.
+12
+
+[33] A. Mallya and S. Lazebnik. Packnet: Adding multiple tasks to a single network by iterative
+pruning. In 2018 IEEE Conference on Computer Vision and Pattern Recognition, CVPR 2018,
+Salt Lake City, UT, USA, June 18-22, 2018, pages 7765–7773. Computer Vision Foundation /
+IEEE Computer Society, 2018.
+[34] J. A. Mendez, H. van Seijen, and E. Eaton. Modular lifelong reinforcement learning via neural
+composition. In The Tenth International Conference on Learning Representations, ICLR 2022,
+Virtual Event, April 25-29, 2022. OpenReview.net, 2022.
+[35] Y. Meng, Z. Bing, X. Yao, K. Chen, K. Huang, Y. Gao, F. Sun, and A. Knoll. Preserving and
+combining knowledge in robotic lifelong reinforcement learning. Nat. Mac. Intell., 7(2):256–
+269, 2025.
+[36] V. Mnih, A. P. Badia, M. Mirza, A. Graves, T. P. Lillicrap, T. Harley, D. Silver, and
+K. Kavukcuoglu. Asynchronous methods for deep reinforcement learning. In M. Balcan
+and K. Q. Weinberger, editors, Proceedings of the 33nd International Conference on Machine Learning, ICML 2016, New York City, NY, USA, June 19-24, 2016, volume 48 of JMLR
+Workshop and Conference Proceedings, pages 1928–1937. JMLR.org, 2016.
+[37] A. Muppidi, Z. Zhang, and H. Yang. Fast TRAC: A parameter-free optimizer for lifelong
+reinforcement learning. In A. Globersons, L. Mackey, D. Belgrave, A. Fan, U. Paquet, J. M.
+Tomczak, and C. Zhang, editors, Advances in Neural Information Processing Systems 38:
+Annual Conference on Neural Information Processing Systems 2024, NeurIPS 2024, Vancouver,
+BC, Canada, December 10 - 15, 2024, 2024.
+[38] B. Peng, X. Li, J. Gao, J. Liu, and K. Wong. Deep dyna-q: Integrating planning for taskcompletion dialogue policy learning. In I. Gurevych and Y. Miyao, editors, Proceedings
+of the 56th Annual Meeting of the Association for Computational Linguistics, ACL 2018,
+Melbourne, Australia, July 15-20, 2018, Volume 1: Long Papers, pages 2182–2192. Association
+for Computational Linguistics, 2018.
+[39] A. A. Rusu, N. C. Rabinowitz, G. Desjardins, H. Soyer, J. Kirkpatrick, K. Kavukcuoglu,
+R. Pascanu, and R. Hadsell. Progressive neural networks. CoRR, abs/1606.04671, 2016.
+[40] J. Schmidhuber, J. Zhao, and N. N. Schraudolph. Reinforcement learning with self-modifying
+policies. In S. Thrun and L. Y. Pratt, editors, Learning to Learn, pages 293–309. Springer, 1998.
+[41] J. Schulman, S. Levine, P. Abbeel, M. I. Jordan, and P. Moritz. Trust region policy optimization.
+In F. R. Bach and D. M. Blei, editors, Proceedings of the 32nd International Conference on
+Machine Learning, ICML 2015, Lille, France, 6-11 July 2015, volume 37 of JMLR Workshop
+and Conference Proceedings, pages 1889–1897. JMLR.org, 2015.
+[42] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov. Proximal policy optimization
+algorithms. CoRR, abs/1707.06347, 2017.
+[43] Z. Shao, P. Wang, Q. Zhu, R. Xu, J. Song, M. Zhang, Y. K. Li, Y. Wu, and D. Guo. Deepseekmath:
+Pushing the limits of mathematical reasoning in open language models. CoRR, abs/2402.03300,
+2024.
+[44] J. Shen, H. Lai, M. Liu, H. Zhao, Y. Yu, and W. Zhang. Adaptation augmented model-based
+policy optimization. J. Mach. Learn. Res., 24:218:1–218:35, 2023.
+[45] H. Sun, J. Hu, Z. Zhang, H. Tian, X. Xie, Y. Wang, Z. Yu, X. Xie, and M. Tan. Open-world
+drone active tracking with goal-centered rewards. In The Thirty-ninth Annual Conference on
+Neural Information Processing Systems, 2025.
+[46] Z. Sun and Y. Mu. Rewiring neurons in non-stationary environments. In A. Oh, T. Naumann,
+A. Globerson, K. Saenko, M. Hardt, and S. Levine, editors, Advances in Neural Information
+Processing Systems 36: Annual Conference on Neural Information Processing Systems 2023,
+NeurIPS 2023, New Orleans, LA, USA, December 10 - 16, 2023, 2023.
+[47] R. S. Sutton and A. G. Barto. Reinforcement learning - an introduction. Adaptive computation
+and machine learning. MIT Press, 1998.
+13
+
+[48] R. S. Sutton, D. A. McAllester, S. Singh, and Y. Mansour. Policy gradient methods for
+reinforcement learning with function approximation. In S. A. Solla, T. K. Leen, and K. Müller,
+editors, Advances in Neural Information Processing Systems 12, [NIPS Conference, Denver,
+Colorado, USA, November 29 - December 4, 1999], pages 1057–1063. The MIT Press, 1999.
+[49] E. Ullah, T. Mai, A. Rao, R. A. Rossi, and R. Arora. Machine unlearning via algorithmic
+stability. In M. Belkin and S. Kpotufe, editors, Conference on Learning Theory, COLT 2021,
+15-19 August 2021, Boulder, Colorado, USA, volume 134 of Proceedings of Machine Learning
+Research, pages 4126–4142. PMLR, 2021.
+[50] Z. Wang, E. Yang, L. Shen, and H. Huang. A comprehensive survey of forgetting in deep
+learning beyond continual learning. IEEE Trans. Pattern Anal. Mach. Intell., 47(3):1464–1483,
+2025.
+[51] C. J. C. H. Watkins et al. Learning from delayed rewards. 1989.
+[52] R. J. Williams. Simple statistical gradient-following algorithms for connectionist reinforcement
+learning. Mach. Learn., 8:229–256, 1992.
+[53] M. Wolczyk, M. Zajac, R. Pascanu, L. Kucinski, and P. Milos. Continual world: A robotic
+benchmark for continual reinforcement learning. In M. Ranzato, A. Beygelzimer, Y. N. Dauphin,
+P. Liang, and J. W. Vaughan, editors, Advances in Neural Information Processing Systems 34:
+Annual Conference on Neural Information Processing Systems 2021, NeurIPS 2021, December
+6-14, 2021, virtual, pages 28496–28510, 2021.
+[54] M. Wolczyk, M. Zajac, R. Pascanu, L. Kucinski, and P. Milos. Disentangling transfer in
+continual reinforcement learning. In S. Koyejo, S. Mohamed, A. Agarwal, D. Belgrave, K. Cho,
+and A. Oh, editors, Advances in Neural Information Processing Systems 35: Annual Conference
+on Neural Information Processing Systems 2022, NeurIPS 2022, New Orleans, LA, USA,
+November 28 - December 9, 2022, 2022.
+[55] Y. Yang, T. Zhou, J. Jiang, G. Long, and Y. Shi. Continual task allocation in meta-policy
+network via sparse prompting. In A. Krause, E. Brunskill, K. Cho, B. Engelhardt, S. Sabato,
+and J. Scarlett, editors, International Conference on Machine Learning, ICML 2023, 23-29
+July 2023, Honolulu, Hawaii, USA, volume 202 of Proceedings of Machine Learning Research,
+pages 39623–39638. PMLR, 2023.
+[56] Q. Yu, Z. Zhang, R. Zhu, Y. Yuan, X. Zuo, Y. Yue, T. Fan, G. Liu, L. Liu, X. Liu, H. Lin, Z. Lin,
+B. Ma, G. Sheng, Y. Tong, C. Zhang, M. Zhang, W. Zhang, H. Zhu, J. Zhu, J. Chen, J. Chen,
+C. Wang, H. Yu, W. Dai, Y. Song, X. Wei, H. Zhou, J. Liu, W. Ma, Y. Zhang, L. Yan, M. Qiao,
+Y. Wu, and M. Wang. DAPO: an open-source LLM reinforcement learning system at scale.
+CoRR, abs/2503.14476, 2025.
+[57] T. Yu, D. Quillen, Z. He, R. Julian, K. Hausman, C. Finn, and S. Levine. Meta-world: A
+benchmark and evaluation for multi-task and meta reinforcement learning. In L. P. Kaelbling,
+D. Kragic, and K. Sugiura, editors, 3rd Annual Conference on Robot Learning, CoRL 2019,
+Osaka, Japan, October 30 - November 1, 2019, Proceedings, volume 100 of Proceedings of
+Machine Learning Research, pages 1094–1100. PMLR, 2019.
+[58] T. Zhang, K. Z. Shen, Z. Lin, B. Yuan, X. Wang, X. Li, and D. Ye. Replay-enhanced continual
+reinforcement learning. Trans. Mach. Learn. Res., 2023, 2023.
+[59] T. Zhang, X. Wang, B. Liang, and B. Yuan. Catastrophic interference in reinforcement learning:
+A solution based on context division and knowledge distillation. IEEE Trans. Neural Networks
+Learn. Syst., 34(12):9925–9939, 2023.
+[60] C. Zheng, H. Yin, J. Chen, T. Ng, Y. Ong, and I. W. Tsang. Mastering continual reinforcement
+learning through fine-grained sparse network allocation and dormant neuron exploration. CoRR,
+abs/2503.05246, 2025.
+
+14
+
+Supplementary Materials for
+“Continual Knowledge Adaptation for Reinforcement Learning”
+Contents
+A Mathematical Analysis
+
+16
+
+B More Related Work
+
+17
+
+C Environments and Tasks
+
+17
+
+C.1 Meta-World . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+18
+
+C.2 SpaceInvaders . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+18
+
+C.3 Freeway . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+19
+
+D Implementation Details
+
+20
+
+E Efficiency of CKA-RL
+
+22
+
+E.1 Performance vs. Memory Cost Analysis . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+22
+
+E.2 Performance vs. Inference Cost Analysis . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+23
+
+F Further Experimental Results
+
+23
+
+G Discussions and Future Works
+
+24
+
+G.1 Limitations and Future Works . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+24
+
+G.2 Broader Impacts . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+24
+
+15
+
+A
+
+Mathematical Analysis
+
+We provide some theoretical analysis to support the improved performance of our proposed method.
+The analysis includes several key lemmas and corollaries, which demonstrate the stability and
+performance of the knowledge merging mechanism in the context of continual reinforcement learning.
+Preliminaries. We parameterize the policy for task τk as:
+θk = θbase +
+
+k−1
+X
+
+αjk vj + vk ,
+
+with
+
+j=1
+
+k−1
+X
+
+αjk = 1,
+
+(11)
+
+j=1
+
+where the normalized adaptation factors αk are produced by a softmax over learnable β k (Eq. (3)–(4)).
+When the pool size exceeds Kmax , we merge the most similar knowledge vectors by averaging (Eq.
+(5)–(7)).
+P
+Lemma 1 (Drift bound under convex reuse). Let ∆k := θk − θbase = j<k αjk vj + vk . Since αk
+are nonnegative and sum to 1, we have:
+X
+X
+∥∆k ∥ ≤
+αjk vj + ∥vk ∥ ≤
+αjk ∥vj ∥ + ∥vk ∥ ≤ max ∥vj ∥ + ∥vk ∥.
+(12)
+j<k
+
+j<k
+
+j<k
+
+Thus, the deviation from the base is controlled by the magnitudes of (a small subset of) vectors
+actually reused and the current task vector. This uses the normalization of αk given by Eq. (3)–(4).
+Corollary 1 (Lipschitz Performance Stability). If the task-k return Jk (θ) is L-Lipschitz in parameters, then:
+X
+X
+|Jk (θk ) − Jk (θbase + vk )| ≤ L
+αjk vj ≤ L
+αjk ∥vj ∥.
+(13)
+j<k
+
+j<k
+
+Thus, reusing historical vectors cannot hurt beyond a tunable, data-dependent bound, and the bound
+tightens as αk concentrates on small-norm or well-aligned vectors (see Eq. (3)–(4)).
+v⊤ v
+
+Lemma 2 (Interference Reduces with Near-Orthogonality). Let Sij = ∥vii∥∥vjj ∥ be the cosine
+similarity. If |Sij | ≤ ε ≪ 1 for i ̸= j, then:
+X
+j<k
+
+αjk vj
+
+2
+
+=
+
+X
+j<k
+
+(αjk )2 ∥vj ∥2 +
+
+X
+
+αik αjk ∥vi ∥ ∥vj ∥Sij ≤
+
+i̸=j
+
+X
+
+X
+(αjk )2 ∥vj ∥2 +ε
+αik αjk ∥vi ∥ ∥vj ∥.
+
+j<k
+
+i̸=j
+
+(14)
+Hence, the “cross-task” term is O(ε). Our empirical cosine analysis shows knowledge vectors are
+nearly orthogonal, with off-diagonal values in [−0.24, 0.12], while full fine-tuned parameters have
+strong correlations (0.93 ∼ 0.95). This matches the design goal of reducing interference.
+Corollary 2 (Combining Lemma 1 and Lemma 2). Combining Lemma 1 and Lemma 2, both the
+drift and the cross-terms that cause interference are controlled—explaining the improved retention
+seen in the final-policy evaluation (Table 3).
+Lemma 3 (Bounded Error of Adaptive Merging). Suppose we must replace (vm , vn ) by vmerge =
+1
+2 (vm + vn ) when |V | > Kmax . For any convex coefficients λ, µ ≥ 0, λ + µ = 1, we have:
+λvm + µvn − vmerge
+
+≤ 12 ∥vm − vn ∥.
+
+If their cosine similarity Smn ≥ 1 − δ with δ ∈ [0, 2], then:
+p
+√
+∥vm − vn ∥ ≤ 2(1 − Smn ) max(∥vm ∥, ∥vn ∥) ≤ 2δ max(∥vm ∥, ∥vn ∥).
+√
+Thus, the parameter perturbation induced by merging is O( δ).
+
+(15)
+
+(16)
+
+Corollary 3 (Performance Stability under Merging). With L-Lipschitz Jk , we have:
+p
+|Jk (θafter-merge ) − Jk (θbefore-merge )| ≤ L2 ∥vm − vn ∥ ≤ L2 2(1 − Smn ) max(∥vm ∥, ∥vn ∥). (17)
+Hence, merging similar vectors (large Smn ) has a small, explicitly bounded effect, justifying our
+“merge-the-most-similar” rule in Eq. (6)–(7).
+16
+
+B
+
+More Related Work
+
+Reinforcement Learning (RL) [24, 29] constitutes a paradigm within machine learning wherein an
+agent learns to optimize its decision-making process through interaction with an environment. This
+interaction involves performing actions and receiving consequent feedback, typically in the form of
+rewards or penalties. The principal learning objective in RL is the maximization of a cumulative
+reward signal. In contrast to supervised learning, which relies on datasets comprising pre-defined
+input-output pairs for model training, RL entails an agent acquiring knowledge from the repercussions
+of its actions, mediated by this reward-penalty mechanism. This iterative, trial-and-error learning
+process, coupled with its emphasis on sequential decision-making under uncertainty, distinguishes
+RL from supervised learning methodologies that depend on labeled datasets. Existing reinforcement
+learning algorithms can be broadly categorized based on whether an explicit model of the environment
+is learned or utilized, leading to two principal classes: Model-free RL and Model-based RL.
+Model-free RL. Model-free RL algorithms enable the agent to learn optimal policies directly from
+trajectory samples accrued through interaction with the environment, without explicitly constructing an environmental model. Within model-free RL, algorithms are further distinguished by the
+components they learn, leading to three primary sub-categories: actor-only, critic-only, and actorcritic algorithms. Actor-only algorithms directly learn a policy network, denoted as πθ (a|s), which
+maps states to actions. This network takes the current state st as input and outputs the action at .
+Prominent examples of such algorithms include Reinforce [52] and various policy gradient methods
+[48]. Critic-only algorithms, in contrast, focus solely on learning a value function (e.g., state-value
+or action-value function). Given a state st , the learned value model is used to evaluate all possible
+actions a′ ∈ A, and the action at yielding the maximum estimated value is selected. This category
+encompasses methods such as Q-learning [51]. Actor-critic algorithms combine these two approaches
+by concurrently maintaining and learning both a policy network (the actor) for action selection and a
+value function model (the critic) for evaluating actions or states. This category includes algorithms
+such as Deep Deterministic Policy Gradient (DDPG) [28], Trust Region Policy Optimization (TRPO)
+[41], Proximal Policy Optimization (PPO) [42], and Asynchronous Advantage Actor-Critic (A3C)
+[36]. Notably, PPO has gained considerable traction for training large language models. Recent
+advancements in this area include GRPO [43], which employs group-based advantage estimates
+within a KL-regularized loss function to reduce computational overhead and enhance update stability,
+and DAPO [56], which utilizes distinct clipping mechanisms and adaptive sampling techniques to
+improve efficiency and reproducibility during the fine-tuning of large-scale models.
+Model-based RL. Model-based RL algorithms endeavor to learn an explicit model of the environment,
+thereby addressing challenges related to sample efficiency. This is because the agent can leverage
+the learned model for planning and decision-making, reducing the necessity for extensive direct
+environmental interaction. The learned representation of the environment is commonly termed a
+‘world model’. This world model typically predicts the subsequent state st+1 and the immediate
+reward rt based on the current state st and the action at taken. Exemplary model-based RL algorithms
+include Dyna-Q [38], Model-Based Policy Optimization (MBPO) [22], and Adaptation Augmented
+Model-based Policy Optimization (AMPO) [44].
+
+C
+
+Environments and Tasks
+
+Our continual learning experiments evaluate agents across three complementary task domains designed to test different capabilities: robotic manipulation with continuous control (Meta-World) [57],
+and two vision-based Atari environments [31, 4] emphasizing dynamic decision-making (SpaceInvaders) and sparse-reward navigation (Freeway). This combination spans key RL challenges including
+high-dimensional state spaces, delayed rewards, procedural variations, and partial observability.
+The Meta-World tasks evaluate precise motor control and tool manipulation, while the Atari environments provide contrasting challenges. SpaceInvaders tests rapid visual processing and threat
+response under varying enemy behaviors, and Freeway examines strategic planning in sparse-reward
+conditions with evolving obstacle patterns. Collectively, these environments form a comprehensive
+benchmark for evaluating continual learning.
+17
+
+Figure 6: Example frames from each of the 10 Meta-World tasks used in the continual learning
+benchmark. Tasks are repeated twice to evaluate sequential skill acquisition.
+
+C.1
+
+Meta-World
+
+The robotic manipulation sequence utilizes the Meta-World benchmark [57], featuring 39-dimensional
+state observations (encoding arm/object positions) and 4-dimensional continuous actions (arm displacement and gripper torque in [−1, 1]). To evaluate continual learning capabilities, we adopt a
+20-task sequence consisting of 10 distinct manipulation tasks repeated twice, following the Continual
+World (CW20) benchmark [53]. This selection covers diverse manipulation skills while maintaining
+consistent evaluation protocols with prior work. The following lines describe the selected tasks:
+hammer-v2. Hammer a screw into a wall with randomized initial positions.
+push-wall-v2. Navigate a puck around obstacles to reach a target location.
+faucet-close-v2. Rotate a faucet handle clockwise from variable starting positions.
+push-back-v2. Position a mug beneath a coffee machine with spatial randomization.
+stick-pull-v2. Retrieve a box using a stick as a tool.
+handle-press-side-v2. Apply lateral force to press down a handle.
+push-v2. Basic puck pushing to variable target locations.
+shelf-place-v2. Precisely place a puck onto a shelf.
+window-close-v2. Slide a window closed from randomized openings.
+peg-unplug-side-v2. Remove a laterally mounted peg.
+Each episode features randomized object and goal positions, testing robustness to environmental
+variations. The task sequence progresses from basic manipulations (pushing) to complex tooluse scenarios (hammering, stick-pulling), providing a comprehensive benchmark for evaluating
+generalization across skills.
+C.2
+
+SpaceInvaders
+
+This arcade-style challenge utilizes the ALE/SpaceInvaders-v5 3 environment from the Arcade
+Learning Environment. In this classic game, the agent controls a laser cannon to defend Earth against
+descending alien invaders. Observations are provided as RGB frames (210×160×3), with the action
+space comprising six discrete actions: NOOP (no operation), FIRE, RIGHT, LEFT, RIGHTFIRE
+(combined movement and firing), and LEFTFIRE. The agent has three lives, and the game terminates
+when either all lives are lost or invaders reach the ground. Rewards are granted for destroying
+invaders, with higher-value targets located in back rows.
+3
+
+Additional details are available at https://ale.farama.org/environments/space_invaders/.
+
+18
+
+Figure 7: Example gameplay frames from the SpaceInvaders environment.
+
+To systematically evaluate the agent’s capability in dynamic threat scenarios, we examine ten
+strategically selected game modes that modify enemy behavior and environmental dynamics:
+Mode 0 (Baseline). Standard configuration with static shields and predictable bomb trajectories.
+Mode 1 (Mobile Shields). Shields oscillate horizontally, eliminating reliable cover positions.
+Mode 2 (Zigzag Bombs). Invader bombs follow non-linear trajectories, increasing evasion difficulty.
+Mode 3 (Composite Challenge). Combines mobile shields (Mode 1) with zigzag bombs (Mode 2).
+Mode 4 (High-Speed Bombs). Baseline configuration with accelerated bomb descent rates.
+Mode 5 (Mobile Shields + Fast Bombs). Integrates Mode 1’s dynamic shields with Mode 4’s bomb
+velocity.
+Mode 6 (Zigzag + Fast Bombs). Combines Mode 2’s erratic bomb paths with increased speed.
+Mode 7 (Full Complexity). Merges all modifiers: mobile shields, zigzag bombs, and high velocity.
+Mode 8 (Intermittent Visibility). Invaders periodically become invisible, testing memory and
+prediction.
+Mode 9 (Dynamic Visibility). Mobile shields (Mode 1) coupled with intermittent invader visibility.
+C.3
+
+Freeway
+
+The Freeway experiments are conducted using the ALE/Freeway-v5 4 environment from the Arcade
+Learning Environment. In this environment, the agent controls a chicken attempting to cross a
+multi-lane highway with moving vehicles. Observations are provided as RGB frames (210×160×3),
+with action space consists of three discrete actions: NOOP (no operation), UP (move forward),
+and DOWN (move backward). Rewards are exceptionally sparse, the agent only receives +1 upon
+successfully reaching the top of the screen after crossing all traffic lanes.
+
+Figure 8: Example gameplay frames from the Freeway environment.
+To evaluate the agent’s adaptability across varying difficulty levels, we select eight distinct game
+modes from the available configurations, each modifying traffic patterns and vehicle behaviors:
+Mode 0 (Default). Default configuration with standard traffic density and vehicle speeds.
+4
+
+Additional details are available at https://ale.farama.org/environments/freeway/.
+
+19
+
+Mode 1 (Increased Traffic & Trucks). Increased traffic density with faster vehicles. Introduces
+trucks in the upper lane closest to the center - these longer vehicles require more strategic avoidance.
+Mode 2 (High-Speed Trucks). Enhanced difficulty from Mode 1 with trucks moving at higher
+speeds and further increased traffic density.
+Mode 3 (All-Lane Trucks). Maximum truck presence with trucks appearing in all lanes, maintaining
+the high speeds established in Mode 2.
+Mode 4 (Randomized Speeds). Dynamic speed variation where vehicle velocities change randomly
+during episodes, while maintaining similar traffic density to previous modes without trucks.
+Mode 5 (Clustered Vehicles & Speed Variability). Combines characteristics of Mode 1 with
+additional stochastic elements: vehicle speeds vary dynamically and some vehicles appear in tightlyspaced clusters (2-3 vehicles).
+Mode 6 (Heaviest Traffic with Clusters). Builds upon Mode 5 with the most dense traffic configuration, creating the most challenging navigation scenario.
+Mode 7 (All-Lane Trucks with Random Speeds). All lanes are filled with trucks, and their speeds
+vary randomly during the episode.
+
+D
+
+Implementation Details
+
+To ensure fairness and reproducibility, we build upon the official implementations released by
+CompoNet [32], which provide well-tested baselines for standard reinforcement learning algorithms.
+Our modifications to the original SAC and PPO codebases are kept minimal: we only substitute the
+agent definition with our proposed architecture and introduce the corresponding learning mechanisms.
+Both Soft Actor-Critic (SAC) and Proximal Policy Optimization (PPO) follow the standard actorcritic paradigm, where the actor samples actions from a parameterized policy distribution and the
+critic estimates state values. In all continual reinforcement learning (CRL) methods, the continual
+adaptation mechanisms are applied only to the actor network, while the critic is reinitialized at the
+beginning of each task, following common practice in the literature.
+Table 5: Hyperparameters shared by all methods in the Meta-World task sequence under the SAC
+algorithm.
+Description
+Value
+
+Common
+
+Optimizer
+Adam’s β1 and β2
+Discount rate (γ)
+Max Std.
+Min Std.
+Activation Function
+Hidden Dimension (dmodel )
+
+Adam
+(0.9, 0.999)
+0.99
+e2
+−20
+e
+ReLU
+256
+
+SAC Specific
+
+Batch size
+Buffer size
+Target Smoothing Coef. (τ )
+Entropy Regularization Coef. (α)
+Auto. Tuning of α
+Policy Update Freq.
+Target Net. Update Freq.
+Noise Clip
+Number of Random Actions
+Timestep to Start Learning
+
+128
+106
+0.005
+0.2
+Yes
+2
+1
+0.5
+104
+5 × 103
+
+Networks
+
+Target Net. Layers
+Critic Net. Layers
+Actor’s Learning Rate
+Q Networks’ Learning Rate
+
+3
+3
+10−3
+10−3
+
+20
+
+For Meta-World tasks, we adopt SAC as the underlying optimization algorithm. Both the actor
+and critic networks are implemented as two-layer multilayer perceptrons (MLPs), each followed by
+separate linear output heads predicting the mean and log standard deviation of the Gaussian policy.
+For Atari-based tasks including SpaceInvaders and Freeway, PPO is used for training. All methods
+employ a shared encoder network to extract compact feature representations from image observations.
+Two single-layer output heads are used to produce the categorical policy logits (actor) and the scalar
+value estimates (critic). Unless otherwise noted, all hyperparameters are kept identical across different
+methods and are consistent with those in the reference implementations.
+
+Table 6: Hyperparameters shared by all methods in the SpaceInvaders and Freeway task sequences
+under the PPO algorithm.
+Description
+Value
+
+Common
+
+Optimizer
+AdamW’s β1 and β2
+Max. Gradient Norm
+Discount Rate (γ)
+Activation Function
+Hidden Dimension (dmodel )
+Learning Rate
+
+Adam
+(0.9, 0.999)
+0.5
+0.99
+ReLU
+512
+2.5 · 10−4
+
+PPO Specific
+
+PPO Value Function Coef.
+GAE λ
+Num. Parallel Environments
+Batch Size
+Mini - Batch Size
+Num. Mini - Batches
+Update Epochs
+PPO Clipping Coefficient
+PPO Entropy Coefficient
+Learn. Rate Annealing
+Clip Value Loss
+Normalize Advantage
+Num. Steps Per Rollout
+
+0.5
+0.95
+8
+1024
+256
+4
+4
+0.2
+0.01
+Yes
+Yes
+Yes
+128
+
+Methods. We compare the CKA-RL with nine SOTA methods. 1) Baseline involves training a
+randomly initialized neural network for each task, providing a fundamental and essential reference
+point for comparison. 2) FT-1 (Fine-Tuning Single Model) [53] continuously fine-tunes a single
+neural network model across all relevant tasks. 3) FT-N (Fine-Tuning with Model Preservation)
+[53] follows a similar fine-tuning approach but maintains separate model instances for each task to
+mitigate forgetting. 4) ProgNet [39] instantiates a new neural network whenever the task changes,
+freezing the parameters of the previous modules and adding lateral connections between their hidden
+layers. 5) PackNet [33] stores the parameters to solve every task of the sequence in the same network
+by building masks to avoid overwriting the ones used to solve previous tasks. 6) MaskNet [5]
+leverages previous score parameters across tasks to learn task-specific score parameters, which are
+then used to generate masks for the neural network, dynamically adapting the model to new tasks.
+7) CReLUs [1] enhances the agent capability in CRL by concatenating ReLUs, which reduces the
+incidence of zero activations and addresses the plasticity loss issue in neural networks. 8) CompoNet
+[32] introduces a scalable neural network architecture that dynamically composes action outputs from
+previously learned policy modules, rather than relying on shared hidden layer representations across
+tasks. 9) CbpNet [11] uses a variation of back-propagation, continually and randomly reinitializing a
+small fraction of underutilized units to maintain the plasticity of neural networks.
+21
+
+ $ F W L Y D W H  0 H P R U \  8 V D J H   0 % 
+
+ 3 D U D P H W H U  0 H P R U \   0 % 
+
+ & R P S R 1 H W
+ 3 U R J 1 H W
+ & . $  5 /
+
+   
+  
+  
+  
+  
+ 
+
+ 
+
+ 
+ 7 D V N  , '
+
+ 
+
+ 
+
+(a) Total parameter memory across tasks. CKA-RL
+plateaus after 5 tasks, while others grow linearly.
+
+   
+
+ & R P S R 1 H W
+ 3 U R J 1 H W
+ & . $  5 /
+
+   
+   
+   
+   
+  
+ 
+
+ 
+
+ 
+
+ 
+ 7 D V N  , '
+
+ 
+
+ 
+
+(b) Activation related memory usage during training. CKA-RL remains flat, whereas ProgNet shows
+quadratic growth.
+
+Figure 9: Memory cost comparison. CKA-RL maintains nearly constant parameter and activation
+size through vector merging, while baselines show linear or even quadratic memory growth.
+
+E
+
+Efficiency of CKA-RL
+
+E.1
+
+Performance vs. Memory Cost Analysis
+
+We evaluate the memory efficiency of CKA-RL by comparing the growth of model parameters
+and activation-related memory across tasks from SpaceInvaders. As shown in Figure 9a, the total
+parameter memory of CKA-RL remains nearly constant beyond the fifth task due to our use of the
+adaptive knowledge merging, which maintains a bounded knowledge vector pool. This ensures that
+model complexity does not scale linearly with the number of tasks. In contrast, both ProgNet and
+CompoNet show linearly increasing memory usage, reaching 64.95 MB and 108.21 MB at the tenth
+task, respectively.
+As shown in Figure 9b, the activation-related memory usage in CKA-RL stays nearly constant
+throughout training. After merging, the knowledge vectors and base parameter construct a fixed-size
+policy parameter, which drastically reduces the activation memory overhead. Notably, the memory
+usage in ProgNet exhibits a quadratic growth trend, whereas CKA-RL remains constant. This suggests
+severe scalability limitations in ProgNet. This memory overhead in ProgNet primarily stems from
+its architectural design: during training and inference, it relies on the hidden representations of all
+previously learned policies. As more tasks are added, the number of such dependencies increases,
+leading to substantial growth in activation memory consumption.
+Table 7: Performance and Forward Transfer Comparison. CKA-RL outperforms existing methods
+across three benchmarks while using significantly less memory.
+
+Method
+
+Pub.’Year
+
+Meta-World
+PERF. FWT.
+
+SpaceInvaders
+PERF. FWT.
+
+Freeway
+PERF. FWT.
+
+Average
+PERF. FWT.
+
+ProgNet [39]
+–
+0.4157 -0.0379 0.3757 -0.0075 0.3125 0.1938 0.3680 0.0495
+CompoNet [32] ICML’2024 0.4131 -0.0055 0.9828 0.6963 0.7629 0.7115 0.7196 0.4674
+CKA-RL (Ours)
+–
+0.4642 -0.0032 0.9928 0.7749 0.7923 0.7429 0.7498 0.5049
+
+CKA-RL achieves a forward transfer of 0.7749 with only 11.49MB of memory overhead, highlighting
+its superior efficiency. Unlike methods that accumulate task-specific modules, our approach leverages
+compact knowledge vectors to consolidate transferable knowledge. This design allows CKA-RL to
+outperform CompoNet and ProgNet with a significantly smaller memory footprint.
+As shown in Table 7, CKA-RL not only achieves the best average performance and forward transfer
+across diverse tasks (Meta-World, SpaceInvaders, Freeway), but also maintains high efficiency in
+historical knowledge utilization. These results underscore the practicality of CKA-RL in continual
+learning scenarios with constrained memory budgets.
+22
+
+Performance vs. Inference Cost Analysis
+
+We further compare the inference efficiency of
+different methods on the SpaceInvaders benchmark. As shown in Figure 10, CKA-RL achieves
+the highest performance and forward transfer
+with an average inference time of only 0.0012s
+per input. Importantly, its inference latency remains almost constant regardless of the number
+of tasks. This is because CKA-RL consolidates
+historical knowledge into a fixed-size policy parameter during the parameter construction phase,
+eliminating the need for complex runtime composition.
+
+ , Q I H U H Q F H  7 L P H   V 
+
+E.2
+
+     
+     
+     
+     
+     
+     
+     
+     
+     
+
+ & R P S R 1 H W
+ 3 U R J 1 H W
+ & . $  5 /
+
+ 
+
+ 
+
+ 
+ 7 D V N  , '
+
+ 
+
+ 
+
+In contrast, existing architectures such as Com- Figure 10: Inference time vs. number of tasks
+poNet and ProgNet exhibit significant increases on SpaceInvaders. CKA-RL maintains nearly
+in inference cost as the number of tasks grows. constant inference latency due to adaptive knowlCompoNet shows a linear growth trend in in- edge merging, while CompoNet and ProgNet sufference time, since its action selection relies on fer from increasing computational overhead.
+aggregating outputs from all previously learned policies. ProgNet, on the other hand, demonstrates
+a quadratic growth pattern due to its dependence on all intermediate hidden layers for knowledge
+integration during inference.
+These results underscore the scalability advantage of CKA-RL. By offloading the knowledge fusion
+process to the model-building stage, it minimizes computational overhead at test time, making it
+well-suited for continual learning in resource-constrained or real-time environments.
+
+Further Experimental Results
+
+ 
+
+                                                   
+
+ 
+
+                                                        
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ ) L U V W  . Q R Z O H G J H  9 H F W R U
+
+ 
+
+ 
+
+   
+
+ 
+ 
+ 
+ 
+
+ 
+
+                                                  
+
+   
+
+ 
+
+ 
+
+                                                  
+
+   
+
+                                                 
+
+ 
+
+ 
+
+                                                     
+
+   
+
+                                                 
+
+                                                 
+
+ 
+
+ 
+ 
+
+                                                     
+
+                                                 
+
+                                                 
+
+ 
+
+   
+
+                                                      
+
+   
+
+                                                 
+
+ 
+
+                                                      
+
+                                                 
+
+                                                 
+
+ 
+
+   
+
+                                                 
+
+   
+   
+
+ 
+
+ 
+
+(a) Knowledge vector similarity (from CKA-RL)
+
+   
+
+                                                 
+
+ 6 H F R Q G  0 R G H O  3 D U D P H W H U
+
+ 
+
+                                                      
+
+ 6 H F R Q G  . Q R Z O H G J H  9 H F W R U
+
+ 
+
+   
+
+                                                 
+
+ 
+
+F
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ ) L U V W  0 R G H O  3 D U D P H W H U
+
+ 
+
+ 
+
+   
+   
+   
+   
+   
+
+ 
+
+(b) Full parameter similarity (from FN)
+
+Figure 11: Cosine similarity of task representations: (a) Knowledge vectors from CKA-RL exhibit
+near-orthogonal structure across tasks, with off-diagonal values ranging from −0.24 to 0.12; the
+zero vector for the first task reflects the base model initialization. (b) In contrast, full parameters
+from standard fine-tuning show strong off-diagonal correlations (0.93 ∼ 0.95), indicating significant
+parameter overlap and interference across tasks.
+Our CKA-RL decomposes policy parameters into stable base weights θbase and task-specific knowledge vectors {vi }. To validate this decomposition, we compute pairwise cosine similarities between
+all parameters of models fine-tuned on different tasks (Figure 11b). The strong off-diagonal correlations (0.93 ∼ 0.95) reveal that standard sequential fine-tuning causes substantial parameter overlap.
+Then we analyze the cosine similarities between our learned knowledge vectors vi (Figure 11a). The
+near-zero off-diagonal values (−0.24 ∼ 0.12) demonstrate that knowledge vectors occupy nearly
+23
+
+orthogonal directions in parameter space. The first task’s zero-valued vector reflects the initial base
+model training phase.
+This decomposition brings two key advantages: (1) stability, by preserving the base parameters θbase
+across tasks, and (2) plasticity, through task-specific knowledge vectors that remain nearly orthogonal.
+The orthogonality ensures minimal interference between tasks while enabling effective adaptation.
+As a result, CKA-RL achieves a forward transfer of 0.7749 and an average performance of 0.9928
+across tasks in continual learning settings, outperforming standard fine-tuning (0.6864 and 0.9785,
+respectively).
+
+G
+
+Discussions and Future Works
+
+G.1
+
+Limitations and Future Works
+
+In this paper, we propose Continual Knowledge Adaptation for Reinforcement Learning (CKA-RL),
+which enables the accumulation and effective utilization of historical knowledge. However, we
+believe that there are potential studies worth exploring in the future to further capitalize on the
+advantages of CKA-RL:
+• Complex-Environment Evaluation: Our current experiments focus on standard continual
+reinforcement learning benchmarks, and the scalability and robustness of CKA-RL in complex,
+real-world settings (e.g., high-dimensional visual perception or long-horizon robotic control)
+remain unverified. In future work, we will extend our evaluation to domains with richer dynamics
+and observation modalities (e.g., outdoor vision-language navigation tasks) to rigorously assess
+the generality and practical utility of CKA-RL.
+• Large-Scale Architecture Generalization: CKA-RL has been validated only on small-scale
+neural networks, and its applicability to deeper or novel architectures remains untested. In future
+work, we will evaluate CKA-RL within large-scale models, such as during the RLHF phase of
+LLMs training, to assess its scalability and effectiveness in deeper networks.
+G.2
+
+Broader Impacts
+
+Positive Societal Impacts. The continual knowledge adaptation mechanism introduced by CKA-RL
+can substantially improve the data- and compute-efficiency of autonomous systems that must operate
+in non-stationary environments. By enabling robots, intelligent assistants, and other agents to
+rapidly integrate new skills without repeatedly retraining from scratch, our method can reduce energy
+consumption and carbon footprint associated with large-scale model updates.
+Negative Societal Impacts. As with any advanced continual learning technique, there is a risk that
+CKA-RL could be exploited to develop adaptive adversarial agents that continuously learn to evade
+detection or defenses.
+
+24
+
+NeurIPS Paper Checklist
+1. Claims
+Question: Do the main claims made in the abstract and introduction accurately reflect the
+paper’s contributions and scope?
+Answer: [Yes]
+Justification: We propose Continual Knowledge Adaptation for Reinforcement Learning
+(CKA-RL), which enables the accumulation and effective utilization of historical knowledge.
+Guidelines:
+• The answer NA means that the abstract and introduction do not include the claims
+made in the paper.
+• The abstract and/or introduction should clearly state the claims made, including the
+contributions made in the paper and important assumptions and limitations. A No or
+NA answer to this question will not be perceived well by the reviewers.
+• The claims made should match theoretical and experimental results, and reflect how
+much the results can be expected to generalize to other settings.
+• It is fine to include aspirational goals as motivation as long as it is clear that these goals
+are not attained by the paper.
+2. Limitations
+Question: Does the paper discuss the limitations of the work performed by the authors?
+Answer: [Yes]
+Justification: The details can be seen in the Appendix G.
+Guidelines:
+• The answer NA means that the paper has no limitation while the answer No means that
+the paper has limitations, but those are not discussed in the paper.
+• The authors are encouraged to create a separate "Limitations" section in their paper.
+• The paper should point out any strong assumptions and how robust the results are to
+violations of these assumptions (e.g., independence assumptions, noiseless settings,
+model well-specification, asymptotic approximations only holding locally). The authors
+should reflect on how these assumptions might be violated in practice and what the
+implications would be.
+• The authors should reflect on the scope of the claims made, e.g., if the approach was
+only tested on a few datasets or with a few runs. In general, empirical results often
+depend on implicit assumptions, which should be articulated.
+• The authors should reflect on the factors that influence the performance of the approach.
+For example, a facial recognition algorithm may perform poorly when image resolution
+is low or images are taken in low lighting. Or a speech-to-text system might not be
+used reliably to provide closed captions for online lectures because it fails to handle
+technical jargon.
+• The authors should discuss the computational efficiency of the proposed algorithms
+and how they scale with dataset size.
+• If applicable, the authors should discuss possible limitations of their approach to
+address problems of privacy and fairness.
+• While the authors might fear that complete honesty about limitations might be used by
+reviewers as grounds for rejection, a worse outcome might be that reviewers discover
+limitations that aren’t acknowledged in the paper. The authors should use their best
+judgment and recognize that individual actions in favor of transparency play an important role in developing norms that preserve the integrity of the community. Reviewers
+will be specifically instructed to not penalize honesty concerning limitations.
+3. Theory assumptions and proofs
+Question: For each theoretical result, does the paper provide the full set of assumptions and
+a complete (and correct) proof?
+25
+
+Answer: [NA]
+Justification: The paper does not include theoretical results.
+Guidelines:
+• The answer NA means that the paper does not include theoretical results.
+• All the theorems, formulas, and proofs in the paper should be numbered and crossreferenced.
+• All assumptions should be clearly stated or referenced in the statement of any theorems.
+• The proofs can either appear in the main paper or the supplemental material, but if
+they appear in the supplemental material, the authors are encouraged to provide a short
+proof sketch to provide intuition.
+• Inversely, any informal proof provided in the core of the paper should be complemented
+by formal proofs provided in appendix or supplemental material.
+• Theorems and Lemmas that the proof relies upon should be properly referenced.
+4. Experimental result reproducibility
+Question: Does the paper fully disclose all the information needed to reproduce the main experimental results of the paper to the extent that it affects the main claims and/or conclusions
+of the paper (regardless of whether the code and data are provided or not)?
+Answer: [Yes]
+Justification: The details can be seen in Section 5.
+Guidelines:
+• The answer NA means that the paper does not include experiments.
+• If the paper includes experiments, a No answer to this question will not be perceived
+well by the reviewers: Making the paper reproducible is important, regardless of
+whether the code and data are provided or not.
+• If the contribution is a dataset and/or model, the authors should describe the steps taken
+to make their results reproducible or verifiable.
+• Depending on the contribution, reproducibility can be accomplished in various ways.
+For example, if the contribution is a novel architecture, describing the architecture fully
+might suffice, or if the contribution is a specific model and empirical evaluation, it may
+be necessary to either make it possible for others to replicate the model with the same
+dataset, or provide access to the model. In general. releasing code and data is often
+one good way to accomplish this, but reproducibility can also be provided via detailed
+instructions for how to replicate the results, access to a hosted model (e.g., in the case
+of a large language model), releasing of a model checkpoint, or other means that are
+appropriate to the research performed.
+• While NeurIPS does not require releasing code, the conference does require all submissions to provide some reasonable avenue for reproducibility, which may depend on the
+nature of the contribution. For example
+(a) If the contribution is primarily a new algorithm, the paper should make it clear how
+to reproduce that algorithm.
+(b) If the contribution is primarily a new model architecture, the paper should describe
+the architecture clearly and fully.
+(c) If the contribution is a new model (e.g., a large language model), then there should
+either be a way to access this model for reproducing the results or a way to reproduce
+the model (e.g., with an open-source dataset or instructions for how to construct
+the dataset).
+(d) We recognize that reproducibility may be tricky in some cases, in which case
+authors are welcome to describe the particular way they provide for reproducibility.
+In the case of closed-source models, it may be that access to the model is limited in
+some way (e.g., to registered users), but it should be possible for other researchers
+to have some path to reproducing or verifying the results.
+5. Open access to data and code
+26
+
+Question: Does the paper provide open access to the data and code, with sufficient instructions to faithfully reproduce the main experimental results, as described in supplemental
+material?
+Answer: [Yes]
+Justification: The source code is available at https://github.com/Fhujinwu/CKA-RL.
+Guidelines:
+• The answer NA means that paper does not include experiments requiring code.
+• Please see the NeurIPS code and data submission guidelines (https://nips.cc/
+public/guides/CodeSubmissionPolicy) for more details.
+• While we encourage the release of code and data, we understand that this might not be
+possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not
+including code, unless this is central to the contribution (e.g., for a new open-source
+benchmark).
+• The instructions should contain the exact command and environment needed to run to
+reproduce the results. See the NeurIPS code and data submission guidelines (https:
+//nips.cc/public/guides/CodeSubmissionPolicy) for more details.
+• The authors should provide instructions on data access and preparation, including how
+to access the raw data, preprocessed data, intermediate data, and generated data, etc.
+• The authors should provide scripts to reproduce all experimental results for the new
+proposed method and baselines. If only a subset of experiments are reproducible, they
+should state which ones are omitted from the script and why.
+• At submission time, to preserve anonymity, the authors should release anonymized
+versions (if applicable).
+• Providing as much information as possible in supplemental material (appended to the
+paper) is recommended, but including URLs to data and code is permitted.
+6. Experimental setting/details
+Question: Does the paper specify all the training and test details (e.g., data splits, hyperparameters, how they were chosen, type of optimizer, etc.) necessary to understand the
+results?
+Answer: [Yes]
+Justification: The details can be seen in Section 5.
+Guidelines:
+• The answer NA means that the paper does not include experiments.
+• The experimental setting should be presented in the core of the paper to a level of detail
+that is necessary to appreciate the results and make sense of them.
+• The full details can be provided either with the code, in appendix, or as supplemental
+material.
+7. Experiment statistical significance
+Question: Does the paper report error bars suitably and correctly defined or other appropriate
+information about the statistical significance of the experiments?
+Answer: [Yes]
+Justification: See Table 1.
+Guidelines:
+• The answer NA means that the paper does not include experiments.
+• The authors should answer "Yes" if the results are accompanied by error bars, confidence intervals, or statistical significance tests, at least for the experiments that support
+the main claims of the paper.
+• The factors of variability that the error bars are capturing should be clearly stated (for
+example, train/test split, initialization, random drawing of some parameter, or overall
+run with given experimental conditions).
+• The method for calculating the error bars should be explained (closed form formula,
+call to a library function, bootstrap, etc.)
+27
+
+• The assumptions made should be given (e.g., Normally distributed errors).
+• It should be clear whether the error bar is the standard deviation or the standard error
+of the mean.
+• It is OK to report 1-sigma error bars, but one should state it. The authors should
+preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis
+of Normality of errors is not verified.
+• For asymmetric distributions, the authors should be careful not to show in tables or
+figures symmetric error bars that would yield results that are out of range (e.g. negative
+error rates).
+• If error bars are reported in tables or plots, The authors should explain in the text how
+they were calculated and reference the corresponding figures or tables in the text.
+8. Experiments compute resources
+Question: For each experiment, does the paper provide sufficient information on the computer resources (type of compute workers, memory, time of execution) needed to reproduce
+the experiments?
+Answer: [Yes]
+Justification: The details can be seen in Section 5.
+Guidelines:
+• The answer NA means that the paper does not include experiments.
+• The paper should indicate the type of compute workers CPU or GPU, internal cluster,
+or cloud provider, including relevant memory and storage.
+• The paper should provide the amount of compute required for each of the individual
+experimental runs as well as estimate the total compute.
+• The paper should disclose whether the full research project required more compute
+than the experiments reported in the paper (e.g., preliminary or failed experiments that
+didn’t make it into the paper).
+9. Code of ethics
+Question: Does the research conducted in the paper conform, in every respect, with the
+NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines?
+Answer: [Yes]
+Justification: The paper meets the NeurIPS Code of Ethics.
+Guidelines:
+• The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics.
+• If the authors answer No, they should explain the special circumstances that require a
+deviation from the Code of Ethics.
+• The authors should make sure to preserve anonymity (e.g., if there is a special consideration due to laws or regulations in their jurisdiction).
+10. Broader impacts
+Question: Does the paper discuss both potential positive societal impacts and negative
+societal impacts of the work performed?
+Answer: [Yes]
+Justification: The details can be seen in Appenidx G.
+Guidelines:
+• The answer NA means that there is no societal impact of the work performed.
+• If the authors answer NA or No, they should explain why their work has no societal
+impact or why the paper does not address societal impact.
+• Examples of negative societal impacts include potential malicious or unintended uses
+(e.g., disinformation, generating fake profiles, surveillance), fairness considerations
+(e.g., deployment of technologies that could make decisions that unfairly impact specific
+groups), privacy considerations, and security considerations.
+28
+
+• The conference expects that many papers will be foundational research and not tied
+to particular applications, let alone deployments. However, if there is a direct path to
+any negative applications, the authors should point it out. For example, it is legitimate
+to point out that an improvement in the quality of generative models could be used to
+generate deepfakes for disinformation. On the other hand, it is not needed to point out
+that a generic algorithm for optimizing neural networks could enable people to train
+models that generate Deepfakes faster.
+• The authors should consider possible harms that could arise when the technology is
+being used as intended and functioning correctly, harms that could arise when the
+technology is being used as intended but gives incorrect results, and harms following
+from (intentional or unintentional) misuse of the technology.
+• If there are negative societal impacts, the authors could also discuss possible mitigation
+strategies (e.g., gated release of models, providing defenses in addition to attacks,
+mechanisms for monitoring misuse, mechanisms to monitor how a system learns from
+feedback over time, improving the efficiency and accessibility of ML).
+11. Safeguards
+Question: Does the paper describe safeguards that have been put in place for responsible
+release of data or models that have a high risk for misuse (e.g., pretrained language models,
+image generators, or scraped datasets)?
+Answer: [NA]
+Justification: This paper poses no such risks.
+Guidelines:
+• The answer NA means that the paper poses no such risks.
+• Released models that have a high risk for misuse or dual-use should be released with
+necessary safeguards to allow for controlled use of the model, for example by requiring
+that users adhere to usage guidelines or restrictions to access the model or implementing
+safety filters.
+• Datasets that have been scraped from the Internet could pose safety risks. The authors
+should describe how they avoided releasing unsafe images.
+• We recognize that providing effective safeguards is challenging, and many papers do
+not require this, but we encourage authors to take this into account and make a best
+faith effort.
+12. Licenses for existing assets
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in
+the paper, properly credited and are the license and terms of use explicitly mentioned and
+properly respected?
+Answer: [Yes]
+Justification: We strictly follow the license of the assets.
+Guidelines:
+• The answer NA means that the paper does not use existing assets.
+• The authors should cite the original paper that produced the code package or dataset.
+• The authors should state which version of the asset is used and, if possible, include a
+URL.
+• The name of the license (e.g., CC-BY 4.0) should be included for each asset.
+• For scraped data from a particular source (e.g., website), the copyright and terms of
+service of that source should be provided.
+• If assets are released, the license, copyright information, and terms of use in the
+package should be provided. For popular datasets, paperswithcode.com/datasets
+has curated licenses for some datasets. Their licensing guide can help determine the
+license of a dataset.
+• For existing datasets that are re-packaged, both the original license and the license of
+the derived asset (if it has changed) should be provided.
+29
+
+• If this information is not available online, the authors are encouraged to reach out to
+the asset’s creators.
+13. New assets
+Question: Are new assets introduced in the paper well documented and is the documentation
+provided alongside the assets?
+Answer: [NA]
+Justification: The paper does not release new assets.
+Guidelines:
+• The answer NA means that the paper does not release new assets.
+• Researchers should communicate the details of the dataset/code/model as part of their
+submissions via structured templates. This includes details about training, license,
+limitations, etc.
+• The paper should discuss whether and how consent was obtained from people whose
+asset is used.
+• At submission time, remember to anonymize your assets (if applicable). You can either
+create an anonymized URL or include an anonymized zip file.
+14. Crowdsourcing and research with human subjects
+Question: For crowdsourcing experiments and research with human subjects, does the paper
+include the full text of instructions given to participants and screenshots, if applicable, as
+well as details about compensation (if any)?
+Answer: [NA]
+Justification: The paper does not involve crowdsourcing nor research with human subjects.
+Guidelines:
+• The answer NA means that the paper does not involve crowdsourcing nor research with
+human subjects.
+• Including this information in the supplemental material is fine, but if the main contribution of the paper involves human subjects, then as much detail as possible should be
+included in the main paper.
+• According to the NeurIPS Code of Ethics, workers involved in data collection, curation,
+or other labor should be paid at least the minimum wage in the country of the data
+collector.
+15. Institutional review board (IRB) approvals or equivalent for research with human
+subjects
+Question: Does the paper describe potential risks incurred by study participants, whether
+such risks were disclosed to the subjects, and whether Institutional Review Board (IRB)
+approvals (or an equivalent approval/review based on the requirements of your country or
+institution) were obtained?
+Answer: [NA]
+Justification: The paper does not involve crowdsourcing nor research with human subjects
+Guidelines:
+• The answer NA means that the paper does not involve crowdsourcing nor research with
+human subjects.
+• Depending on the country in which research is conducted, IRB approval (or equivalent)
+may be required for any human subjects research. If you obtained IRB approval, you
+should clearly state this in the paper.
+• We recognize that the procedures for this may vary significantly between institutions
+and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the
+guidelines for their institution.
+• For initial submissions, do not include any information that would break anonymity (if
+applicable), such as the institution conducting the review.
+16. Declaration of LLM usage
+30
+
+Question: Does the paper describe the usage of LLMs if it is an important, original, or
+non-standard component of the core methods in this research? Note that if the LLM is used
+only for writing, editing, or formatting purposes and does not impact the core methodology,
+scientific rigorousness, or originality of the research, declaration is not required.
+Answer: [NA]
+Justification: The core method development in this research does not involve LLMs as any
+important, original, or non-standard components.
+Guidelines:
+• The answer NA means that the core method development in this research does not
+involve LLMs as any important, original, or non-standard components.
+• Please refer to our LLM policy (https://neurips.cc/Conferences/2025/LLM)
+for what should or should not be described.
+
+31
+
+
