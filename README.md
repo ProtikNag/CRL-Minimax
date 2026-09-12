@@ -275,6 +275,18 @@ advantages.
   `scripts/hpc_atari_worker.sbatch` (continual) / `scripts/hpc_expert.sbatch`
   (experts). **Current status + next steps: `HANDOFF.md`.**
 
+## 6c. External comparison: CKA-RL (NeurIPS 2025)
+
+We are adding our min-max method as a **row in the CKA-RL benchmark's Table 1
+(PERF + FWT) and Table 3 (final-policy cross-task)** — SpaceInvaders (10 modes),
+Freeway (8 modes), and Meta-World CW20 (20 tasks). This work lives in a **separate
+clone `/work/pnag/CKA-RL-compare` (branch `ours-minmax-row`)**, NOT in this repo:
+the method is ported into their harness (Atari PPO `run_ours.py`; SAC/Meta-World
+`run_sac_ours.py`), verified (`code-verifier: PASS`), with a targeted `needy`
+consolidation + async-env speedups. Seed-0 runs are in progress; see `HANDOFF.md`
+(▸ ACTIVE WORK) and the auto-memory `cka-rl-comparison.md` for status, job IDs,
+and the disclosure flags (past-task env access, budget asymmetry, reduced Meta ∆).
+
 ## 7. Metrics
 
 Continual World conventions: average performance, forgetting, forward

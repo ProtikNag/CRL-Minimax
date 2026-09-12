@@ -28,6 +28,44 @@ older per-iteration configs were removed in the 2026-09-08 cleanup.)
 
 ---
 
+## ►► ACTIVE WORK (2026-09-12): CKA-RL (NeurIPS'25) comparison
+
+Adding our min-max method as a new **row in the CKA-RL paper's Table 1
+(PERF + FWT) and Table 3 (final-policy cross-task)**, on *their* benchmark
+(`docs/papers/2025_Hu_CKA_RL_Continual_Knowledge_Adaptation`). Their "3 benchmarks"
+are long single-game-variant sequences: **SpaceInvaders 10 modes, Freeway 8 modes,
+Meta-World CW20 20 tasks** (38 tasks, ∆=1e6 steps/task; PPO for Atari, SAC for
+Meta-World; "Baseline" = train-from-scratch-per-task, the FWT reference).
+
+- **All this work lives in a SEPARATE clone `/work/pnag/CKA-RL-compare`, branch
+  `ours-minmax-row`** — the main repo here is untouched by it. NOTE its git remote
+  is the *upstream authors'* repo (`Fhujinwu/CKA-RL`, no push access); pushing the
+  branch needs a personal fork (e.g. `ProtikNag/CKA-RL`).
+- **Ports (both `code-verifier: PASS`):** Atari PPO `experiments/atari/run_ours.py`
+  + `models/ours.py`; SAC/Meta-World `experiments/meta-world/run_sac_ours.py` +
+  `models/ours.py` + `eval_final_policy_metaworld.py`. Single-process full-sequence
+  runners mirroring the canonical method: task0 → per-task **local clone-from-global**
+  specialist → **global consolidation** (one-sided squared value constraint, dual μ,
+  two-timescale, retention-gated early stop). Speed variants: `--consolidate-mode
+  needy` (targeted — replay only past tasks below their retention bar + current),
+  `--vector-env async` (Atari only), `global_iters` cap; relative dual tolerance
+  `eps_eff=(tol_frac·V_k^L)²`. Crash-safe observability (status.json / progress.jsonl
+  / retention_history / checkpoints / `--resume`).
+- **Running (seed 0):** SI-Ours + SI-Baseline (∆=1e6), Freeway-Ours + Freeway-Baseline
+  (∆=1e6); Meta-Ours + Meta-Baseline at **reduced ∆=300k, global_iters=400**
+  (single-env SAC only ~51 SPS → 1e6 would be ~a week; **300k is a DISCLOSURE item
+  for the Meta row**). ETA: Freeway ~4-5h, SI ~10h, Meta ~2-3 days.
+- **Disclosure flags for the "Ours" row** (from the CL-expert review): live past-task
+  env access (baselines have none), >2× frames/task, Table-1 PERF = plasticity while
+  retention shows in Table-3, single seed, reduced Meta ∆.
+- **NEXT:** when a benchmark finishes → Atari: `gather_rt_results` +
+  `process_results` + `eval_final_policy`; Meta: `extract_results` +
+  `process_results` + `eval_final_policy_metaworld` → assemble the Table-1 + Table-3
+  rows. Then multi-seed (≥3). **Full detail + job IDs in the auto-memory
+  `cka-rl-comparison.md`.**
+
+---
+
 ## ►► CURRENT STATE (2026-09-11)
 
 ### Results so far (seed 0, canonical order Qbert→Pong→Breakout→Boxing→SpaceInvaders)
