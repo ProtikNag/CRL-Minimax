@@ -42,7 +42,8 @@ import numpy as np
 import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
+from matplotlib.patches import Patch, Rectangle
+from matplotlib.colors import TwoSlopeNorm
 
 # ---------------------------------------------------------------------------
 # Data (seed 0, greedy-100, plain impala_ac_multihead net)
@@ -60,6 +61,49 @@ SCORES = {
 
 # Series order for the 5 bars per game in Fig 1.
 FIG1_ORDER = ["Local_C", "Local_R", "V5_C", "V5_R", "Joint"]
+
+# ---------------------------------------------------------------------------
+# Forgetting / retention matrices (Figs 4-6). V5 min-max, seed 0, greedy-100.
+#
+# Rows  = training phase (score of the consolidated model AFTER learning task k).
+# Cols  = tasks in the LEARNING order of that run (diagonal = the just-learned
+#         game right after its consolidation; upper triangle = not-yet-seen,
+#         left blank -- eval_all_tasks=false, we never evaluate a future task).
+# Source: results/atari5_v5_seed0/eval_matrix.json (canonical) and
+#         results/atari5_v5_order2_seed0/eval_matrix.json (reversed).
+# NaN marks the unobserved upper triangle; it is masked (grey), never imputed.
+_NAN = np.nan
+
+# Canonical learning order: Qbert -> Pong -> Breakout -> Boxing -> SpaceInvaders
+GAMES_C = ["Qbert", "Pong", "Breakout", "Boxing", "SpaceInv"]
+ROWS_C = ["after Qbert", "after Pong", "after Breakout",
+          "after Boxing", "after SpaceInv"]
+MAT_C = np.array([
+    [4467.75,   _NAN,   _NAN,   _NAN,   _NAN],
+    [4145.50,  19.75,   _NAN,   _NAN,   _NAN],
+    [5448.00,  20.00,  90.45,   _NAN,   _NAN],
+    [ 729.00,  18.96,  44.08,  97.00,   _NAN],
+    [4075.00,  19.75,  51.81, -25.76, 765.85],
+])
+# References in the SAME (canonical) column order.
+LOCAL_C = np.array([4467.8, 20.0, 132.7,  94.0, 1132.2])   # order-dependent
+JOINT_C = np.array([4261.5, 20.7, 285.4,  67.5,  905.8])   # order-independent
+
+# Reversed learning order: SpaceInvaders -> Boxing -> Breakout -> Pong -> Qbert
+GAMES_R = ["SpaceInv", "Boxing", "Breakout", "Pong", "Qbert"]
+ROWS_R = ["after SpaceInv", "after Boxing", "after Breakout",
+          "after Pong", "after Qbert"]
+MAT_R = np.array([
+    [588.50,   _NAN,   _NAN,  _NAN,    _NAN],
+    [587.50,  96.85,   _NAN,  _NAN,    _NAN],
+    [595.50,  21.72, 293.58,  _NAN,    _NAN],
+    [702.40,  74.19, 156.73, 21.00,    _NAN],
+    [711.65,  55.44, 199.83, 21.00, 4270.25],
+])
+# References in the SAME (reversed) column order (Joint is the canonical Joint
+# values re-indexed to this column order -- it is order-independent).
+LOCAL_R = np.array([588.5, 98.9, 363.9, 21.0, 4341.0])
+JOINT_R = np.array([905.8, 67.5, 285.4, 20.7, 4261.5])
 
 # Colorblind-safe palette (Wong 2011). Color encodes the SERIES (Local/V5/Joint).
 # Order (canonical vs reversed) is encoded by shade + hatch:
@@ -233,10 +277,179 @@ def figure3():
                              "fig3_retention_vs_joint", note)
 
 
+# ---------------------------------------------------------------------------
+# Figures 4-6 -- Retention / forgetting MATRICES (task x training-phase).
+#   Fig 4: raw greedy-100 scores (color = per-column fraction-of-max, since raw
+#          scales differ ~200x across games; cell text = the RAW score).
+#   Fig 5: normalized by LOCAL reference (retention).
+#   Fig 6: normalized by JOINT reference (retention).
+# Normalized cells use a diverging colormap centered at 1.0 (= matches the
+# reference); a shared color scale spans BOTH orders so the two panels are
+# directly comparable. Negative cells (Boxing canonical) are shown honestly.
+# ---------------------------------------------------------------------------
+def _lower_mask(M):
+    """True where a cell is unobserved (upper triangle / NaN)."""
+    return ~np.isfinite(M)
+
+
+def _draw_matrix(ax, M, row_labels, col_labels, kind,
+                 ref=None, norm=None, cmap=None):
+    """Draw one heatmap. kind in {'raw','norm'}.
+
+    raw : color = value / column-max (per-column, purely a visual aid because
+          raw game scales differ ~200x); annotated with the RAW score.
+    norm: color-array = value / ref (broadcast over columns); TwoSlopeNorm
+          centered at 1.0; annotated with the retention percentage.
+    Unobserved cells (upper triangle) are masked grey and left blank.
+    """
+    n = M.shape[0]
+    mask = _lower_mask(M)
+    if kind == "raw":
+        with np.errstate(invalid="ignore"):
+            colmax = np.nanmax(np.where(mask, np.nan, M), axis=0)
+        C = M / colmax                      # per-column [.,1]
+        cmap = cmap or plt.cm.viridis.copy()
+        vmin, vmax = 0.0, 1.0
+        cmap.set_bad("0.9")
+        im = ax.imshow(np.ma.array(C, mask=mask), cmap=cmap,
+                       vmin=vmin, vmax=vmax, aspect="auto")
+    else:                                    # normalized retention
+        C = M / ref                          # broadcast ref over columns
+        cmap = cmap or plt.cm.RdBu.copy()
+        cmap.set_bad("0.9")
+        im = ax.imshow(np.ma.array(C, mask=mask), cmap=cmap,
+                       norm=norm, aspect="auto")
+
+    # Cell annotations (white bbox for legibility over any color).
+    for i in range(n):
+        for j in range(n):
+            if mask[i, j]:
+                continue
+            if kind == "raw":
+                txt = f"{M[i, j]:g}"
+            else:
+                txt = f"{C[i, j] * 100:.0f}%"
+            ax.text(j, i, txt, ha="center", va="center", fontsize=8,
+                    color="black",
+                    bbox=dict(boxstyle="round,pad=0.12", facecolor="white",
+                              alpha=0.60, edgecolor="none"))
+
+    # Outline the diagonal (the just-learned game before later interference).
+    for d in range(n):
+        ax.add_patch(Rectangle((d - 0.5, d - 0.5), 1, 1, fill=False,
+                               edgecolor="black", linewidth=1.6))
+
+    ax.set_xticks(range(n))
+    ax.set_xticklabels(col_labels, rotation=35, ha="right")
+    ax.set_yticks(range(n))
+    ax.set_yticklabels(row_labels)
+    ax.set_xlabel("evaluated on task (learning order ->)")
+    ax.tick_params(length=0)
+    return im
+
+
+def figure4_raw():
+    """Raw forgetting matrices, canonical (left) and reversed (right)."""
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.8))
+    _draw_matrix(axes[0], MAT_C, ROWS_C, GAMES_C, "raw")
+    _draw_matrix(axes[1], MAT_R, ROWS_R, GAMES_R, "raw")
+    axes[0].set_title("Canonical order")
+    axes[1].set_title("Reversed order")
+    axes[0].set_ylabel("training phase")
+    fig.suptitle("Figure 4 -- V5 forgetting matrix: RAW greedy-100 score "
+                 "(diagonal = just-learned game)", y=1.02, fontsize=12)
+    fig.text(0.5, -0.10,
+             CAPTION + "\ncolor = fraction of each column's max (raw scales "
+             "differ ~200x); cell text = raw score; grey = task not yet seen.",
+             ha="center", fontsize=8, style="italic")
+    fig.tight_layout()
+    save(fig, "fig4_retention_matrix_raw")
+
+
+def _norm_matrix_figure(ref_c, ref_r, ref_name, fig_no, fname, note):
+    """Normalized (retention) matrices for both orders, shared color scale."""
+    Cc = MAT_C / ref_c
+    Cr = MAT_R / ref_r
+    finite = np.concatenate([Cc[np.isfinite(Cc)], Cr[np.isfinite(Cr)]])
+    vmin = min(finite.min(), 0.0)          # include negatives if present
+    vmax = max(finite.max(), 1.0)          # include 1.0 (the reference line)
+    # Keep 1.0 strictly inside (vmin, vmax) for TwoSlopeNorm.
+    vmin = min(vmin, 0.999)
+    vmax = max(vmax, 1.001)
+    norm = TwoSlopeNorm(vcenter=1.0, vmin=vmin, vmax=vmax)
+    cmap = plt.cm.RdBu.copy()
+
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.8))
+    _draw_matrix(axes[0], MAT_C, ROWS_C, GAMES_C, "norm",
+                 ref=ref_c, norm=norm, cmap=cmap)
+    im = _draw_matrix(axes[1], MAT_R, ROWS_R, GAMES_R, "norm",
+                      ref=ref_r, norm=norm, cmap=cmap)
+    axes[0].set_title("Canonical order")
+    axes[1].set_title("Reversed order")
+    axes[0].set_ylabel("training phase")
+
+    cbar = fig.colorbar(im, ax=axes, fraction=0.035, pad=0.02)
+    cbar.set_label(f"retention  (V5 / {ref_name})")
+    cbar.ax.axhline(1.0, color="black", linewidth=1.0)  # 1.0 = matches ref
+
+    fig.suptitle(f"Figure {fig_no} -- V5 forgetting matrix: retention vs "
+                 f"{ref_name.upper()} (blue >= reference, red < reference; "
+                 "white = 1.0)", y=1.02, fontsize=12)
+    fig.text(0.5, -0.10, CAPTION + "\n" + note, ha="center", fontsize=8,
+             style="italic")
+    save(fig, fname)
+
+
+def figure5_vs_local():
+    note = ("Denominator (Local specialist) is ORDER-DEPENDENT; diagonal < 1 "
+            "means consolidation already trades off the just-learned game. "
+            "Cells can be negative (Boxing canonical) or > 1.")
+    _norm_matrix_figure(LOCAL_C, LOCAL_R, "Local", 5,
+                        "fig5_retention_matrix_vs_local", note)
+
+
+def figure6_vs_joint():
+    note = ("Denominator (Joint ceiling) is FIXED / order-independent -> the "
+            "cleaner comparison. Same shared color scale as Fig 5's panels.")
+    _norm_matrix_figure(JOINT_C, JOINT_R, "Joint", 6,
+                        "fig6_retention_matrix_vs_joint", note)
+
+
 if __name__ == "__main__":
     figure1()
     rc_l, rr_l, mc_l, mr_l = figure2()
     rc_j, rr_j, mc_j, mr_j = figure3()
+    figure4_raw()
+    figure5_vs_local()
+    figure6_vs_joint()
+
+    print("\n=== Forgetting matrix -- CANONICAL (rows=after task, cols=game) ===")
+    print("cols:", GAMES_C)
+    for lbl, row in zip(ROWS_C, MAT_C):
+        print(f"{lbl:16s}", " ".join("   .  " if not np.isfinite(v)
+                                     else f"{v:7.1f}" for v in row))
+    print("--- vs LOCAL (%) ---")
+    for lbl, row in zip(ROWS_C, MAT_C / LOCAL_C):
+        print(f"{lbl:16s}", " ".join("  .  " if not np.isfinite(v)
+                                     else f"{v*100:5.0f}" for v in row))
+    print("--- vs JOINT (%) ---")
+    for lbl, row in zip(ROWS_C, MAT_C / JOINT_C):
+        print(f"{lbl:16s}", " ".join("  .  " if not np.isfinite(v)
+                                     else f"{v*100:5.0f}" for v in row))
+    print("\n=== Forgetting matrix -- REVERSED ===")
+    print("cols:", GAMES_R)
+    for lbl, row in zip(ROWS_R, MAT_R):
+        print(f"{lbl:16s}", " ".join("   .  " if not np.isfinite(v)
+                                     else f"{v:7.1f}" for v in row))
+    print("--- vs LOCAL (%) ---")
+    for lbl, row in zip(ROWS_R, MAT_R / LOCAL_R):
+        print(f"{lbl:16s}", " ".join("  .  " if not np.isfinite(v)
+                                     else f"{v*100:5.0f}" for v in row))
+    print("--- vs JOINT (%) ---")
+    for lbl, row in zip(ROWS_R, MAT_R / JOINT_R):
+        print(f"{lbl:16s}", " ".join("  .  " if not np.isfinite(v)
+                                     else f"{v*100:5.0f}" for v in row))
+    print()
 
     # Self-audit correspondence table.
     print("=== Raw scores (Qbert Pong Breakout Boxing SpaceInvaders) ===")

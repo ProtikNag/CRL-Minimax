@@ -86,7 +86,37 @@ drawn), never clipped.
   Joint is the fixed, order-independent reference => the cleaner cross-order
   comparison. This is where the mean rises **51% -> 86%**.
 
+## Retention matrices (forgetting matrix, task × training-phase)
+
+Figures 4-6 are the full **forgetting matrices** for V5 (min-max), one heatmap
+per task order (canonical left, reversed right). **Rows** = training phase (the
+consolidated model's score *after* learning task k); **columns** = the games in
+that run's **learning order**; the **outlined diagonal** = the just-learned game
+right after its consolidation; the **grey upper triangle** = a task not yet seen
+(never evaluated, never imputed). Source: the ragged `eval_matrix.json` of
+`results/atari5_v5_seed0` (canonical) and `results/atari5_v5_order2_seed0`
+(reversed). Verified FAITHFUL (visualization-expert).
+
+- **Figure 4 — RAW scores** (`fig4_retention_matrix_raw`). Cell text = raw
+  greedy-100 score. Color = each cell as a **fraction of its own column's max**
+  (a per-column visual aid, since raw game scales differ ~200x: Pong ~20 vs
+  Qbert ~4000); no shared color scale, so read the numbers, not the shade.
+- **Figure 5 — retention vs LOCAL** (`fig5_retention_matrix_vs_local`). Cell =
+  score / that game's Local specialist. Diverging color centered at 1.0 (blue ≥
+  reference, red < reference; white = 1.0), shared across both panels. Local is
+  order-dependent; the diagonal < 1 means consolidation already trades off the
+  just-learned game.
+- **Figure 6 — retention vs JOINT** (`fig6_retention_matrix_vs_joint`). Cell =
+  score / the fixed order-independent Joint ceiling; same shared diverging scale
+  as Fig 5 — the cleaner comparison. Negative cells (Boxing canonical) render as
+  the deepest red and are shown honestly, never clipped.
+
+> **V5 only, for now.** Once the CLEAR-reversed run lands, companion CLEAR
+> matrices will be added here (and to the dashboard) alongside these.
+
 ## Files
 - Script: `make_figures.py` (run with `/work/apps/python3/anaconda/2023.7/bin/python3`)
-- PNG (200 dpi): `png/fig1_per_game_scores.png`, `png/fig2_retention_vs_local.png`, `png/fig3_retention_vs_joint.png`
-- SVG (vector): `svg/fig1_per_game_scores.svg`, `svg/fig2_retention_vs_local.svg`, `svg/fig3_retention_vs_joint.svg`
+- PNG (200 dpi): `png/fig1_per_game_scores.png`, `png/fig2_retention_vs_local.png`, `png/fig3_retention_vs_joint.png`,
+  `png/fig4_retention_matrix_raw.png`, `png/fig5_retention_matrix_vs_local.png`, `png/fig6_retention_matrix_vs_joint.png`
+- SVG (vector): `svg/fig1_per_game_scores.svg`, `svg/fig2_retention_vs_local.svg`, `svg/fig3_retention_vs_joint.svg`,
+  `svg/fig4_retention_matrix_raw.svg`, `svg/fig5_retention_matrix_vs_local.svg`, `svg/fig6_retention_matrix_vs_joint.svg`
