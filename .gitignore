@@ -19,3 +19,7 @@ results_*.log
 .claude/gate-status.json
 expert_states/
 ref_states/
+
+# graphify knowledge graph (derived; rebuild with `graphify extract . --code-only`)
+graphify-out/
+.claude/settings.json.graphify-bak
