@@ -55,6 +55,15 @@ Meta-World; "Baseline" = train-from-scratch-per-task, the FWT reference).
   (∆=1e6); Meta-Ours + Meta-Baseline at **reduced ∆=300k, global_iters=400**
   (single-env SAC only ~51 SPS → 1e6 would be ~a week; **300k is a DISCLOSURE item
   for the Meta row**). ETA: Freeway ~4-5h, SI ~10h, Meta ~2-3 days.
+- **FIRST RESULT — Freeway (seed 0, PROVISIONAL), Freeway-Ours DONE:** Table-1
+  **PERF 0.753** (CKA-RL 0.792, CompoNet 0.763, FT-N 0.753 — Ours mid-pack,
+  *competitive, not better*), **FWT 0.661** (CKA-RL 0.743). Per-mode final-policy
+  **retention ≈ 81%** of local specialists (3-ep greedy, noisy — clean 100-ep GPU
+  eval pending), **no catastrophic forgetting** (worst mode 66%). So Freeway both
+  learns competitively and retains well. **Not established as "better than the
+  paper"**: on the one comparable metric (PERF) ours is slightly below CKA-RL, and
+  retention isn't in the paper's success-units yet. Figure: `CKA-RL-compare/reports/
+  freeway/` (visualization-expert checked). SI-Ours + Meta-Ours still running.
 - **Disclosure flags for the "Ours" row** (from the CL-expert review): live past-task
   env access (baselines have none), >2× frames/task, Table-1 PERF = plasticity while
   retention shows in Table-3, single seed, reduced Meta ∆.

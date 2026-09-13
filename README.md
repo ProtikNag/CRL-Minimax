@@ -287,6 +287,11 @@ consolidation + async-env speedups. Seed-0 runs are in progress; see `HANDOFF.md
 (▸ ACTIVE WORK) and the auto-memory `cka-rl-comparison.md` for status, job IDs,
 and the disclosure flags (past-task env access, budget asymmetry, reduced Meta ∆).
 
+**First result (Freeway, seed 0, PROVISIONAL):** PERF 0.753 / FWT 0.661 (CKA-RL
+0.792 / 0.743) — competitive, *not* better; retention ≈ 81% of local specialists
+with no catastrophic forgetting. Figure + numbers in the comparison repo
+(`reports/freeway/`). SpaceInvaders and Meta-World still running.
+
 ## 7. Metrics
 
 Continual World conventions: average performance, forgetting, forward
