@@ -128,28 +128,41 @@ Joint ceiling of 906 — a config bug, not a weakness in the method. The local
 reference is the bar the global's μ-constraint must clear on the current task, so
 a weak local caps the global.
 
-**The fix:** train each specialist **to convergence (plateau on greedy-100),
-with a hard cap**, rather than to a fixed iteration count.
+**The fix: train each specialist to a per-task target score, not to a fixed
+iteration count.**
 
-Do **not** make "train until ≥ the joint ceiling" the rule, for three reasons:
+```
+target_k = max(expert_score_k, joint_ceiling_k)
+train local k until greedy-100 >= target_k, or until a hard iteration cap
+```
 
-1. It may not terminate. Joint trains on all five games with transfer between
-   them; a single-task learner may never reach that score at any budget.
-2. **It breaks the continual premise.** The joint model needs all five games at
-   once. Making it a training target means the method consumes something a
-   continual learner cannot have, and a reviewer will catch it.
-3. It makes the ceiling circular. We normalise retention against Joint. If locals
-   are trained *to* Joint by construction, Joint stops being an independent
-   reference.
+**Why a target and not convergence-to-plateau.** A plateau below a score we
+*know* is achievable is evidence of under-training, not a natural limit. A
+reviewer looking at SpaceInvaders local 588 against a known-achievable 906 will
+say the specialist is undertrained, and they will be right — that is exactly what
+happened. "Trained to convergence" is unfalsifiable; "reaches a score we
+independently demonstrated is achievable on this task" is not.
 
-Convergence-to-plateau reaches the same place without referencing Joint at all,
-and Joint stays an honest post-hoc check: *"every specialist meets or exceeds the
-budget-matched multi-task ceiling."* That is a stronger sentence than the version
-that trains to it.
+**This does not break the continual premise.** The local phase only ever touches
+task `k`'s own environment. What the target supplies is a *scalar for task k* —
+"≈906 is achievable on SpaceInvaders" — which is a fact about the game, not
+information about the other four tasks, and nothing about them enters task `k`'s
+training. The same number could have come from a published benchmark.
+
+**Prefer the expert as the source.** `experiments/train_expert.py` trains
+single-task experts on one game only, so a target taken from there is
+unimpeachable by construction and the question never arises at all. Take
+`max(expert, joint)` so the bar never drops below either. Say in the paper where
+the target came from.
+
+**The cap is the one real constraint.** The loop must terminate. Hitting the cap
+short of target is a **flagged defect to investigate** — learning rate, budget,
+seed — and is logged as such. It is never silently accepted as "that is just how
+well this task trains", because we have proof the score is reachable.
 
 **Scope of the rerun: same five games, same reversed order, ONLY the task-1 local
-budget and the convergence rule change.** Changing the sequence at the same time
-would make the difference unattributable. Plus the one logging change below.
+budget and the target rule change.** Changing the sequence at the same time would
+make the difference unattributable. Plus the one logging change below.
 
 ### `eval_every` must be on — this is the FWT fix
 
