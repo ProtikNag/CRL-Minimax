@@ -287,10 +287,15 @@ consolidation + async-env speedups. Seed-0 runs are in progress; see `HANDOFF.md
 (▸ ACTIVE WORK) and the auto-memory `cka-rl-comparison.md` for status, job IDs,
 and the disclosure flags (past-task env access, budget asymmetry, reduced Meta ∆).
 
-**First result (Freeway, seed 0, PROVISIONAL):** PERF 0.753 / FWT 0.661 (CKA-RL
-0.792 / 0.743) — competitive, *not* better; retention ≈ 81% of local specialists
-with no catastrophic forgetting. Figure + numbers in the comparison repo
-(`reports/freeway/`). SpaceInvaders and Meta-World still running.
+**Results so far (seed 0), 2/3 benchmarks done:**
+- **Freeway:** PERF 0.753 / FWT 0.661 (CKA-RL 0.792/0.743); final-policy success 0.75 (6/8), ~82% retention.
+- **SpaceInvaders:** PERF 0.981 / FWT 0.650 (CKA-RL 0.993/0.775); final-policy success 1.0 (10/10), ~90% retention.
+- **Meta-World:** still running (~task 6/20).
+
+Competitive-to-strong; strong retention is enabled by ours' disclosed live past-task
+env access. Single seed. Figures/numbers in the comparison repo
+(`reports/freeway/`, `reports/RESULTS.md`); the **next session builds the remaining
+figures (orient via the graphify plugin first).** See `HANDOFF.md` ▸ ACTIVE WORK.
 
 ## 7. Metrics
 

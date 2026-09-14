@@ -55,23 +55,49 @@ Meta-World; "Baseline" = train-from-scratch-per-task, the FWT reference).
   (∆=1e6); Meta-Ours + Meta-Baseline at **reduced ∆=300k, global_iters=400**
   (single-env SAC only ~51 SPS → 1e6 would be ~a week; **300k is a DISCLOSURE item
   for the Meta row**). ETA: Freeway ~4-5h, SI ~10h, Meta ~2-3 days.
-- **FIRST RESULT — Freeway (seed 0, PROVISIONAL), Freeway-Ours DONE:** Table-1
-  **PERF 0.753** (CKA-RL 0.792, CompoNet 0.763, FT-N 0.753 — Ours mid-pack,
-  *competitive, not better*), **FWT 0.661** (CKA-RL 0.743). Per-mode final-policy
-  **retention ≈ 81%** of local specialists (3-ep greedy, noisy — clean 100-ep GPU
-  eval pending), **no catastrophic forgetting** (worst mode 66%). So Freeway both
-  learns competitively and retains well. **Not established as "better than the
-  paper"**: on the one comparable metric (PERF) ours is slightly below CKA-RL, and
-  retention isn't in the paper's success-units yet. Figure: `CKA-RL-compare/reports/
-  freeway/` (visualization-expert checked). SI-Ours + Meta-Ours still running.
+- **RESULTS SO FAR (seed 0). 2 of 3 benchmarks DONE (Freeway, SpaceInvaders); Meta running.**
+  All numbers vs CKA-RL (paper) for that env. Retention = final-policy 100-ep success
+  (fraction of modes ≥ the benchmark's fixed per-mode threshold) + score-ratio vs our
+  local specialist.
+  - **Freeway (DONE):** PERF **0.753** (CKA-RL 0.792, CompoNet 0.763, FT-N 0.753),
+    FWT **0.661** (CKA-RL 0.743); final-policy **success 0.75 (6/8 modes)**,
+    retention ≈ **82%** of specialists, no catastrophic forgetting. Competitive, not
+    better on PERF/FWT.
+  - **SpaceInvaders (DONE):** PERF **0.981** (CKA-RL 0.993, CompoNet 0.983, FT-N 0.979)
+    — near-top; FWT **0.650** (CKA-RL 0.775) — mid; final-policy **success 1.0 (10/10)**,
+    retention ≈ **90%** of specialists. STRONG (note: SI's mid-run 64% snapshot was a
+    transient/noisy in-consolidation read; the final model recovered all modes).
+  - **Meta-World: RUNNING** (job 21910655, ~task 6/20, ~1.5–2.5 days left at 55 SPS,
+    ∆=300k). Meta-Baseline DONE (21910656).
+  - **Honest framing:** Ours is competitive-to-strong; the strong retention is enabled
+    by ours' disclosed **live past-task env access** (we re-simulate + re-consolidate
+    old modes) — asterisk stands. Single seed. Not a clean "beats the paper" claim yet.
+  - Data on disk (gitignored): `CKA-RL-compare/experiments/{atari,meta-world}/data/<tag>/Ours/`
+    (`table3_final_policy.json`, `returns.csv`, `retention_history.jsonl`,
+    `phase_summaries.jsonl`) + `agents/.../final_global`. Freeway figure:
+    `CKA-RL-compare/reports/freeway/` (visualization-expert FAITHFUL).
 - **Disclosure flags for the "Ours" row** (from the CL-expert review): live past-task
   env access (baselines have none), >2× frames/task, Table-1 PERF = plasticity while
   retention shows in Table-3, single seed, reduced Meta ∆.
-- **NEXT:** when a benchmark finishes → Atari: `gather_rt_results` +
-  `process_results` + `eval_final_policy`; Meta: `extract_results` +
-  `process_results` + `eval_final_policy_metaworld` → assemble the Table-1 + Table-3
-  rows. Then multi-seed (≥3). **Full detail + job IDs in the auto-memory
-  `cka-rl-comparison.md`.**
+- **NEXT SESSION = VISUALIZATIONS (user's plan).** Orient FIRST via the installed
+  **graphify** plugin (`graphify query "..."` — `graphify-out/graph.json` exists) before
+  reading source. Then build the results figures (all go through the **visualization**
+  agent / visualization-expert gate; keep the honest caveats in captions):
+  1. **SpaceInvaders figure** — mirror `CKA-RL-compare/reports/freeway/make_fig.py`
+     (PERF/FWT bars Ours vs paper + per-mode retention). SI numbers above; data in
+     `experiments/atari/data/SpaceInvaders/si_s0/`.
+  2. **Combined 3-benchmark summary** (Freeway + SI + Meta once done): PERF, FWT, and
+     final-policy retention, Ours vs CKA-RL/CompoNet/FT-N.
+  3. **Table-3 comparison**: average Ours' final-policy success across the 3 envs →
+     compare to CKA-RL's 0.3966 (need Meta first).
+  - Metric pipeline to (re)compute: Atari `gather_rt_results` + `process_results`
+    (PERF/FWT) + `eval_final_policy` (100-ep retention, needs a GPU — dgx is free);
+    Meta `extract_results` + `process_results` + `eval_final_policy_metaworld`.
+  - When Meta finishes: compute its row, then refresh figures + `reports/RESULTS.md` and
+    push (main repo → origin `feature/updated-objective`; comparison repo → remote
+    `fork` = ProtikNag/CKA-RL, branch `ours-minmax-row`).
+  - Then multi-seed (≥3). **Full detail + job IDs + paper bars in `cka-rl-comparison.md`
+    and `CKA-RL-compare/reports/RESULTS.md`.**
 
 ---
 
