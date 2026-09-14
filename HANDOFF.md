@@ -298,6 +298,12 @@ the residue that is not part of it.
 - `reports/final/` holds the paper figure set for both lines (see below).
 
 ## ►► INFRA / REPO STATE
+
+- **Build the code graph first, on whatever machine you are on.**
+  `graphify-out/` is **gitignored** — it is derived, AST-only and costs nothing,
+  so it does not travel with the repo. Run `graphify update .` once before
+  exploring; then `graphify query "<question>"` beats grepping for anything
+  architectural. Currently 1600 nodes / 3363 edges locally.
 - **Branches:** `feature/updated-objective` = canonical (this branch, min-max).
   `feature/updated-objective-v2` = abandoned V2 critic-retention (preserved, don't
   resume). Old per-iteration Atari configs (v3/v4/v5, ppo_v3/4/5, atari4_*, CLEAR
