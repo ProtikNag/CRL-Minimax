@@ -172,15 +172,15 @@ def format_score(value: float) -> str:
     return f"{value:,.0f}" if abs(value) >= 100 else f"{value:.1f}"
 
 
-def scale_color(fraction: float) -> str:
-    """Sample ``RETENTION_SCALE`` at ``fraction`` in [0, 1], interpolating in sRGB.
+def sample_scale(scale: list, fraction: float) -> str:
+    """Sample a Plotly colourscale at ``fraction`` in [0, 1], blending in sRGB.
 
-    Needed because the matrix is drawn as vector rectangles rather than as a
+    Needed because the matrices are drawn as vector rectangles rather than as a
     ``go.Heatmap``: Plotly rasterises heatmap cells into an embedded bitmap, and
     a paper figure has to stay vector all the way down.
     """
     fraction = min(max(fraction, 0.0), 1.0)
-    for (low, low_hex), (high, high_hex) in zip(RETENTION_SCALE, RETENTION_SCALE[1:]):
+    for (low, low_hex), (high, high_hex) in zip(scale, scale[1:]):
         if fraction <= high:
             span = high - low
             weight = 0.0 if span == 0 else (fraction - low) / span
@@ -188,7 +188,12 @@ def scale_color(fraction: float) -> str:
             right = [int(high_hex[i:i + 2], 16) for i in (1, 3, 5)]
             blend = [round(a + (b - a) * weight) for a, b in zip(left, right)]
             return "#{:02X}{:02X}{:02X}".format(*blend)
-    return RETENTION_SCALE[-1][1]
+    return scale[-1][1]
+
+
+def scale_color(fraction: float) -> str:
+    """Retention colour for ``fraction`` of the ceiling, clamped to [0, 1]."""
+    return sample_scale(RETENTION_SCALE, fraction)
 
 
 # ── Figure 1: forgetting matrices ───────────────────────────────────────────
@@ -393,6 +398,172 @@ def figure_final_scores(data: dict) -> None:
     ), row=1, col=1)
 
     export_pair(fig, "final_scores", W_FULL, height_for(W_FULL, 1.52))
+
+
+# ── Figure: backward-transfer matrix ────────────────────────────────────────
+# Signed, so the pivot is 0. The arms are deliberately NOT the same length:
+# backward transfer here runs to -1.12 but only to +0.16, so equal arms would
+# spend half the palette on a sign that barely occurs and leave every gain as a
+# tint indistinguishable from no change. The gain arm therefore saturates at
+# BWT_GAIN and the loss arm at BWT_LOSS, and the colourbar shows both extents so
+# the asymmetry is visible rather than hidden.
+BWT_LOSS, BWT_GAIN = 1.15, 0.25
+
+# Stops are expressed on the symmetric [-BWT_LOSS, +BWT_LOSS] axis the colourbar
+# uses, with full blue pulled in to where +BWT_GAIN falls.
+_GAIN_STOP = 0.5 + 0.5 * BWT_GAIN / BWT_LOSS
+BWT_SCALE = [
+    [0.00, "#DC2626"],                        # heaviest loss
+    [0.16, "#E8736F"],
+    [0.33, "#F4B3AE"],
+    [0.50, "#F2F3F5"],                        # no change
+    [0.50 + 0.35 * (_GAIN_STOP - 0.5), "#C7D8F8"],
+    [0.50 + 0.70 * (_GAIN_STOP - 0.5), "#7CA2F0"],
+    [_GAIN_STOP, "#2563EB"],                  # gain at or above BWT_GAIN
+    [1.00, "#2563EB"],
+]
+
+
+def bwt_matrix(data: dict, key: str) -> np.ndarray:
+    """Backward transfer at every training phase, in normalised units.
+
+    Cell ``(i, j)`` is task ``j`` measured after consolidating task ``i``, minus
+    task ``j`` when it was just learned. Negative is forgetting. The diagonal is
+    zero by construction and the upper triangle was never evaluated.
+
+    This is the whole lower triangle of what ``transfer_metrics`` reduces to its
+    last row, so it shows *when* a task was lost, and whether it came back.
+    """
+    order = data["orders"][ORDER_KEY]
+    joint = reference_in_order(data, "joint", order)
+    floor = np.array([random_scores()[game] for game in order], dtype=float)
+
+    normalised = (matrix(data, key) - floor[None, :]) / (joint - floor)[None, :]
+    just_learned = np.array([normalised[i, i] for i in range(len(order))])
+    return normalised - just_learned[None, :]
+
+
+def figure_bwt_matrix(data: dict) -> None:
+    """Backward transfer at every phase, Min-Max against CLEAR."""
+    order = data["orders"][ORDER_KEY]
+    labels = data["short_labels"]
+    panels = [
+        (NAME["MinMax"], bwt_matrix(data, f"v5_{ORDER_KEY}")),
+        (NAME["CLEAR"], bwt_matrix(data, f"clear_{ORDER_KEY}")),
+    ]
+    axis_labels = [labels[game] for game in order]
+    size = len(axis_labels)
+
+    limit = BWT_LOSS
+    observed = max(abs(np.nanmin(v)) for _, v in panels)
+    if observed > limit:
+        raise RuntimeError(
+            f"BWT_LOSS={limit} is below the observed {observed:.3f}; widen it "
+            "rather than letting a cell silently saturate")
+
+    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.15,
+                        subplot_titles=[name for name, _ in panels])
+
+    gap = 0.035
+    for column, (_name, values) in enumerate(panels, start=1):
+        suffix = "" if column == 1 else str(column)
+        for row_index in range(size):
+            for column_index in range(row_index + 1):
+                value = values[row_index, column_index]
+                on_diagonal = row_index == column_index
+                # The diagonal is zero by definition, not a measurement, and is
+                # held apart from the scale so it cannot be confused with a
+                # measured zero (Min-Max holds Pong at exactly 0.00).
+                fraction = 0.5 + 0.5 * value / limit
+                fill = AC["surface"] if on_diagonal else sample_scale(
+                    BWT_SCALE, fraction)
+                fig.add_shape(
+                    type="rect", layer="below",
+                    x0=column_index + gap, x1=column_index + 1 - gap,
+                    y0=row_index + gap, y1=row_index + 1 - gap,
+                    xref=f"x{suffix}", yref=f"y{suffix}",
+                    fillcolor=fill, line=dict(width=0),
+                )
+                if on_diagonal:
+                    text, tone = "·", AC["text_faint"]
+                else:
+                    # Contrast is judged on where the cell sits in the ramp, not
+                    # on |value|: the arms are different lengths, so a modest
+                    # gain can be a saturated blue while a larger loss is not.
+                    text = f"{value:+.2f}"
+                    light = fraction < 0.18 or fraction > _GAIN_STOP - 0.03
+                    tone = AC["bg"] if light else AC["text_primary"]
+                fig.add_annotation(
+                    x=column_index + 0.5, y=row_index + 0.5,
+                    xref=f"x{suffix}", yref=f"y{suffix}",
+                    text=text, showarrow=False,
+                    font=dict(family=FONT_MONO, size=9.5, color=tone),
+                )
+
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None], mode="markers", hoverinfo="skip", showlegend=False,
+            marker=dict(
+                color=[0], colorscale=BWT_SCALE, cmin=-limit, cmax=limit,
+                showscale=(column == 2), opacity=0,
+                colorbar=dict(
+                    title=dict(text="backward transfer",
+                               font=dict(family=FONT_UI, size=10,
+                                         color=AC["text_muted"]),
+                               side="right"),
+                    tickmode="array",
+                    tickvals=[-1.0, -0.5, -0.25, 0.0, BWT_GAIN],
+                    ticktext=["−1.00", "−0.50", "−0.25", "0",
+                              f"≥ +{BWT_GAIN:.2f}"],
+                    thickness=9, len=0.70, y=0.5, yanchor="middle", x=1.015,
+                    outlinewidth=0, ticklen=3, tickcolor=AC["border"],
+                    tickfont=dict(family=FONT_MONO, size=9,
+                                  color=AC["text_muted"]),
+                ),
+            ),
+        ), row=1, col=column)
+
+    for annotation in fig.layout.annotations[:2]:
+        annotation.font = dict(family=FONT_UI, size=12.5, color=AC["text_primary"])
+        annotation.y = 1.04
+
+    centres = [i + 0.5 for i in range(size)]
+    fig.update_xaxes(
+        title=dict(text="task  (learning order →)",
+                   font=dict(family=FONT_UI, size=10.5, color=AC["text_muted"])),
+        range=[0, size], tickmode="array", tickvals=centres, ticktext=axis_labels,
+        showgrid=False, ticklen=0, side="bottom", showline=False, zeroline=False,
+        tickfont=dict(family=FONT_UI, size=9, color=AC["text_muted"]),
+    )
+    fig.update_yaxes(
+        range=[size, 0], tickmode="array", tickvals=centres, ticktext=axis_labels,
+        showgrid=False, ticklen=0, showline=False, zeroline=False,
+        tickfont=dict(family=FONT_UI, size=9, color=AC["text_muted"]),
+    )
+    fig.update_yaxes(
+        title=dict(text="after consolidating",
+                   font=dict(family=FONT_UI, size=10.5, color=AC["text_muted"])),
+        row=1, col=1,
+    )
+    fig.update_layout(title=None, margin=dict(l=76, r=118, t=44, b=142))
+
+    fig.add_annotation(
+        x=0, y=-0.30, xref="paper", yref="paper", xshift=-70,
+        text=("Task j after consolidating task i, minus task j when it was just "
+              "learned, in units of (score − random) / (ceiling − random). "
+              "Negative is forgetting.<br>"
+              "The diagonal (·) is zero by construction, not a measurement, and "
+              "is held off the scale so it cannot be mistaken for a measured "
+              "zero. The upper triangle was<br>"
+              "never evaluated. The loss and gain arms of the scale are different lengths, "
+              "because backward transfer here runs to −1.12 but only to +0.16; the "
+              "colourbar shows both.<br>"
+              "Nothing is clamped. Seed 0, so no "
+              "error bars are drawn and none are invented."),
+        showarrow=False, xanchor="left", yanchor="top", align="left",
+        font=dict(family=FONT_UI, size=8.5, color=AC["text_muted"]),
+    )
+
+    export_pair(fig, "backward_transfer_matrix", W_FULL, height_for(W_FULL, 1.34))
 
 
 # ── Figure 3: transfer table ────────────────────────────────────────────────
@@ -702,6 +873,7 @@ def main() -> int:
     print("reports/final/atari_reversed")
     figure_matrices(data)
     figure_final_scores(data)
+    figure_bwt_matrix(data)
     figure_transfer_table(data)
     figure_compute_cost()
     return 0

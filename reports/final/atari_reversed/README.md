@@ -16,6 +16,7 @@ are out of scope here, so the canonical order is **not** rebuilt in this folder;
 |------|---------------|
 | `forgetting_matrices` | Full forgetting matrices, Min-Max against CLEAR, every cell as a fraction of the Joint ceiling |
 | `final_scores` | Per-game final greedy-100 score, Local specialist and both methods as bars against the Joint ceiling drawn as a rule |
+| `backward_transfer_matrix` | Backward transfer at **every** training phase, both methods |
 | `transfer_table` | Per-task backward transfer plus the aggregates, both methods |
 | `compute_cost` | Wall-clock cost of one full five-game run, Min-Max against CLEAR and Joint |
 
@@ -47,6 +48,39 @@ games. The prior-4 row is the one that measures retention.
 Min-Max's Space Invaders backward transfer is **positive** (+0.16). It is the
 first task in the sequence and it ends the run above where it was when it was
 learned, so consolidation improved it rather than merely preserving it.
+
+### The backward-transfer matrix, and what it shows that the table does not
+
+`transfer_table` reduces backward transfer to its final row. The full lower
+triangle is available, since every task is evaluated after every later phase, and
+it answers a question the final row cannot: **when** was a task lost, and did it
+come back. Cell `(i, j)` is task `j` after consolidating task `i`, minus task `j`
+when it was just learned.
+
+Reading each column downward, from the phase after that task was learned:
+
+| Task | Min-Max | CLEAR |
+|---|---|---|
+| Space Invaders | −0.00 → +0.01 → +0.15 → **+0.16** | −0.07 → −0.14 → −0.08 → −0.11 |
+| Boxing | **−1.12** → −0.34 → −0.61 | −0.18 → −0.45 → **−0.94** |
+| Breakout | −0.48 → −0.33 | −0.88 → **−0.99** |
+| Pong | +0.00 | −0.24 |
+
+**Min-Max's forgetting is non-monotone; CLEAR's is not.** Boxing collapses to
+−1.12 under the Breakout consolidation and then **recovers to −0.34**, and
+Breakout climbs back from −0.48 to −0.33. Space Invaders ends *above* where it
+was learned. Three of Min-Max's ten cells are positive.
+
+CLEAR has **no positive cell anywhere**, and its two worst columns decline
+monotonically with no recovery at all: Boxing −0.18 → −0.45 → −0.94, Breakout
+−0.88 → −0.99.
+
+The reading this supports is that consolidation actively repairs a past task,
+whereas replay slows the bleed without reversing it. It is also the honest place
+to note that Min-Max's single worst cell (−1.12) is worse than anything CLEAR
+does; the difference is that Min-Max does not stay there.
+
+Single seed, so this is a pattern in one run, not an estimated effect.
 
 ### Forward transfer is not measurable in this study
 
