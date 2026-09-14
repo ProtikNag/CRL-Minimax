@@ -409,11 +409,143 @@ the left, a small bold panel title per facet. Use
 `plotly.subplots.make_subplots(shared_xaxes=True, shared_yaxes=True)` and keep
 per-panel margins tight.
 
+**Exception — panels whose scales differ by more than ~10×.** A shared axis is
+wrong when one panel tops out at 20 and another at 4000: four panels flatten to
+nothing. Give each panel its own axis, always including zero, and say so in the
+caption. No log scale, no clipping, no silent normalisation as a substitute.
+
 ### No decorative effects
 
 No gradient fills, no glow, no drop shadows, no rounded plot frames, no 3-D
 extrusion of 2-D data, no textured backgrounds on a paper figure. Shadows are
 permitted only on dashboard UI chrome, never inside the plotting area.
+
+## F.5b Publication Figures
+
+Everything above assumes a figure that stands alone (a dashboard card, a slide).
+A figure **destined for a paper** is set inside a LaTeX caption and carries extra
+obligations. These override F.3–F.5 where they conflict.
+
+### No title inside the artwork
+
+The caption carries the title. A baked-in one duplicates it and is cropped at
+typesetting anyway. Set `title=None` and reclaim the top margin. Panel titles,
+axis titles and legends stay. Dashboard figures are the exception and keep a
+title.
+
+### Fixed palette roles across a figure set
+
+Assign roles once and hold them, so a colour means one thing across every figure
+in the paper:
+
+| Role | Token |
+|------|-------|
+| Ours / primary method | `blue` |
+| The baseline being compared against | `amber` |
+| Ceiling, upper bound, reference model | `green` |
+| Failure, below threshold, regression | `red` |
+| Neutral reference (a specialist, a prior) | `text_faint` |
+
+Band the two rows that matter in a table: ours on `#EFF6FF`, the rival on
+`#FEF3C7`, with matching text colour. Everything else stays neutral.
+
+**Every numeral is mono** (`FONT_MONO`), in tables, value labels and tick labels
+alike. It is what makes columns align and read as data.
+
+### Pick the mark by what the reader must judge
+
+| The question | The mark |
+|---|---|
+| How large is each value? | Bar from zero |
+| How far past a **per-row** target? | Dumbbell (below) |
+| Did it clear one shared bar? | Bars plus a dashed rule across the panel |
+| Matrix of ratios | Heatmap, clamped and pivoted scale (below) |
+
+**Dumbbell.** When every row has its *own* reference, a bar from zero is wrong:
+the stretch from 0 to the reference compares nothing, and it forces a shared axis
+that flattens the margins you care about. Run the bar from reference to achieved
+so its **length and direction are the margin**, put a white-ringed dot at the
+achieved end, and mark the reference with a short vertical gate tick. Dropping
+the zero baseline is legitimate here because length now encodes a *difference*,
+not a magnitude — state that in the footnote. Draw the ±1 s.d. spread *under* the
+margin bar in a 60%-lightened tint, so only the overhang past the mean shows.
+
+**A reference is a rule, not a bar.** A ceiling or threshold drawn as one more
+bar reads as one more competitor. Draw it as a dashed line across the panel and
+put its value in the panel subtitle.
+
+**One shared legend at the top, then delete per-panel tick labels.** Rotated
+category labels repeated across every panel are the worst thing you can do to a
+small-multiple figure.
+
+**Headroom** is `max(bar_max * 1.20, reference * 1.04)`. Giving a reference rule
+a bar's headroom leaves a third of the panel empty.
+
+### Clamped, pivoted scales for ratio data
+
+Clamp at the semantically meaningful ceiling; pivot at the meaningful threshold,
+not at the midpoint of the data. A scale stretched to fit one 360% outlier drags
+a genuinely good 82% into alarming red.
+
+```python
+PIVOT = 0.65  # the "acceptable" line
+SCALE = [
+    [0.00, "#DC2626"], [0.22, "#E8736F"], [0.45, "#F4B3AE"],
+    [PIVOT, "#F2F3F5"],
+    [0.78, "#B9CDF6"], [0.89, "#7CA2F0"], [1.00, "#2563EB"],
+]
+# z = min(value, 1.0); the PRINTED number is always the true value.
+```
+
+Cell text white below 0.26 or above 0.93, `text_primary` between; bold the
+diagonal; label the clamp on the colourbar as `≥100%`.
+
+### Tables as figures
+
+Booktabs, drawn with shapes and annotations on hidden axes. Three rules only:
+top (1.3 px `axis`), under the header (1.0 px), bottom (1.3 px). **No vertical
+rules and no row shading** beyond the two banded rows. Section labels in 9 px
+uppercase `text_muted`; values right-aligned mono; labels left-aligned Inter;
+`±std` as a 6.5 px `text_faint` span appended to the value rather than its own
+column. Advance a cursor by each row's own height so a separator costs ~0.34 of a
+row instead of a whole empty one.
+
+For per-row results, pair the graph with a **narrow second subplot of mono
+numbers** (value, reference, ratio) and a faint rail across each row, so the eye
+tracks from mark to exact value. The graph carries shape; the column carries
+precision.
+
+### Footnotes inside the figure
+
+A figure needing a caveat to avoid misleading gets one, 7.5–8.5 px `text_muted`
+under the bottom rule: what the normaliser is, what the error bars mean, why a
+cell is empty, any measurement asymmetry, the seed count.
+
+Plotly does not reflow — hand-wrap with `<br>`, indent continuations with
+`&nbsp;&nbsp;&nbsp;`, budget ~108 characters per line at 8.5 px in a 648 px
+figure. Anchor at `xref="paper", x=0` with `xshift=-<left_margin>` so it starts
+at the figure edge, not the plot edge.
+
+### Data hygiene
+
+Keep the numbers in a `data.json` beside the script, never inline in plotting
+code, with a `provenance` block naming the source file and any caveat. Read
+shared constants out of the codebase rather than retyping them — parse with
+`ast.literal_eval` when importing would drag in heavy dependencies.
+
+**Recompute headline statistics from the raw data** instead of copying them out
+of an older README. A caption that contradicts its own figure is the most common
+defect in a results folder, and it survives because nobody re-derives the number.
+
+### Honest numbers
+
+- **Never pad precision.** Print the decimals the run reports, even beside
+  someone else's extra digit. Padding implies precision you do not have.
+- **Never combine standard deviations** without their seed-level covariance.
+- **Mark any cell that is not the same quantity as its column** with `†`, explain
+  it in the footnote, and exclude it from the "best value" bolding.
+- A value that is a definitional constant (a reference method scoring exactly 0
+  on a metric defined against itself) is **not** a competitor for bold.
 
 ## F.6 Animation
 
@@ -515,6 +647,32 @@ Aspect ratio: default to the golden-ish 1.55:1 (`height = round(width / 1.55)`)
 for line plots; square for matrices and heatmaps.
 
 **Every figure produces both PNG and SVG. There is no single-format figure.**
+
+### The SVG must actually be vector — verify it
+
+Non-empty is not the same as vector. Check:
+
+```bash
+grep -c '<image' fig.svg    # must be 0
+```
+
+**`go.Heatmap` rasterises its cells into an embedded bitmap** and fails this,
+which silently ships a blurry matrix into a paper. For any matrix small enough to
+label (say up to 15×15), draw the cells yourself:
+
+- numeric axes, `range=[0, n]`, ticks re-labelled at cell centres `i + 0.5`;
+- one `add_shape(type="rect")` per cell, inset ~0.035 to emulate `xgap`/`ygap`,
+  `fillcolor` sampled from the colourscale by interpolating in sRGB;
+- the colourbar carried on an invisible marker trace, which Plotly renders as an
+  SVG gradient:
+
+```python
+go.Scatter(x=[None], y=[None], mode="markers", showlegend=False,
+           marker=dict(color=[0], colorscale=SCALE, cmin=0, cmax=1,
+                       showscale=True, opacity=0, colorbar=dict(...)))
+```
+
+Annotations, shapes and `go.Scatter` are all vector and safe.
 
 ## F.8 Manifest Contract
 
@@ -631,9 +789,21 @@ Before reporting a figure complete:
 - [ ] No decorative effects
 - [ ] PNG exported at `scale = 3.125` (300 dpi at print width) **and** SVG
 - [ ] Both files verified to exist and be non-empty
+- [ ] `grep -c '<image' *.svg` returns 0 — no rasterised `go.Heatmap`
 - [ ] Animation produced if and only if it reveals something static cannot
 - [ ] One manifest entry appended (or replaced by `id`), paths relative to `report/`
 - [ ] `report/build_dashboard.py` re-run afterwards
+
+Paper-destined figures additionally (F.5b):
+
+- [ ] No title inside the artwork
+- [ ] Palette roles fixed across the whole figure set; every numeral in mono
+- [ ] Mark chosen by what must be judged; per-row references as dumbbell anchors
+      or rules, never extra bars
+- [ ] One shared legend; no rotated per-panel tick labels
+- [ ] Ratio scales clamped and pivoted; printed numbers un-clamped
+- [ ] Precision not padded; non-comparable cells daggered and excluded from bolding
+- [ ] Footnote covers normaliser, error-bar meaning, empty cells, seed count
 
 ---
 
@@ -1229,6 +1399,8 @@ generation (Track F) must never depend on it.
 - [ ] Uncertainty band or error bars wherever repeats exist
 - [ ] Units in axis titles, 4–7 readable ticks
 - [ ] PNG at `scale = 3.125` **and** SVG, both verified non-empty
+- [ ] SVG verified genuinely vector: `grep -c '<image'` returns 0
+- [ ] Paper figures: F.5b applied (no title, fixed roles, honest precision, footnote)
 - [ ] Animation only when it adds information; `gif` + `html` if so
 - [ ] Manifest entry appended/replaced, paths relative to `report/`
 - [ ] `report/build_dashboard.py` and `report/verify_dashboard.py` re-run
