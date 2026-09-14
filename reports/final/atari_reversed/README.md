@@ -125,7 +125,15 @@ the run directories are gitignored and live only on the cluster.
 | CLEAR | 36.9 | 2.04× |
 
 CLEAR spans 36.4 to 37.3 across its replay-buffer configurations, drawn as a
-whisker; the configuration choice moves it by under an hour.
+capped span at the end of its stem; the configuration choice moves it by under
+an hour.
+
+Drawn as a lollipop with a dashed reference rule at Min-Max. With three values
+the encoding is identical to a bar chart at a tenth of the ink, which leaves the
+panel quiet enough to carry the rule, and the rule is what turns three numbers
+into the comparison the reader came for. Zero is kept on the axis: unlike a
+threshold comparison, hours have a meaningful zero and stem length is a real
+magnitude.
 
 Two things to carry into any caption.
 

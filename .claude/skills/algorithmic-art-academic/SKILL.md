@@ -456,10 +456,18 @@ alike. It is what makes columns align and read as data.
 
 | The question | The mark |
 |---|---|
-| How large is each value? | Bar from zero |
+| How large is each value, across many? | Bar from zero |
+| How large is each value, across **3–6**? | Lollipop (below) |
 | How far past a **per-row** target? | Dumbbell (below) |
-| Did it clear one shared bar? | Bars plus a dashed rule across the panel |
+| Did it clear one shared bar? | Bars or lollipops plus a dashed rule |
 | Matrix of ratios | Heatmap, clamped and pivoted scale (below) |
+
+**Lollipop.** Below about six categories, thick bars are mostly ink. A thin stem
+(3 px at 40% alpha) from zero with a white-ringed dot at the value encodes the
+same thing and leaves the panel quiet enough to carry a **dashed reference rule**
+at the subject's value — and that rule is what turns a list of numbers into a
+comparison. Keep zero on the axis: stem length is a real magnitude here, unlike
+the dumbbell case.
 
 **Dumbbell.** When every row has its *own* reference, a bar from zero is wrong:
 the stretch from 0 to the reference compares nothing, and it forces a shared axis

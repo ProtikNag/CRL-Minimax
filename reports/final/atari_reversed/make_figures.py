@@ -42,7 +42,7 @@ sys.path.insert(0, str(REPO / "report"))
 
 from acviz import (  # noqa: E402
     AC, FONT_MONO, FONT_UI, W_FULL, W_ONE_HALF, export_figure, height_for,
-    install_template,
+    hex_to_rgba, install_template,
 )
 
 DATA = REPO / "reports" / "order_sensitivity" / "data.json"
@@ -563,14 +563,19 @@ def figure_transfer_table(data: dict) -> None:
 
 # ── Figure 4: compute cost ──────────────────────────────────────────────────
 def figure_compute_cost() -> None:
-    """Wall-clock cost of one full five-game run, horizontal bars.
+    """Wall-clock cost of one full five-game run, as a lollipop with a reference.
 
-    Horizontal because three bars with multi-word names read better along the
-    reading direction than as three columns with rotated ticks.
+    Lollipop rather than bars: with three values the encoding is identical but
+    the ink is a tenth of it, which leaves the panel quiet enough to carry a
+    reference rule at ours. The rule is what turns three numbers into a
+    comparison, and it is the comparison the reader is here for.
+
+    Zero is kept on the axis. Unlike a threshold comparison, hours have a
+    meaningful zero and the stem length is a real magnitude.
 
     CLEAR spans its replay-buffer configurations, which land within 0.9 h of one
-    another; the spread is drawn as a whisker so the single bar is not read as a
-    single measurement.
+    another. That span is drawn at the end of its stem so the dot is not read as
+    a single measurement.
     """
     compute = json.loads((HERE / "compute.json").read_text(encoding="utf-8"))
     hours, labels = compute["hours"], compute["labels"]
@@ -587,22 +592,55 @@ def figure_compute_cost() -> None:
 
     names = [labels[key] for key, *_ in series]
     reference = hours["ours"]
+    axis_high = max(value for _, value, *_ in series) * 1.16
 
     fig = go.Figure()
+
+    # Reference rule at ours, behind everything. Unlabelled: our own dot sits on
+    # it, which says what it is more economically than a label would.
+    fig.add_shape(
+        type="line", x0=reference, x1=reference, y0=-0.55, y1=len(series) - 0.45,
+        line=dict(color=hex_to_rgba(COLOR["MinMax"], 0.35), width=1.1, dash="dash"),
+        layer="below",
+    )
+
     for index, (_key, value, color, spread) in enumerate(series):
-        fig.add_trace(go.Bar(
-            x=[value], y=[index], orientation="h",
-            marker=dict(color=color, line=dict(width=0)), width=0.52,
+        # Faint track, so each row reads as its own lane.
+        fig.add_trace(go.Scatter(
+            x=[0, axis_high], y=[index, index], mode="lines",
+            line=dict(color=AC["grid"], width=0.8),
+            hoverinfo="skip", showlegend=False,
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=[0, value], y=[index, index], mode="lines",
+            line=dict(color=hex_to_rgba(color, 0.40), width=3),
+            hoverinfo="skip", showlegend=False,
+        ))
+
+        if spread is not None:
+            # Capped, because the span is under a unit wide and the dot would
+            # otherwise swallow it whole, leaving the footnote describing a mark
+            # nobody can see.
+            low, high = spread
+            fig.add_trace(go.Scatter(
+                x=[low, high], y=[index, index], mode="lines",
+                line=dict(color=color, width=2),
+                hoverinfo="skip", showlegend=False,
+            ))
+            for edge in (low, high):
+                fig.add_trace(go.Scatter(
+                    x=[edge, edge], y=[index - 0.13, index + 0.13], mode="lines",
+                    line=dict(color=color, width=2),
+                    hoverinfo="skip", showlegend=False,
+                ))
+
+        fig.add_trace(go.Scatter(
+            x=[value], y=[index], mode="markers",
+            marker=dict(color=color, size=11,
+                        line=dict(color=AC["bg"], width=2)),
             hovertemplate="%{x:.1f} h<extra></extra>", showlegend=False,
         ))
-        if spread is not None:
-            low, high = spread
-            fig.add_shape(type="line", x0=low, x1=high, y0=index, y1=index,
-                          line=dict(color=AC["bg"], width=1.4), layer="above")
-            for edge in (low, high):
-                fig.add_shape(type="line", x0=edge, x1=edge,
-                              y0=index - 0.1, y1=index + 0.1,
-                              line=dict(color=AC["bg"], width=1.4), layer="above")
 
         ratio = value / reference
         tail = "" if abs(ratio - 1.0) < 1e-9 else (
@@ -610,14 +648,14 @@ def figure_compute_cost() -> None:
             f"  {ratio:.2f}×</span>")
         fig.add_annotation(
             x=value, y=index, text=f"<b>{value:.1f} h</b>{tail}",
-            showarrow=False, xanchor="left", yanchor="middle", xshift=7,
+            showarrow=False, xanchor="left", yanchor="middle", xshift=12,
             font=dict(family=FONT_MONO, size=11, color=AC["text_primary"]),
         )
 
     fig.update_xaxes(
         title=dict(text="wall-clock hours for one full five-game run",
                    font=dict(family=FONT_UI, size=11, color=AC["text_muted"])),
-        range=[0, max(h for _, h, *_ in series) * 1.30],
+        range=[0, axis_high],
         showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
         zeroline=False, showline=True, linecolor=AC["border"], ticklen=0,
         tickfont=dict(family=FONT_MONO, size=9.5, color=AC["text_muted"]),
@@ -625,26 +663,26 @@ def figure_compute_cost() -> None:
     fig.update_yaxes(
         tickmode="array", tickvals=list(range(len(series))), ticktext=names,
         showgrid=False, zeroline=False, showline=False, ticklen=0,
-        range=[len(series) - 0.5, -0.5],
+        range=[len(series) - 0.45, -0.55],
         tickfont=dict(family=FONT_UI, size=11.5, color=AC["text_primary"]),
     )
     fig.add_annotation(
         x=0, y=-0.40, xref="paper", yref="paper",
-        text=("× is relative to Min-Max. CLEAR spans its buffer configurations "
-              "(36.4–37.3 h), drawn as a whisker.<br>"
+        text=("× is relative to Min-Max, marked by the dashed rule. CLEAR's capped span "
+              "covers its buffer configurations (36.4–37.3 h).<br>"
               "Single seed, single GPU. Ours sums per-phase training time while "
               "CLEAR and Joint use total elapsed<br>"
               "time, so ours is the series understated by the difference."),
         showarrow=False, xanchor="left", yanchor="top", align="left",
         # Back out of the left margin so the note starts at the figure edge,
-        # not at the plot edge, which is 108 px in to clear the category labels.
+        # not at the plot edge, which is held wide by the category labels.
         xshift=-100,
         font=dict(family=FONT_UI, size=8.5, color=AC["text_muted"]),
     )
-    fig.update_layout(title=None, showlegend=False, bargap=0.42,
-                      margin=dict(l=108, r=86, t=14, b=104))
+    fig.update_layout(title=None, showlegend=False,
+                      margin=dict(l=108, r=96, t=14, b=104))
 
-    export_pair(fig, "compute_cost", W_ONE_HALF, 265)
+    export_pair(fig, "compute_cost", W_ONE_HALF, 250)
 
 
 # ── Export ──────────────────────────────────────────────────────────────────

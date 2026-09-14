@@ -65,11 +65,18 @@ data. Never below 8 px on a footnote, never below 9 px on a label.
 
 | The question | The mark |
 |---|---|
-| How large is each value? | Bar from zero |
+| How large is each value, across many? | Bar from zero |
+| How large is each value, across **3–6**? | **Lollipop**: thin stem from zero, dot at the value |
 | How far past a per-row target? | **Dumbbell**: bar from target → achieved, dot at achieved |
-| Did it clear one shared bar? | Bars + a dashed rule across the panel |
+| Did it clear one shared bar? | Bars or lollipops + a dashed rule across the panel |
 | How do two states compare? | Slope chart |
 | Matrix of ratios | Heatmap with a **clamped, pivoted** scale (§6) |
+
+**Lollipop rule.** Below about six categories, thick bars are mostly ink. A thin
+stem (3 px at 40% alpha) with a white-ringed dot encodes exactly the same thing
+and leaves the panel quiet enough to carry a **dashed reference rule** at the
+subject's value — and that rule is what turns a list of numbers into a
+comparison. Keep zero on the axis here: stem length is a real magnitude.
 
 **Dumbbell rule.** When every row has its *own* reference, do not draw bars from
 zero: the stretch from 0 to the reference compares nothing, and it forces a
