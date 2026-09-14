@@ -11,9 +11,13 @@ Two optimizer backends implement the **same** formulation: **REINFORCE**
 the ∇V estimator — the constraints, Lagrangians, and dual updates are identical.
 See `docs/REINFORCE_to_PPO.md` for the equation-by-equation mapping.
 
-> **Note for Claude Code / new sessions.** Read this file and `HANDOFF.md`
-> before touching code (`HANDOFF.md` has the current status, findings, and next
-> steps). The canonical branch is **`feature/updated-objective`**: the **min-max**
+> **Note for Claude Code / new sessions.** Read this file, then **the sprint
+> section at the top of `HANDOFF.md`**, which is the current plan (ICLR, deadline
+> ~2026-09-25) with lanes, priorities and the ground rules for every run. Any run
+> launched from here must follow `docs/LOGGING_CONTRACT.md` — one log schema for
+> every method, so one metrics module computes PERF / FWT / BWT / forgetting /
+> retention / compute for all of them. Paper figures live in `reports/final/`
+> and nowhere else; `reports/final/FIGURE_STYLE.md` is how to reproduce the look. The canonical branch is **`feature/updated-objective`**: the **min-max**
 > consolidation (`ppo.method: constrained`), verified SOUND (`math-verifier`) and
 > PASS (`code-verifier`); pseudocode is in `pseudocode/`. **Two binding rules:**
 > reported evaluation is always **greedy, 100 rollouts** (never stochastic); Atari

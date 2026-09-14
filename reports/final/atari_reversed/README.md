@@ -82,31 +82,44 @@ does; the difference is that Min-Max does not stay there.
 
 Single seed, so this is a pattern in one run, not an estimated effect.
 
-### Forward transfer is not measurable in this study
+### Forward transfer is absent from these runs, but it is not unmeasurable
 
-Reported as `—`, not estimated. Two independent reasons, either sufficient.
+Reported as `—` in `transfer_table` because **these runs did not log what it
+needs**, not because the quantity is undefined. An earlier version of this file
+said forward transfer was "not measurable in this study". That was overstated,
+and the distinction matters for the rerun.
 
-1. **No task is evaluated before it is trained.** `configs/atari5.yaml` sets
-   `eval_all_tasks: false`, so every `eval_matrix.json` is strictly lower
-   triangular ([ppo_continual.py:130](../../../crl/ppo_continual.py#L130)). The
-   standard definition needs `R[i-1, i]`, which lives in the upper triangle.
-2. **A zero-shot number would measure an untrained head, not transfer.**
-   `ImpalaMultiHeadActorCriticPolicy` allocates every task's actor and critic
-   head at construction
-   ([impala.py:104](../../../crl/policies/impala.py#L104)), and a task's head
-   stays at its random initialisation until that task arrives. Evaluating the
-   task-`k-1` checkpoint on task `k` would therefore score a random head
-   regardless of how much the shared trunk had transferred.
+**Which definition.** CKA-RL and Continual World use
+`FT_i = (AUC_i − AUC_i^b) / (1 − AUC_i^b)`, where `AUC_i` is the area under task
+`i`'s learning curve **during its own training phase**, against a from-scratch
+baseline's curve on the same task. That is a statement about *learning speed*.
 
-Flipping the flag and re-running does **not** fix this; reason 2 survives it.
-Forward transfer in this architecture is a statement about *learning speed*, so
-measuring it means the Continual World construction: the area between each task's
-training curve under the continual learner and under a from-scratch single-task
-learner. That needs per-task training curves for both methods plus from-scratch
-references, none of which are in this repository for the reversed order.
+The zero-shot Lopez-Paz form `R[i−1, i]` — performance on task `i` before
+training on it — genuinely is meaningless here, for two reasons:
+`configs/atari5.yaml` sets `eval_all_tasks: false`, so the upper triangle was
+never populated ([ppo_continual.py:130](../../../crl/ppo_continual.py#L130)); and
+`ImpalaMultiHeadActorCriticPolicy` allocates every task's head at construction
+([impala.py:104](../../../crl/policies/impala.py#L104)), leaving it at random
+init until its task arrives, so a zero-shot score would measure an untrained head
+rather than transfer through the trunk.
 
-The CKA-RL comparison (line 2) does report forward transfer, because that
-benchmark ships a per-task train-from-scratch Baseline as the reference.
+**But the AUC form is unaffected by both.** It needs no upper triangle, and
+per-task heads are irrelevant to it: the continual learner and the baseline both
+start task `i`'s head from scratch, and what differs is the trunk they sit on —
+exactly what forward transfer is supposed to measure.
+
+What it does need, and what these runs lack:
+
+1. **Periodic within-phase evaluation of the current task.** `atari5.yaml` sets
+   `eval_every: 0`, so there is no `p_i(t)` to integrate. This cannot be
+   recovered from a finished run.
+2. **A paired from-scratch baseline per task.** `experiments/train_expert.py`
+   already trains single-task experts from a shared init — those *are* the
+   baseline. Whether their learning curves were logged is an open question worth
+   checking before training new ones.
+
+Both are addressed in the rerun; see the sprint section of `HANDOFF.md` and
+`docs/LOGGING_CONTRACT.md`.
 
 ## Reading the retention colour
 
