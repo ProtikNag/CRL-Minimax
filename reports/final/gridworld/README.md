@@ -28,20 +28,28 @@ Normalisation is `(score − random) / (1 − random)`, so **0 is a random polic
 
 ## Status
 
-Complete 50-task runs: **ours ×3 seeds**, and one seed each of CKA-RL,
-fine-tuning and from-scratch. Their seeds 1–2 are still running. Partial runs are
-**excluded from every aggregate** rather than averaged in — mixing a 50-task run
-with a 24-task one produces a number that belongs to neither. Which runs count is
-read from `metrics.json`, so finished seeds join automatically on a re-run.
+Complete 50-task runs: **Min-Max 3, CKA-RL 2, fine-tuning 3, from-scratch 2**.
+Every method now has a measured standard deviation; no interval in this folder is
+borrowed any more.
+
+Partial runs are **excluded from every aggregate** rather than averaged in —
+mixing a 50-task run with a 24-task one produces a number belonging to neither.
+Which runs count is read from `metrics.json`, and every caption's seed counts and
+tallies are derived from the data rather than typed, so a re-run after new seeds
+land updates the figures and their captions together.
 
 ## What the numbers say
 
 | | PERF | Forgetting | BWT | FWT |
 |---|---:|---:|---:|---:|
-| **Min-Max (ours)** | **0.60** | **0.11** | **+0.36** | 0.05 |
-| CKA-RL | 0.51 | 0.21 | −0.15 | **0.20** |
-| Fine-tuning | 0.31 | 0.39 | −0.34 | 0.16 |
-| From-scratch | 0.18 | 0.52 | −0.47 | 0 (reference) |
+| **Min-Max (ours)** | **0.596** ±0.007 | **0.112** ±0.008 | **+0.358** ±0.028 | 0.080 ±0.064 |
+| CKA-RL | 0.490 ±0.027 | 0.226 ±0.029 | −0.168 ±0.026 | **0.181** ±0.022 |
+| Fine-tuning | 0.261 ±0.051 | 0.430 ±0.048 | −0.390 ±0.053 | 0.147 ±0.022 |
+| From-scratch | 0.193 ±0.012 | 0.520 ±0.006 | −0.466 ±0.001 | 0 (reference) |
+
+Ours leads average performance by **0.106**, and the two intervals are nowhere
+near touching. It halves CKA-RL's forgetting and is the only method with positive
+backward transfer.
 
 ### Why `learned_vs_retained` is the figure to lead with
 
@@ -52,8 +60,8 @@ than when it was learned* — and the methods separate completely:
 | | tasks that ended **better** |
 |---|---:|
 | **Min-Max (ours)** | **91%** |
-| CKA-RL | 12% |
-| Fine-tuning | 4% |
+| CKA-RL | 13% |
+| Fine-tuning | 8% |
 | From-scratch | 8% |
 
 Ours' point cloud sits above the no-change diagonal; every other method's sits
@@ -71,16 +79,17 @@ the way to solved.
 
 Each panel shades only the quadrant that characterises its method.
 
-| | rescued | lost |
-|---|---:|---:|
-| **Min-Max (ours)** | **32 of 150** | **0** |
-| CKA-RL | 0 | 2 |
-| Fine-tuning | 0 | 15 |
-| From-scratch | 0 | 20 |
+| | points | rescued | lost |
+|---|---:|---:|---:|
+| **Min-Max (ours)** | 150 | **32** | **0** |
+| CKA-RL | 100 | 0 | 6 |
+| Fine-tuning | 150 | 0 | 45 |
+| From-scratch | 100 | 0 | 40 |
 
 No baseline rescues a single task. Ours loses none. CKA-RL's low count in the
 red quadrant is not retention — its final scores mostly sit above 0.25, so it
-lands between the two boxes rather than in either.
+lands between the two boxes rather than in either; its weakness shows up in the
+aggregate metrics instead.
 
 **It is not a headroom artefact.** A task left at 0.2 has more room to improve
 than one left at 0.9, so "improved" could in principle be mechanical. Measuring
@@ -90,9 +99,9 @@ out:
 | | learned < 0.2 | 0.2–0.5 | > 0.5 |
 |---|---:|---:|---:|
 | **Min-Max (ours)** | **+41%** | **+57%** | +16% |
-| CKA-RL | −6% | −26% | −114% |
-| Fine-tuning | −11% | −32% | −288% |
-| From-scratch | −9% | −66% | −267% |
+| CKA-RL | −8% | −24% | −123% |
+| Fine-tuning | −7% | −40% | −285% |
+| From-scratch | −8% | −53% | −282% |
 
 Ours captures a large share of the room it has left. Every baseline is negative
 in every bin: they do not merely fail to improve, they give ground back
@@ -104,10 +113,10 @@ The per-task detail behind the aggregate is not flattering in every direction:
 
 | | mean score when just learned | mean score at the end |
 |---|---:|---:|
-| **Min-Max (ours)** | 0.25 | **0.63** |
-| CKA-RL | 0.64 | 0.42 |
-| Fine-tuning | 0.65 | 0.31 |
-| From-scratch | 0.64 | 0.17 |
+| **Min-Max (ours)** | 0.25 | **0.60** |
+| CKA-RL | 0.65 | 0.49 |
+| Fine-tuning | 0.64 | 0.26 |
+| From-scratch | 0.65 | 0.19 |
 
 **Ours learns each new task to less than half the immediate level the others
 reach**, then climbs past all of them within two or three phases. So its positive
@@ -146,16 +155,16 @@ achievement on different tasks. Median final score:
 | | raw | normalised |
 |---|---:|---:|
 | **Min-Max (ours)** | 0.92 | **0.67** |
-| CKA-RL | 0.88 | 0.55 |
-| Fine-tuning | 0.81 | 0.21 |
-| From-scratch | 0.78 | 0.10 |
+| CKA-RL | 0.88 | 0.51 |
+| Fine-tuning | 0.80 | 0.20 |
+| From-scratch | 0.78 | 0.11 |
 
 Showing both is the point: the separation normalisation exposes is real, not an
 artefact of the normaliser.
 
 ### Forward transfer, and the budget asymmetry behind it
 
-Ours is last on FWT (0.05 against CKA-RL's 0.20), and the table above is why: forward transfer measures how fast a task is learned in its own phase, and
+Ours is last on FWT (0.080 against CKA-RL's 0.181), and the table above is why: forward transfer measures how fast a task is learned in its own phase, and
 ours deliberately spends less there.
 
 **The per-task budgets are not matched.** Ours' local phase runs 150–250
@@ -168,9 +177,9 @@ reference, so its value is 0 by construction and it is omitted from that panel.
 | | wall-clock | vs ours |
 |---|---:|---:|
 | **Min-Max (ours)** | 244 min | — |
-| CKA-RL | 177 min | 0.72× |
-| Fine-tuning | 140 min | 0.57× |
-| From-scratch | 156 min | 0.64× |
+| CKA-RL | 155 min | 0.63× |
+| Fine-tuning | 136 min | 0.56× |
+| From-scratch | 151 min | 0.62× |
 
 Ours is the most expensive because consolidation re-simulates past environments,
 spending time on tasks it has already learned. Measured on a shared, contended
@@ -186,10 +195,10 @@ cluster, so read it as indicative rather than exact.
 - **CompoNet is excluded** because it grows the network; every method here has a
   fixed footprint (ours a fixed shared head, CKA-RL a fixed trunk plus a bounded
   pool of 5 and a small per-task α).
-- **Seeds:** ours 3 complete, the others 1 each so far. `headline_metrics` lends
-  ours' standard deviation to the single-seed methods as a **placeholder**,
-  marked `†` so it cannot be mistaken for a measurement. Replace as their seeds
-  land — the script picks them up with no edits.
+- **Seeds:** Min-Max 3, CKA-RL 2, fine-tuning 3, from-scratch 2, all complete.
+  Every interval shown is measured; the borrowed-standard-deviation placeholder
+  is no longer used anywhere and its `†` note disappears from the table
+  automatically when it is not needed.
 
 ## Rebuild
 

@@ -103,6 +103,17 @@ def learned_and_final(run: str, column: str = "normalized") -> tuple[np.ndarray,
     return learned[keep], final[keep]
 
 
+def seed_summary() -> str:
+    """"ours 3, CKA-RL 2, ..." — the complete-seed count per method.
+
+    Captions state seed counts, and seed counts change every time a run lands.
+    Deriving the sentence rather than typing it is what stops a figure from
+    describing a state of the world that stopped being true two commits ago.
+    """
+    return ", ".join(f"{label.split(' (')[0]} {len(complete_runs(prefix))}"
+                     for _key, label, _color, prefix in METHODS)
+
+
 def add_footnote(fig: go.Figure, text: str, left_margin: int,
                  clear_axis_title: bool = True) -> None:
     """Place a footnote below the plot, measured in pixels rather than fractions.
@@ -133,6 +144,7 @@ def figure_learned_vs_retained() -> None:
     """
     fig = make_subplots(rows=2, cols=2, horizontal_spacing=0.13,
                         vertical_spacing=0.20)
+    tally: dict[str, tuple[int, int, int]] = {}
 
     for index, (key, label, color, prefix) in enumerate(METHODS):
         row, col = index // 2 + 1, index % 2 + 1
@@ -142,6 +154,10 @@ def figure_learned_vs_retained() -> None:
         final = np.concatenate([p[1] for p in pairs])
         improved = float(np.mean(final > learned))
         rescue = key == "ours"
+        tally[key] = (
+            int(((learned < POOR) & (final > STRONG)).sum()),
+            int(((learned > STRONG) & (final < POOR)).sum()),
+            len(learned))
 
         # Only the two bounds of this panel's own quadrant are drawn; all four
         # would be clutter, and each panel is asking a single question.
@@ -216,26 +232,34 @@ def figure_learned_vs_retained() -> None:
         fig.update_xaxes(title=dict(text="score when the task was just learned",
                                     **title), row=2, col=col)
 
+    def phrase(which: int) -> str:
+        parts = [f"{label.split(' (')[0]} "
+                 f"{tally[key][which] or 'none'}"
+                 + (f" of {tally[key][2]}" if tally[key][which] else "")
+                 for key, label, _c, _p in METHODS]
+        return "; ".join(parts)
+
+    rescued_line, lost_line = phrase(0), phrase(1)
     add_footnote(fig, (
         "One point per task, in units of (score − random) / (1 − random), so 0 "
         "is a random policy and 1 a solved task; the diagonal is no change.<br>"
         "Each panel shades one quadrant and draws only its two bounds.<br>"
         "The quadrants are mirror images: 0.25 is barely off random, 0.60 is "
         "most of the way to solved.<br>"
-        "<b>Rescued: ours 32 of 150; CKA-RL, fine-tuning and from-scratch none. "
-        "Lost: ours none; CKA-RL 2, fine-tuning 15, from-scratch 20.</b><br>"
-        "Ours is 3 complete seeds (150 points), the others 1 each (50 points)."
-    ), 78)
+        f"<b>Rescued: {rescued_line}.</b><br>"
+        f"<b>Lost: {lost_line}.</b><br>"
+        f"Complete seeds per method: {seed_summary()}; each contributes 50 "
+        "points."), 78)
     fig.update_layout(
         title=None, plot_bgcolor=AC["bg"],
-        margin=dict(l=78, r=26, t=112, b=132),
+        margin=dict(l=78, r=26, t=112, b=152),
         legend=dict(orientation="h", x=0.0, xanchor="left", y=1.135,
                     yanchor="bottom", bgcolor="rgba(0,0,0,0)", borderwidth=0,
                     itemsizing="constant",
                     font=dict(family=FONT_UI, size=FS_TICK,
                               color=AC["text_primary"])),
         showlegend=True)
-    export_pair(fig, "learned_vs_retained", W_FULL, 740)
+    export_pair(fig, "learned_vs_retained", W_FULL, 764)
 
 
 # ── Figure 2: retention across the sequence ─────────────────────────────────
@@ -315,12 +339,13 @@ def figure_retention_curve() -> None:
         "before it, in units of (score − random) / (1 − random).<br>"
         "The just-learned task is excluded, because including it lets a method "
         "that merely learns the newest task well post a flattering curve.<br>"
-        "<b>The shaded band is the min-max over ours' 3 complete seeds.</b><br>"
-        "The other three have one complete seed each so far, so they carry no "
-        "band; their remaining seeds are still running."), 74)
+        f"<b>Shaded bands are the min-max across each method's complete "
+        f"seeds</b> — {seed_summary()}.<br>"
+        "A method with one seed carries no band: an interval over a single run "
+        "is invented rather than measured."), 74)
     fig.update_layout(title=None, showlegend=False,
-                      margin=dict(l=74, r=150, t=24, b=122))
-    export_pair(fig, "retention_curve", W_FULL, 446)
+                      margin=dict(l=74, r=150, t=24, b=138))
+    export_pair(fig, "retention_curve", W_FULL, 462)
 
 
 # ── Figure 3: raw against normalised ────────────────────────────────────────
@@ -396,10 +421,11 @@ def figure_raw_vs_normalised() -> None:
         "The random floor also varies per task, from 0.55 to 0.87, so the same "
         "raw number is a different achievement on different tasks.<br>"
         "Normalising against each task's own floor is what makes them "
-        "comparable. Ours is 3 complete seeds, the others 1 each."), 118)
+        "comparable.<br>"
+        f"Complete seeds per method: {seed_summary()}."), 118)
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=118, r=26, t=56, b=136))
-    export_pair(fig, "raw_vs_normalised", W_FULL, 440)
+                      margin=dict(l=118, r=26, t=56, b=152))
+    export_pair(fig, "raw_vs_normalised", W_FULL, 456)
 
 
 # ── Figure 4: compute cost ──────────────────────────────────────────────────
@@ -465,13 +491,14 @@ def figure_compute_cost() -> None:
 
     add_footnote(fig, (
         "× is relative to ours. Complete runs only; the capped segment on ours "
-        "is its min-max over 3 seeds, the others are single runs.<br>"
+        "is its min-max across complete seeds.<br>"
+        f"Complete seeds per method: {seed_summary()}.<br>"
         "<b>Ours is the most expensive because consolidation re-simulates past "
         "environments</b>, spending time on tasks it has already learned.<br>"
         "Measured on a shared, contended cluster, so read it as indicative."), 122)
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=122, r=126, t=20, b=116))
-    export_pair(fig, "compute_cost", W_FULL, 300)
+                      margin=dict(l=122, r=126, t=20, b=132))
+    export_pair(fig, "compute_cost", W_FULL, 318)
 
 
 # ── Figure 5: headline metrics, as a table ──────────────────────────────────
@@ -516,6 +543,7 @@ def figure_headline_table() -> None:
             xanchor="right", yanchor="middle",
             font=dict(family=FONT_UI, size=FS_AXIS, color=color))
 
+    lent_used = False
     for index, (metric, label, sense, better) in enumerate(rows):
         y = -index - 0.55
         fig.add_annotation(
@@ -551,6 +579,7 @@ def figure_headline_table() -> None:
             mean = float(np.mean(values))
             measured = len(values) > 1
             sd = float(np.std(values, ddof=1)) if measured else lent_sd
+            lent_used = lent_used or (not measured and sd > 1e-9)
             body = f"{mean:+.2f}" if metric == "bwt" else f"{mean:.2f}"
             if best is not None and abs(mean - best) < 1e-9:
                 body = f"<b>{body}</b>"
@@ -570,12 +599,12 @@ def figure_headline_table() -> None:
         x=label_x - 1, y=bottom - 0.35,
         text=("Complete 50-task runs only; partial seeds are excluded rather "
               "than averaged in. <b>Bold</b> is the best value in each row.<br>"
-              "Ours is the mean over 3 seeds and its ±1 s.d. is measured across "
-              "them.<br>"
-              "<b>† marks a placeholder:</b> the other three have one complete "
-              "seed each,<br>"
-              "so they carry ours' s.d. on that metric until their own land. A "
-              "lent interval is not a measurement.<br>"
+              f"Values are the mean over each method's complete seeds with ±1 "
+              f"s.d. across them ({seed_summary()}).<br>"
+              + ("<b>† marks a placeholder:</b> that method has a single "
+                 "complete seed, so it carries ours' s.d. until its own land. "
+                 "A lent interval is not a measurement.<br>" if lent_used else "")
+              +
               "Forward transfer is measured against the from-scratch run, which "
               "is therefore 0 by construction."),
         showarrow=False, xanchor="left", yanchor="top", align="left",
