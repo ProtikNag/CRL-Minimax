@@ -62,30 +62,25 @@ the backward-transfer column summarises — read one task at a time.
 
 #### The shaded quadrants
 
-Two dotted lines cut each panel into quadrants. Both are the **equally-weighted
-mean over the four method means** — one per axis, so a single justification
-covers both:
+Two dotted lines per panel bound one quadrant, and the two quadrants are mirror
+images of each other: **0.25** is barely off a random policy, **0.60** is most of
+the way to solved.
 
-- **0.55** on the x-axis: the mean score a task had when the model moved on.
-- **0.40** on the y-axis: the mean score a task had after all 50.
+- **Blue** (ours): learned below 0.25, ended above 0.60 — brought back.
+- **Red** (baselines): learned above 0.60, ended below 0.25 — lost.
 
-Averaging the *method* means rather than pooling every point matters: pooling
-would weight ours three times for having three complete seeds and quietly shift
-the very bars it is then measured against.
+Each panel shades only the quadrant that characterises its method.
 
-Each panel shades the quadrant that characterises its method — ours the tasks it
-left below average and brought back above it, the baselines the tasks they
-learned above average and then lost:
-
-| | rescued (learned < 0.55, ended > 0.40) | lost (learned > 0.55, ended < 0.40) |
+| | rescued | lost |
 |---|---:|---:|
-| **Min-Max (ours)** | **97 of 150** | 1 |
-| CKA-RL | 0 | 9 |
-| Fine-tuning | 0 | 20 |
-| From-scratch | 1 | 25 |
+| **Min-Max (ours)** | **32 of 150** | **0** |
+| CKA-RL | 0 | 2 |
+| Fine-tuning | 0 | 15 |
+| From-scratch | 0 | 20 |
 
-The two columns are near-perfect complements. Ours rescues and does not lose;
-the baselines lose and do not rescue.
+No baseline rescues a single task. Ours loses none. CKA-RL's low count in the
+red quadrant is not retention — its final scores mostly sit above 0.25, so it
+lands between the two boxes rather than in either.
 
 **It is not a headroom artefact.** A task left at 0.2 has more room to improve
 than one left at 0.9, so "improved" could in principle be mechanical. Measuring

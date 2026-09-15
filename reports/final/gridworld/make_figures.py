@@ -45,16 +45,13 @@ N_TASKS = 50
 FS_PANEL, FS_AXIS, FS_TICK = 13.0, 12.0, 10.5
 FS_VALUE, FS_NOTE = 11.0, 9.5
 
-# The two reference lines, one per axis, each the mean over the four METHOD
-# means rather than over pooled points. Pooling would weight ours three times
-# for having three complete seeds and quietly move the bars it is measured
-# against. They cut the plane into quadrants; the two that matter are opposite
-# corners, and each panel shades the one that characterises that method.
-MEAN_LEARNED = 0.55   # mean score a task had when the model moved on
-MEAN_FINAL = 0.40     # mean score a task had after all 50
+# The two shaded quadrants are mirror images, so one pair of bounds defines
+# both: POOR is "barely off a random policy", STRONG is "most of the way to
+# solved". Blue is learned < POOR and ended > STRONG; red swaps the roles.
+POOR, STRONG = 0.25, 0.60
 
-RESCUED_FILL = "#DCE7FB"   # learned below average, ended above it
-LOST_FILL = "#FBDCDC"      # learned above average, ended below it
+RESCUED_FILL = "#DCE7FB"   # learned poorly, ended strong
+LOST_FILL = "#FBDCDC"      # learned strong, ended poorly
 
 METHODS = [
     ("ours",     "Min-Max (ours)", AC["blue"],       "biggrid50_sh_ours_"),
@@ -146,13 +143,15 @@ def figure_learned_vs_retained() -> None:
         improved = float(np.mean(final > learned))
         rescue = key == "ours"
 
-        box = (dict(x0=-0.6, x1=MEAN_LEARNED, y0=MEAN_FINAL, y1=1.05)
-               if rescue else
-               dict(x0=MEAN_LEARNED, x1=1.05, y0=-0.6, y1=MEAN_FINAL))
+        # Only the two bounds of this panel's own quadrant are drawn; all four
+        # would be clutter, and each panel is asking a single question.
+        box = (dict(x0=-0.6, x1=POOR, y0=STRONG, y1=1.05) if rescue
+               else dict(x0=STRONG, x1=1.05, y0=-0.6, y1=POOR))
         fig.add_shape(type="rect", layer="below",
                       fillcolor=RESCUED_FILL if rescue else LOST_FILL,
                       line=dict(width=0), row=row, col=col, **box)
-        for value, horizontal in ((MEAN_LEARNED, False), (MEAN_FINAL, True)):
+        for value, horizontal in (((POOR, False), (STRONG, True)) if rescue
+                                  else ((STRONG, False), (POOR, True))):
             fig.add_shape(
                 type="line", layer="below",
                 x0=-0.6 if horizontal else value, x1=1.05 if horizontal else value,
@@ -171,8 +170,8 @@ def figure_learned_vs_retained() -> None:
             hovertemplate="learned %{x:.2f} → final %{y:.2f}<extra></extra>",
             showlegend=False), row=row, col=col)
 
-        inside = (((learned < MEAN_LEARNED) & (final > MEAN_FINAL)) if rescue
-                  else ((learned > MEAN_LEARNED) & (final < MEAN_FINAL)))
+        inside = (((learned < POOR) & (final > STRONG)) if rescue
+                  else ((learned > STRONG) & (final < POOR)))
         axis = f"{index + 1 if index else ''}"
         fig.add_annotation(
             x=0, y=1.19, xref=f"x{axis} domain", yref=f"y{axis} domain",
@@ -188,8 +187,10 @@ def figure_learned_vs_retained() -> None:
             font=dict(family=FONT_UI, size=FS_TICK, color=color))
 
     # Real legend entries rather than text inside the panels.
-    for name, fill in (("learned below average, ended above it", RESCUED_FILL),
-                       ("learned above average, ended below it", LOST_FILL)):
+    for name, fill in ((f"learned poorly (&lt; {POOR:.2f}), ended strong "
+                        f"(&gt; {STRONG:.2f})", RESCUED_FILL),
+                       (f"learned strong (&gt; {STRONG:.2f}), ended poorly "
+                        f"(&lt; {POOR:.2f})", LOST_FILL)):
         fig.add_trace(go.Scatter(
             x=[None], y=[None], mode="markers", name=name,
             marker=dict(size=13, symbol="square", color=fill,
@@ -216,12 +217,13 @@ def figure_learned_vs_retained() -> None:
                                     **title), row=2, col=col)
 
     add_footnote(fig, (
-        "One point per task, in units of (score − random) / (1 − random); the "
-        "diagonal is no change.<br>"
-        "The dotted lines are the mean score when learned (0.55) and the mean "
-        "score at the end (0.40), each averaged over the four method means.<br>"
-        "<b>Rescued: ours 97 of 150, CKA-RL 0, fine-tuning 0, from-scratch 1. "
-        "Lost: ours 1, CKA-RL 9, fine-tuning 20, from-scratch 25.</b><br>"
+        "One point per task, in units of (score − random) / (1 − random), so 0 "
+        "is a random policy and 1 a solved task; the diagonal is no change.<br>"
+        "Each panel shades one quadrant and draws only its two bounds.<br>"
+        "The quadrants are mirror images: 0.25 is barely off random, 0.60 is "
+        "most of the way to solved.<br>"
+        "<b>Rescued: ours 32 of 150; CKA-RL, fine-tuning and from-scratch none. "
+        "Lost: ours none; CKA-RL 2, fine-tuning 15, from-scratch 20.</b><br>"
         "Ours is 3 complete seeds (150 points), the others 1 each (50 points)."
     ), 78)
     fig.update_layout(
