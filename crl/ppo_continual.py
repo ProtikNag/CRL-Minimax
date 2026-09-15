@@ -299,6 +299,10 @@ class PPOAlternationTrainer:
         task = self.family.tasks[k - 1]
         if hasattr(self.global_policy, "add_task"):
             self.global_policy.add_task(k)
+            # add_task creates new modules/params (CompoNet module, CKA-RL alpha) that
+            # land on CPU (its own device detection is empty at task 1); move the whole
+            # policy to the run device so nothing is left on CPU on a GPU run.
+            self.global_policy.to(self.device)
         if self.clog is not None:
             self.clog.phase_start(k - 1, task.spec.name, self.method)
         n_iters = (self.ppo.task1_iters if k == 1
