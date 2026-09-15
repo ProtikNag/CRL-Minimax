@@ -15,7 +15,9 @@ from crl.policies.impala import (
     ImpalaMultiHeadActorCriticPolicy,
 )
 from crl.policies.cka_rl import CkaRlPolicy
+from crl.policies.cka_rl_cnn import CkaRlCNNPolicy
 from crl.policies.componet import CompoNetPolicy
+from crl.policies.componet_cnn import CompoNetCNNPolicy
 from crl.policies.mlp import (
     MLPActorCriticPolicy,
     MLPMultiHeadActorCriticPolicy,
@@ -87,6 +89,22 @@ def make_policy(cfg: PolicyConfig, family: TaskFamily) -> Policy:
             num_tasks=len(family),
             task_conditioned=cfg.task_conditioned,
         )
+    if cfg.kind in ("componet_cnn", "cka_rl_cnn"):
+        # CompoNet / CKA-RL on the ATARI image backend (Nature-CNN trunk). Driven by
+        # ppo.method componet/cka_rl via _grow_task, same as their MLP counterparts.
+        obs_shape = getattr(family, "obs_shape", None)
+        if obs_shape is None:
+            raise ValueError(f"policy '{cfg.kind}' needs a family with obs_shape (e.g. atari).")
+        hidden = list(cfg.hidden_sizes)[0] if cfg.hidden_sizes else 512
+        if cfg.kind == "componet_cnn":
+            return CompoNetCNNPolicy(
+                obs_shape=obs_shape, num_actions=family.num_actions,
+                hidden_size=hidden, num_tasks=len(family),
+                task_conditioned=cfg.task_conditioned)
+        return CkaRlCNNPolicy(
+            obs_shape=obs_shape, num_actions=family.num_actions,
+            hidden_size=hidden, num_tasks=len(family), pool_size=cfg.pool_size,
+            task_conditioned=cfg.task_conditioned)
     if cfg.kind in ("cnn_ac", "cnn_ac_multihead"):
         obs_shape = getattr(family, "obs_shape", None)
         if obs_shape is None:
@@ -133,8 +151,8 @@ def make_policy(cfg: PolicyConfig, family: TaskFamily) -> Policy:
         )
     raise KeyError(
         f"Unknown policy kind '{cfg.kind}'; available: tabular, mlp, multihead, "
-        "mlp_ac, mlp_ac_multihead, componet, cka_rl, cnn, cnn_multihead, cnn_ac, "
-        "cnn_ac_multihead, impala_ac, impala_ac_multihead"
+        "mlp_ac, mlp_ac_multihead, componet, cka_rl, componet_cnn, cka_rl_cnn, cnn, "
+        "cnn_multihead, cnn_ac, cnn_ac_multihead, impala_ac, impala_ac_multihead"
     )
 
 
