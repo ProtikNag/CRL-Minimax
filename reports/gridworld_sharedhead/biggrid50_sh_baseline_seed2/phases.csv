@@ -1,0 +1,16 @@
+method,task_idx,task,phase,iters,frames_phase,wall_s_phase,t_wall,frames_total
+baseline,0,"biggrid50-goal(40,31)",task1,250,256000,48.7,50.299,256000
+baseline,1,"biggrid50-goal(9,31)",task1,150,153600,33.0,83.754,409600
+baseline,2,"biggrid50-goal(15,31)",task1,200,204800,49.1,133.387,614400
+baseline,3,"biggrid50-goal(9,24)",task1,150,153600,40.6,174.765,768000
+baseline,4,"biggrid50-goal(21,17)",task1,500,512000,146.2,321.985,1280000
+baseline,5,"biggrid50-goal(27,3)",task1,500,512000,158.7,481.929,1792000
+baseline,6,"biggrid50-goal(3,31)",task1,200,204800,67.1,550.45,1996800
+baseline,7,"biggrid50-goal(33,10)",task1,150,153600,55.4,607.521,2150400
+baseline,8,"biggrid50-goal(27,45)",task1,450,460800,174.9,784.397,2611200
+baseline,9,"biggrid50-goal(21,45)",task1,150,153600,61.9,848.456,2764800
+baseline,10,"biggrid50-goal(33,3)",task1,150,153600,65.7,916.551,2918400
+baseline,11,"biggrid50-goal(21,24)",task1,300,307200,144.3,1063.551,3225600
+baseline,12,"biggrid50-goal(21,3)",task1,150,153600,83.1,1149.585,3379200
+baseline,13,"biggrid50-goal(3,17)",task1,150,153600,94.3,1247.716,3532800
+baseline,14,"biggrid50-goal(15,45)",task1,150,153600,86.8,1338.715,3686400

@@ -1,0 +1,9 @@
+method,task_idx,task,phase,iters,frames_phase,wall_s_phase,t_wall,frames_total
+cka_rl,0,"biggrid50-goal(40,31)",cka_rl,250,256000,67.6,70.776,256000
+cka_rl,1,"biggrid50-goal(9,31)",cka_rl,150,153600,50.6,121.62,409600
+cka_rl,2,"biggrid50-goal(15,31)",cka_rl,150,153600,54.5,176.625,563200
+cka_rl,3,"biggrid50-goal(9,24)",cka_rl,150,153600,57.2,234.676,716800
+cka_rl,4,"biggrid50-goal(21,17)",cka_rl,500,512000,199.6,435.292,1228800
+cka_rl,5,"biggrid50-goal(27,3)",cka_rl,500,512000,214.6,651.179,1740800
+cka_rl,6,"biggrid50-goal(3,31)",cka_rl,150,153600,66.7,719.406,1894400
+cka_rl,7,"biggrid50-goal(33,10)",cka_rl,150,153600,72.7,793.859,2048000

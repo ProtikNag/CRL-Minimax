@@ -1,0 +1,734 @@
+{
+  "run_name": "biggrid50_cka_rl_seed1",
+  "method": "cka_rl",
+  "seed": 1,
+  "git_sha": "1b34abe",
+  "started": "2026-09-15T19:03:27.270258+00:00",
+  "env_family": "biggrid",
+  "tasks": [
+    "biggrid50-goal(40,31)",
+    "biggrid50-goal(9,31)",
+    "biggrid50-goal(15,31)",
+    "biggrid50-goal(9,24)",
+    "biggrid50-goal(21,17)",
+    "biggrid50-goal(27,3)",
+    "biggrid50-goal(3,31)",
+    "biggrid50-goal(33,10)",
+    "biggrid50-goal(27,45)",
+    "biggrid50-goal(21,45)",
+    "biggrid50-goal(33,3)",
+    "biggrid50-goal(21,24)",
+    "biggrid50-goal(21,3)",
+    "biggrid50-goal(3,17)",
+    "biggrid50-goal(15,45)",
+    "biggrid50-goal(3,24)",
+    "biggrid50-goal(3,10)",
+    "biggrid50-goal(46,31)",
+    "biggrid50-goal(46,24)",
+    "biggrid50-goal(3,45)",
+    "biggrid50-goal(21,10)",
+    "biggrid50-goal(40,3)",
+    "biggrid50-goal(15,38)",
+    "biggrid50-goal(40,45)",
+    "biggrid50-goal(15,17)",
+    "biggrid50-goal(15,24)",
+    "biggrid50-goal(21,38)",
+    "biggrid50-goal(33,17)",
+    "biggrid50-goal(27,17)",
+    "biggrid50-goal(3,3)",
+    "biggrid50-goal(9,10)",
+    "biggrid50-goal(46,17)",
+    "biggrid50-goal(40,10)",
+    "biggrid50-goal(46,38)",
+    "biggrid50-goal(27,31)",
+    "biggrid50-goal(21,31)",
+    "biggrid50-goal(46,10)",
+    "biggrid50-goal(9,17)",
+    "biggrid50-goal(33,24)",
+    "biggrid50-goal(40,17)",
+    "biggrid50-goal(40,38)",
+    "biggrid50-goal(33,38)",
+    "biggrid50-goal(9,45)",
+    "biggrid50-goal(9,38)",
+    "biggrid50-goal(9,3)",
+    "biggrid50-goal(40,24)",
+    "biggrid50-goal(33,31)",
+    "biggrid50-goal(46,45)",
+    "biggrid50-goal(3,38)",
+    "biggrid50-goal(46,3)"
+  ],
+  "task_order": "as_configured",
+  "reference": {
+    "random": [
+      0.6615646481513977,
+      0.7625849843025208,
+      0.7704080939292908,
+      0.7653061151504517,
+      0.7221088409423828,
+      0.6649659872055054,
+      0.7085033655166626,
+      0.7551020383834839,
+      0.6442176699638367,
+      0.7384353280067444,
+      0.752380907535553,
+      0.7931973338127136,
+      0.6731292605400085,
+      0.7244898676872253,
+      0.7523809671401978,
+      0.7153061628341675,
+      0.6540815830230713,
+      0.6863945126533508,
+      0.6319727301597595,
+      0.5857143402099609,
+      0.7302721738815308,
+      0.6051021218299866,
+      0.8163264989852905,
+      0.7268707156181335,
+      0.7568027377128601,
+      0.7945578098297119,
+      0.7891156077384949,
+      0.7608843445777893,
+      0.771428644657135,
+      0.6476190090179443,
+      0.7244898080825806,
+      0.7187073826789856,
+      0.6523809432983398,
+      0.7622448801994324,
+      0.8506801724433899,
+      0.755442202091217,
+      0.5901359915733337,
+      0.7360543608665466,
+      0.7877550721168518,
+      0.809863805770874,
+      0.6435374021530151,
+      0.7710884213447571,
+      0.7119047045707703,
+      0.6806122660636902,
+      0.6380951404571533,
+      0.7149659991264343,
+      0.789455771446228,
+      0.5727891325950623,
+      0.6676870584487915,
+      0.645578145980835
+    ],
+    "ceiling": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "config": {
+    "experiment": {
+      "name": "biggrid50_cka_rl",
+      "seed": 1,
+      "results_dir": "results",
+      "device": "auto",
+      "log_every": 50
+    },
+    "env": {
+      "family": "biggrid",
+      "params": {
+        "size": 50,
+        "gamma": 0.99,
+        "max_steps": 160,
+        "goal_in_obs": false,
+        "slip": 0.1,
+        "obstacle_seed": 12345
+      },
+      "tasks": [
+        {
+          "goal": [
+            40,
+            31
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            31
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            15,
+            31
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            24
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            17
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            27,
+            3
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            31
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            10
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            27,
+            45
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            45
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            3
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            24
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            3
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            17
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            15,
+            45
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            24
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            10
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            31
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            24
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            45
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            10
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            3
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            15,
+            38
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            45
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            15,
+            17
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            15,
+            24
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            38
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            17
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            27,
+            17
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            3
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            10
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            17
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            10
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            38
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            27,
+            31
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            31
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            10
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            17
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            24
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            17
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            38
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            38
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            45
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            38
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            3
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            24
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            31
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            45
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            38
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            3
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        }
+      ]
+    },
+    "policy": {
+      "kind": "cka_rl",
+      "hidden_sizes": [
+        64
+      ],
+      "task_conditioned": true,
+      "pool_size": 5
+    },
+    "estimator": {
+      "kind": "exact",
+      "episodes_per_eval": 16,
+      "episodes_per_grad": 16,
+      "episodes_per_ref": 64,
+      "baseline": "batch_mean",
+      "time_discount_weighting": true
+    },
+    "duals": {
+      "kind": "projected_ascent",
+      "lr": 0.3,
+      "init": 0.0,
+      "max_value": 5.0,
+      "warm_start": false,
+      "kp": 0.05,
+      "ki": 0.01,
+      "kd": 0.0
+    },
+    "trainer": {
+      "cycles_per_task": 1,
+      "local_steps": 50,
+      "global_steps": 50,
+      "task1_steps": 200,
+      "lr_local": 0.05,
+      "lr_global": 0.05,
+      "optimizer": "sgd",
+      "eps": 0.04,
+      "omega": null,
+      "past_task_sampling": "all",
+      "entropy_coef": 0.0,
+      "eval_episodes": 32,
+      "eval_all_tasks": false,
+      "eval_probe_every": 25,
+      "report_return": false,
+      "kind": "ppo",
+      "local_unconstrained": false
+    },
+    "ppo": {
+      "method": "cka_rl",
+      "past_task_sampling": "sample",
+      "constraint_greedy": false,
+      "eval_noop_enumerate": false,
+      "eval_max_ep_steps": 0,
+      "joint_iters": 2000,
+      "joint_single_iters": 600,
+      "global_bc_coef": 0.0,
+      "clear_policy_clone_cost": 0.01,
+      "clear_value_clone_cost": 0.005,
+      "clear_snapshot_batches": 2,
+      "clear_replay_task_per_step": 1,
+      "async_envs": false,
+      "n_envs": 16,
+      "n_steps": 64,
+      "ppo_epochs": 4,
+      "target_kl": 0.0,
+      "num_minibatches": 4,
+      "clip_ratio": 0.2,
+      "gae_lambda": 0.95,
+      "vf_coef": 0.5,
+      "ent_coef": 0.01,
+      "max_grad_norm": 0.5,
+      "lr": 0.00025,
+      "normalize_advantage": true,
+      "task1_iters": 300,
+      "local_iters": 250,
+      "local_iters_per_task": {},
+      "select_best_local": true,
+      "global_stop_all_tasks": true,
+      "global_retention_frac": 0.7,
+      "global_iters": 250,
+      "min_iters": 50,
+      "patience": 3,
+      "stop_eval_every": 50,
+      "stop_eval_episodes": 10,
+      "constraint_episodes": 16,
+      "constraint_every": 5,
+      "eval_episodes": 30,
+      "eval_greedy": true,
+      "eval_greedy_episodes": 30,
+      "eval_seed": 100000,
+      "eval_every": 10,
+      "matrix_eval_every": 0,
+      "diagnostics": false,
+      "diag_every": 25,
+      "diag_score_episodes": 6,
+      "global_probe_head_only": false
+    }
+  }
+}

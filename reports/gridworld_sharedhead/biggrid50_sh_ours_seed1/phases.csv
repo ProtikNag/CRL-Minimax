@@ -86,3 +86,15 @@ constrained,42,"biggrid50-goal(9,45)",local,250,256000,316.0,12922.445,15820800
 constrained,42,"biggrid50-goal(9,45)",global,150,153600,231.1,13154.159,15974400
 constrained,43,"biggrid50-goal(9,38)",local,150,153600,192.7,13357.786,16128000
 constrained,43,"biggrid50-goal(9,38)",global,150,153600,235.7,13594.141,16281600
+constrained,44,"biggrid50-goal(9,3)",local,250,256000,328.2,13933.539,16537600
+constrained,44,"biggrid50-goal(9,3)",global,150,153600,238.0,14172.144,16691200
+constrained,45,"biggrid50-goal(40,24)",local,150,153600,197.5,14380.869,16844800
+constrained,45,"biggrid50-goal(40,24)",global,150,153600,242.1,14623.651,16998400
+constrained,46,"biggrid50-goal(33,31)",local,150,153600,203.8,14839.102,17152000
+constrained,46,"biggrid50-goal(33,31)",global,150,153600,246.4,15086.19,17305600
+constrained,47,"biggrid50-goal(46,45)",local,250,256000,337.9,15435.641,17561600
+constrained,47,"biggrid50-goal(46,45)",global,150,153600,247.5,15683.773,17715200
+constrained,48,"biggrid50-goal(3,38)",local,250,256000,347.7,16043.385,17971200
+constrained,48,"biggrid50-goal(3,38)",global,250,256000,423.7,16467.811,18227200
+constrained,49,"biggrid50-goal(46,3)",local,250,256000,358.1,16838.347,18483200
+constrained,49,"biggrid50-goal(46,3)",global,150,153600,257.7,17096.711,18636800

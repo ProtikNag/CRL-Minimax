@@ -408,5 +408,95 @@
       "final_greedy": 0.9081631898880005,
       "best_greedy": 0.9081631898880005
     }
+  },
+  "biggrid50-goal(33,38)": {
+    "task": 42,
+    "cka_rl": {
+      "iters_run": 500,
+      "early_stopped": false,
+      "wall_s": 548.0,
+      "final_greedy": 0.9030610918998718,
+      "best_greedy": 0.9030610918998718
+    }
+  },
+  "biggrid50-goal(9,45)": {
+    "task": 43,
+    "cka_rl": {
+      "iters_run": 150,
+      "early_stopped": true,
+      "wall_s": 166.9,
+      "final_greedy": 0.8867346048355103,
+      "best_greedy": 0.9540815353393555
+    }
+  },
+  "biggrid50-goal(9,38)": {
+    "task": 44,
+    "cka_rl": {
+      "iters_run": 150,
+      "early_stopped": true,
+      "wall_s": 169.2,
+      "final_greedy": 0.9622448682785034,
+      "best_greedy": 0.9999998807907104
+    }
+  },
+  "biggrid50-goal(9,3)": {
+    "task": 45,
+    "cka_rl": {
+      "iters_run": 500,
+      "early_stopped": false,
+      "wall_s": 566.4,
+      "final_greedy": 0.7193876504898071,
+      "best_greedy": 0.7499998807907104
+    }
+  },
+  "biggrid50-goal(40,24)": {
+    "task": 46,
+    "cka_rl": {
+      "iters_run": 150,
+      "early_stopped": true,
+      "wall_s": 173.8,
+      "final_greedy": 0.9999998807907104,
+      "best_greedy": 0.9999998807907104
+    }
+  },
+  "biggrid50-goal(33,31)": {
+    "task": 47,
+    "cka_rl": {
+      "iters_run": 150,
+      "early_stopped": true,
+      "wall_s": 175.2,
+      "final_greedy": 0.9204080700874329,
+      "best_greedy": 0.9204080700874329
+    }
+  },
+  "biggrid50-goal(46,45)": {
+    "task": 48,
+    "cka_rl": {
+      "iters_run": 200,
+      "early_stopped": true,
+      "wall_s": 238.0,
+      "final_greedy": 0.960204005241394,
+      "best_greedy": 0.960204005241394
+    }
+  },
+  "biggrid50-goal(3,38)": {
+    "task": 49,
+    "cka_rl": {
+      "iters_run": 450,
+      "early_stopped": true,
+      "wall_s": 540.2,
+      "final_greedy": 0.9693876504898071,
+      "best_greedy": 0.9999998807907104
+    }
+  },
+  "biggrid50-goal(46,3)": {
+    "task": 50,
+    "cka_rl": {
+      "iters_run": 200,
+      "early_stopped": true,
+      "wall_s": 241.5,
+      "final_greedy": 0.9316326379776001,
+      "best_greedy": 0.9999998807907104
+    }
   }
 }
