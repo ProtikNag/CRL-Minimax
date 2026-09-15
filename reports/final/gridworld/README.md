@@ -60,6 +60,42 @@ Ours' point cloud sits above the no-change diagonal; every other method's sits
 below it. That is a difference in kind, not in degree, and it is the same fact
 the backward-transfer column summarises — read one task at a time.
 
+#### The shaded band: tasks that started badly
+
+The band holds every task the model left **below 0.25**, barely above a random
+policy. That is where ours pays its plasticity cost, so it is also where the
+question "did consolidation actually rescue anything" gets answered:
+
+| | tasks left below 0.25 | recovered |
+|---|---:|---:|
+| **Min-Max (ours)** | 80 | **77 (96%)** |
+| CKA-RL | 5 | 0 |
+| Fine-tuning | 5 | 0 |
+| From-scratch | 2 | 1 |
+
+**The threshold is not fitted to flatter anyone.** Sweeping it, ours'
+recovery-rate advantage over the baselines plateaus at **+88 to +91 percentage
+points** for every value in [0.25, 0.55] — the conclusion does not depend on
+where in that range the line sits. 0.25 is the smallest value inside the plateau
+at which the baselines still have enough tasks (12 between them) to compare
+against, which makes it the conservative pick rather than the flattering one.
+
+**And it is not a headroom artefact.** A task left at 0.2 has more room to
+improve than one left at 0.9, so "improved" could in principle be mechanical.
+Measuring the gain as a *fraction of the headroom still available* (`1 − learned`)
+rules that out:
+
+| | learned < 0.2 | 0.2–0.5 | > 0.5 |
+|---|---:|---:|---:|
+| **Min-Max (ours)** | **+41%** | **+57%** | +16% |
+| CKA-RL | −6% | −26% | −114% |
+| Fine-tuning | −11% | −32% | −288% |
+| From-scratch | −9% | −66% | −267% |
+
+Ours captures a large share of the room it has left. Every baseline is negative
+in every bin: they do not merely fail to improve, they give ground back
+regardless of where the task started.
+
 ### The trade, stated plainly
 
 The per-task detail behind the aggregate is not flattering in every direction:

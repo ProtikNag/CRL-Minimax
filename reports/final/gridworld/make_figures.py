@@ -45,6 +45,15 @@ N_TASKS = 50
 FS_PANEL, FS_AXIS, FS_TICK = 13.0, 12.0, 10.5
 FS_VALUE, FS_NOTE = 11.0, 9.5
 
+# "Learned poorly": a task the model left below a quarter of the way from a
+# random policy to a solved one. The value is not fitted to flatter anyone. The
+# recovery-rate gap between ours and the baselines plateaus at +88 to +91
+# percentage points for every threshold in [0.25, 0.55], so the conclusion does
+# not depend on where in that range the line sits; 0.25 is the smallest
+# threshold inside the plateau at which the baselines still have enough tasks
+# (n = 12) to compare against, which makes it the conservative choice.
+POORLY_LEARNED = 0.25
+
 METHODS = [
     ("ours",     "Min-Max (ours)", AC["blue"],       "biggrid50_sh_ours_"),
     ("cka_rl",   "CKA-RL",         AC["amber"],      "biggrid50_cka_rl_"),
@@ -134,6 +143,15 @@ def figure_learned_vs_retained() -> None:
         final = np.concatenate([p[1] for p in pairs])
         improved = float(np.mean(final > learned))
 
+        # Band over the tasks the model left barely above random, and the line
+        # that bounds it. Everything here started poorly; the question the panel
+        # answers is whether it was recovered.
+        fig.add_vrect(x0=-0.6, x1=POORLY_LEARNED,
+                      fillcolor=hex_to_rgba(AC["axis"], 0.08),
+                      opacity=1.0, layer="below", line_width=0,
+                      row=row, col=col)
+        fig.add_vline(x=POORLY_LEARNED, line=dict(color=AC["axis"], width=1.4),
+                      row=row, col=col)
         fig.add_trace(go.Scatter(
             x=[-0.6, 1.05], y=[-0.6, 1.05], mode="lines",
             line=dict(color=AC["border"], width=1.3),
@@ -158,6 +176,26 @@ def figure_learned_vs_retained() -> None:
             showarrow=False, xanchor="left", yanchor="bottom",
             font=dict(family=FONT_UI, size=FS_TICK, color=color))
 
+        # The count that matters inside the band: of the tasks that started
+        # poorly, how many the method actually brought back.
+        poor = learned < POORLY_LEARNED
+        recovered = int((final[poor] > learned[poor]).sum())
+        fig.add_annotation(
+            x=-0.55, y=-0.55, xref=f"x{axis}", yref=f"y{axis}",
+            text=(f"<b>{recovered} of {int(poor.sum())}</b> recovered"
+                  if poor.sum() else "no tasks here"),
+            showarrow=False, xanchor="left", yanchor="bottom",
+            font=dict(family=FONT_UI, size=FS_TICK,
+                      color=color if poor.sum() else AC["text_faint"]),
+            bgcolor="rgba(255,255,255,0.88)", borderpad=2)
+        if index == 0:
+            fig.add_annotation(
+                x=-0.55, y=0.98, xref=f"x{axis}", yref=f"y{axis}",
+                text=f"learned poorly<br>(below {POORLY_LEARNED:.2f})",
+                showarrow=False, xanchor="left", yanchor="top", align="left",
+                font=dict(family=FONT_UI, size=FS_TICK, color=AC["text_muted"]),
+                bgcolor="rgba(255,255,255,0.86)", borderpad=2)
+
     fig.update_xaxes(range=[-0.6, 1.05], dtick=0.5, showgrid=True,
                      gridcolor=AC["grid"], gridwidth=0.6, zeroline=False,
                      showline=True, linecolor=AC["axis"], linewidth=1.2,
@@ -178,10 +216,16 @@ def figure_learned_vs_retained() -> None:
                                     **title), row=2, col=col)
 
     add_footnote(fig, (
-        "One point per task, in units of (score − random) / (1 − random). The "
-        "grey line is no change.<br>"
-        "<b>Above it a task improved after the model moved on; below it the task "
-        "was forgotten.</b><br>"
+        "One point per task, in units of (score − random) / (1 − random).<br>"
+        "The diagonal is no change: <b>above it a task improved after the model "
+        "moved on, below it the task was forgotten.</b><br>"
+        "The shaded band holds the tasks left <b>below 0.25</b>, barely above a "
+        "random policy; the count in it is how many of those the method brought "
+        "back.<br>"
+        "That threshold is not fitted. Ours' recovery-rate advantage plateaus "
+        "at +88 to +91 points anywhere in [0.25, 0.55];<br>"
+        "0.25 is the smallest value in that plateau at which the baselines "
+        "still have enough tasks (12) to compare against.<br>"
         "Ours contributes <b>150 points: 50 tasks × 3 complete seeds</b>.<br>"
         "The other three have one complete seed each so far, so 50 points "
         "apiece; their remaining seeds are still running.<br>"
@@ -189,7 +233,7 @@ def figure_learned_vs_retained() -> None:
         "where ours and CKA-RL stop being close."), 78)
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
                       margin=dict(l=78, r=26, t=56, b=136))
-    export_pair(fig, "learned_vs_retained", W_FULL, 656)
+    export_pair(fig, "learned_vs_retained", W_FULL, 684)
 
 
 # ── Figure 2: retention across the sequence ─────────────────────────────────
