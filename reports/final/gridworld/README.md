@@ -60,25 +60,36 @@ Ours' point cloud sits above the no-change diagonal; every other method's sits
 below it. That is a difference in kind, not in degree, and it is the same fact
 the backward-transfer column summarises — read one task at a time.
 
-#### The shaded band: tasks that started badly
+#### The shaded box: learned poorly, ended above average
 
-The band holds every task the model left **below 0.25**, barely above a random
-policy. That is where ours pays its plasticity cost, so it is also where the
-question "did consolidation actually rescue anything" gets answered:
+The box is an **intersection**, which is why it is a box and not a band: a task
+qualifies only if it was left **below 0.25** when the model moved on — barely
+above a random policy — *and* still finished **above 0.40**, the average final
+score across the four methods.
 
-| | tasks left below 0.25 | recovered |
-|---|---:|---:|
-| **Min-Max (ours)** | 80 | **77 (96%)** |
-| CKA-RL | 5 | 0 |
-| Fine-tuning | 5 | 0 |
-| From-scratch | 2 | 1 |
+| | tasks in the box |
+|---|---:|
+| **Min-Max (ours)** | **43** |
+| CKA-RL | 0 |
+| Fine-tuning | 0 |
+| From-scratch | 0 |
 
-**The threshold is not fitted to flatter anyone.** Sweeping it, ours'
+Every baseline's box is empty. Ours is where its plasticity cost shows up as
+points on the left, and the box is the evidence that consolidation converts them
+rather than leaving them there.
+
+**Neither edge is fitted to flatter anyone.** Sweeping the left edge, ours'
 recovery-rate advantage over the baselines plateaus at **+88 to +91 percentage
 points** for every value in [0.25, 0.55] — the conclusion does not depend on
 where in that range the line sits. 0.25 is the smallest value inside the plateau
 at which the baselines still have enough tasks (12 between them) to compare
 against, which makes it the conservative pick rather than the flattering one.
+
+The top edge, 0.40, averages the **four method means** rather than pooling every
+point. Pooling would weight ours three times for having three complete seeds and
+quietly raise the bar it is then measured against. Using the pooled mean (0.465)
+or the pooled median (0.493) instead changes the counts to 39 / 0 / 0 / 0, so the
+result does not turn on that choice either.
 
 **And it is not a headroom artefact.** A task left at 0.2 has more room to
 improve than one left at 0.9, so "improved" could in principle be mechanical.

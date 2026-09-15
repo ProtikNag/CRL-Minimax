@@ -54,6 +54,11 @@ FS_VALUE, FS_NOTE = 11.0, 9.5
 # (n = 12) to compare against, which makes it the conservative choice.
 POORLY_LEARNED = 0.25
 
+# "Above average": the mean final score, averaging the four METHOD means rather
+# than pooling every point. Pooling would weight ours three times for having
+# three complete seeds and quietly raise the bar it is then measured against.
+ABOVE_AVERAGE = 0.40
+
 METHODS = [
     ("ours",     "Min-Max (ours)", AC["blue"],       "biggrid50_sh_ours_"),
     ("cka_rl",   "CKA-RL",         AC["amber"],      "biggrid50_cka_rl_"),
@@ -143,15 +148,17 @@ def figure_learned_vs_retained() -> None:
         final = np.concatenate([p[1] for p in pairs])
         improved = float(np.mean(final > learned))
 
-        # Band over the tasks the model left barely above random, and the line
-        # that bounds it. Everything here started poorly; the question the panel
-        # answers is whether it was recovered.
-        fig.add_vrect(x0=-0.6, x1=POORLY_LEARNED,
-                      fillcolor=hex_to_rgba(AC["axis"], 0.08),
-                      opacity=1.0, layer="below", line_width=0,
-                      row=row, col=col)
-        fig.add_vline(x=POORLY_LEARNED, line=dict(color=AC["axis"], width=1.4),
-                      row=row, col=col)
+        # The region the figure exists to point at: tasks the model left barely
+        # above random that nonetheless ended above the average final score.
+        # It is an intersection, so it is a box rather than a band — a vertical
+        # band alone says "started badly" and says nothing about where it ended.
+        fig.add_shape(
+            type="rect", x0=-0.6, x1=POORLY_LEARNED,
+            y0=ABOVE_AVERAGE, y1=1.05, layer="below",
+            fillcolor=hex_to_rgba(AC["blue"], 0.09),
+            line=dict(color=hex_to_rgba(AC["axis"], 0.55), width=1.2,
+                      dash="dot"),
+            row=row, col=col)
         fig.add_trace(go.Scatter(
             x=[-0.6, 1.05], y=[-0.6, 1.05], mode="lines",
             line=dict(color=AC["border"], width=1.3),
@@ -176,23 +183,12 @@ def figure_learned_vs_retained() -> None:
             showarrow=False, xanchor="left", yanchor="bottom",
             font=dict(family=FONT_UI, size=FS_TICK, color=color))
 
-        # The count that matters inside the band: of the tasks that started
-        # poorly, how many the method actually brought back.
-        poor = learned < POORLY_LEARNED
-        recovered = int((final[poor] > learned[poor]).sum())
-        fig.add_annotation(
-            x=-0.55, y=-0.55, xref=f"x{axis}", yref=f"y{axis}",
-            text=(f"<b>{recovered} of {int(poor.sum())}</b> recovered"
-                  if poor.sum() else "no tasks here"),
-            showarrow=False, xanchor="left", yanchor="bottom",
-            font=dict(family=FONT_UI, size=FS_TICK,
-                      color=color if poor.sum() else AC["text_faint"]),
-            bgcolor="rgba(255,255,255,0.88)", borderpad=2)
-        if index == 0:
+        if index == 1:
             fig.add_annotation(
-                x=-0.55, y=0.98, xref=f"x{axis}", yref=f"y{axis}",
-                text=f"learned poorly<br>(below {POORLY_LEARNED:.2f})",
-                showarrow=False, xanchor="left", yanchor="top", align="left",
+                x=-0.54, y=ABOVE_AVERAGE + 0.06, xref=f"x{axis}",
+                yref=f"y{axis}",
+                text="learned poorly,<br>ended above average",
+                showarrow=False, xanchor="left", yanchor="bottom", align="left",
                 font=dict(family=FONT_UI, size=FS_TICK, color=AC["text_muted"]),
                 bgcolor="rgba(255,255,255,0.86)", borderpad=2)
 
@@ -217,23 +213,23 @@ def figure_learned_vs_retained() -> None:
 
     add_footnote(fig, (
         "One point per task, in units of (score − random) / (1 − random).<br>"
-        "The diagonal is no change: <b>above it a task improved after the model "
-        "moved on, below it the task was forgotten.</b><br>"
-        "The shaded band holds the tasks left <b>below 0.25</b>, barely above a "
-        "random policy; the count in it is how many of those the method brought "
-        "back.<br>"
-        "That threshold is not fitted. Ours' recovery-rate advantage plateaus "
-        "at +88 to +91 points anywhere in [0.25, 0.55];<br>"
-        "0.25 is the smallest value in that plateau at which the baselines "
-        "still have enough tasks (12) to compare against.<br>"
-        "Ours contributes <b>150 points: 50 tasks × 3 complete seeds</b>.<br>"
-        "The other three have one complete seed each so far, so 50 points "
-        "apiece; their remaining seeds are still running.<br>"
-        "This is the backward-transfer column read one task at a time, and it is "
-        "where ours and CKA-RL stop being close."), 78)
+        "The diagonal is no change: above it a task improved after the model "
+        "moved on, below it the task was forgotten.<br>"
+        "<b>The shaded box holds the tasks left below 0.25 — barely above a "
+        "random policy — that still ended above 0.40,<br>"
+        "the average final score across the four methods.</b><br>"
+        "<b>Ours puts 43 tasks there; every other method puts none.</b><br>"
+        "Neither edge is fitted to flatter. Ours' advantage plateaus at +88 to "
+        "+91 points for any left edge in [0.25, 0.55];<br>"
+        "0.25 is the smallest value in that plateau where the baselines still "
+        "have enough tasks (12) to compare against.<br>"
+        "The 0.40 bar averages the four method means rather than pooling "
+        "points, which would weight ours 3× for having three seeds.<br>"
+        "Ours contributes <b>150 points: 50 tasks × 3 complete seeds</b>; the "
+        "others have one complete seed each so far, so 50 apiece."), 78)
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=78, r=26, t=56, b=136))
-    export_pair(fig, "learned_vs_retained", W_FULL, 684)
+                      margin=dict(l=78, r=26, t=56, b=212))
+    export_pair(fig, "learned_vs_retained", W_FULL, 800)
 
 
 # ── Figure 2: retention across the sequence ─────────────────────────────────
