@@ -45,19 +45,16 @@ N_TASKS = 50
 FS_PANEL, FS_AXIS, FS_TICK = 13.0, 12.0, 10.5
 FS_VALUE, FS_NOTE = 11.0, 9.5
 
-# "Learned poorly": a task the model left below a quarter of the way from a
-# random policy to a solved one. The value is not fitted to flatter anyone. The
-# recovery-rate gap between ours and the baselines plateaus at +88 to +91
-# percentage points for every threshold in [0.25, 0.55], so the conclusion does
-# not depend on where in that range the line sits; 0.25 is the smallest
-# threshold inside the plateau at which the baselines still have enough tasks
-# (n = 12) to compare against, which makes it the conservative choice.
-POORLY_LEARNED = 0.25
+# The two reference lines, one per axis, each the mean over the four METHOD
+# means rather than over pooled points. Pooling would weight ours three times
+# for having three complete seeds and quietly move the bars it is measured
+# against. They cut the plane into quadrants; the two that matter are opposite
+# corners, and each panel shades the one that characterises that method.
+MEAN_LEARNED = 0.55   # mean score a task had when the model moved on
+MEAN_FINAL = 0.40     # mean score a task had after all 50
 
-# "Above average": the mean final score, averaging the four METHOD means rather
-# than pooling every point. Pooling would weight ours three times for having
-# three complete seeds and quietly raise the bar it is then measured against.
-ABOVE_AVERAGE = 0.40
+RESCUED_FILL = "#DCE7FB"   # learned below average, ended above it
+LOST_FILL = "#FBDCDC"      # learned above average, ended below it
 
 METHODS = [
     ("ours",     "Min-Max (ours)", AC["blue"],       "biggrid50_sh_ours_"),
@@ -129,13 +126,13 @@ def figure_learned_vs_retained() -> None:
     """Each task's score when learned against its score at the end.
 
     The separator. Average performance puts ours and CKA-RL within 0.09 of each
-    other, which is easy to wave away; this asks a yes/no question of every task
-    — did it end better or worse than when it was learned — and the answer
-    splits the methods completely. The diagonal is "no change": above it a task
-    improved after the model moved on, below it the task was forgotten.
+    other, which is easy to wave away; asking a yes/no question of every task
+    splits them completely.
 
-    Laid out 2x2 rather than 1x4 so each panel has room for 50-150 points, and
-    the headline percentage sits above the panel rather than on top of the data.
+    The two mean lines cut the plane into quadrants. Each panel shades the one
+    that characterises its method: ours the tasks it left below average and
+    brought back above it, the baselines the tasks they learned above average
+    and then lost.
     """
     fig = make_subplots(rows=2, cols=2, horizontal_spacing=0.13,
                         vertical_spacing=0.20)
@@ -147,18 +144,22 @@ def figure_learned_vs_retained() -> None:
         learned = np.concatenate([p[0] for p in pairs])
         final = np.concatenate([p[1] for p in pairs])
         improved = float(np.mean(final > learned))
+        rescue = key == "ours"
 
-        # The region the figure exists to point at: tasks the model left barely
-        # above random that nonetheless ended above the average final score.
-        # It is an intersection, so it is a box rather than a band — a vertical
-        # band alone says "started badly" and says nothing about where it ended.
-        fig.add_shape(
-            type="rect", x0=-0.6, x1=POORLY_LEARNED,
-            y0=ABOVE_AVERAGE, y1=1.05, layer="below",
-            fillcolor=hex_to_rgba(AC["blue"], 0.09),
-            line=dict(color=hex_to_rgba(AC["axis"], 0.55), width=1.2,
-                      dash="dot"),
-            row=row, col=col)
+        box = (dict(x0=-0.6, x1=MEAN_LEARNED, y0=MEAN_FINAL, y1=1.05)
+               if rescue else
+               dict(x0=MEAN_LEARNED, x1=1.05, y0=-0.6, y1=MEAN_FINAL))
+        fig.add_shape(type="rect", layer="below",
+                      fillcolor=RESCUED_FILL if rescue else LOST_FILL,
+                      line=dict(width=0), row=row, col=col, **box)
+        for value, horizontal in ((MEAN_LEARNED, False), (MEAN_FINAL, True)):
+            fig.add_shape(
+                type="line", layer="below",
+                x0=-0.6 if horizontal else value, x1=1.05 if horizontal else value,
+                y0=value if horizontal else -0.6, y1=value if horizontal else 1.05,
+                line=dict(color=hex_to_rgba(AC["axis"], 0.40), width=1,
+                          dash="dot"),
+                row=row, col=col)
         fig.add_trace(go.Scatter(
             x=[-0.6, 1.05], y=[-0.6, 1.05], mode="lines",
             line=dict(color=AC["border"], width=1.3),
@@ -170,7 +171,8 @@ def figure_learned_vs_retained() -> None:
             hovertemplate="learned %{x:.2f} → final %{y:.2f}<extra></extra>",
             showlegend=False), row=row, col=col)
 
-        # Title and headline live above the panel, clear of every point.
+        inside = (((learned < MEAN_LEARNED) & (final > MEAN_FINAL)) if rescue
+                  else ((learned > MEAN_LEARNED) & (final < MEAN_FINAL)))
         axis = f"{index + 1 if index else ''}"
         fig.add_annotation(
             x=0, y=1.19, xref=f"x{axis} domain", yref=f"y{axis} domain",
@@ -179,18 +181,20 @@ def figure_learned_vs_retained() -> None:
             font=dict(family=FONT_UI, size=FS_PANEL, color=AC["text_primary"]))
         fig.add_annotation(
             x=0, y=1.035, xref=f"x{axis} domain", yref=f"y{axis} domain",
-            text=f"<b>{improved:.0%}</b> of tasks ended better than when learned",
+            text=(f"<b>{improved:.0%}</b> ended better &nbsp;·&nbsp; "
+                  f"<b>{int(inside.sum())}</b> of {len(learned)} in the "
+                  "shaded quadrant"),
             showarrow=False, xanchor="left", yanchor="bottom",
             font=dict(family=FONT_UI, size=FS_TICK, color=color))
 
-        if index == 1:
-            fig.add_annotation(
-                x=-0.54, y=ABOVE_AVERAGE + 0.06, xref=f"x{axis}",
-                yref=f"y{axis}",
-                text="learned poorly,<br>ended above average",
-                showarrow=False, xanchor="left", yanchor="bottom", align="left",
-                font=dict(family=FONT_UI, size=FS_TICK, color=AC["text_muted"]),
-                bgcolor="rgba(255,255,255,0.86)", borderpad=2)
+    # Real legend entries rather than text inside the panels.
+    for name, fill in (("learned below average, ended above it", RESCUED_FILL),
+                       ("learned above average, ended below it", LOST_FILL)):
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None], mode="markers", name=name,
+            marker=dict(size=13, symbol="square", color=fill,
+                        line=dict(color=hex_to_rgba(AC["axis"], 0.40), width=1)),
+            showlegend=True, hoverinfo="skip"), row=1, col=1)
 
     fig.update_xaxes(range=[-0.6, 1.05], dtick=0.5, showgrid=True,
                      gridcolor=AC["grid"], gridwidth=0.6, zeroline=False,
@@ -212,24 +216,24 @@ def figure_learned_vs_retained() -> None:
                                     **title), row=2, col=col)
 
     add_footnote(fig, (
-        "One point per task, in units of (score − random) / (1 − random).<br>"
-        "The diagonal is no change: above it a task improved after the model "
-        "moved on, below it the task was forgotten.<br>"
-        "<b>The shaded box holds the tasks left below 0.25 — barely above a "
-        "random policy — that still ended above 0.40,<br>"
-        "the average final score across the four methods.</b><br>"
-        "<b>Ours puts 43 tasks there; every other method puts none.</b><br>"
-        "Neither edge is fitted to flatter. Ours' advantage plateaus at +88 to "
-        "+91 points for any left edge in [0.25, 0.55];<br>"
-        "0.25 is the smallest value in that plateau where the baselines still "
-        "have enough tasks (12) to compare against.<br>"
-        "The 0.40 bar averages the four method means rather than pooling "
-        "points, which would weight ours 3× for having three seeds.<br>"
-        "Ours contributes <b>150 points: 50 tasks × 3 complete seeds</b>; the "
-        "others have one complete seed each so far, so 50 apiece."), 78)
-    fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=78, r=26, t=56, b=212))
-    export_pair(fig, "learned_vs_retained", W_FULL, 800)
+        "One point per task, in units of (score − random) / (1 − random); the "
+        "diagonal is no change.<br>"
+        "The dotted lines are the mean score when learned (0.55) and the mean "
+        "score at the end (0.40), each averaged over the four method means.<br>"
+        "<b>Rescued: ours 97 of 150, CKA-RL 0, fine-tuning 0, from-scratch 1. "
+        "Lost: ours 1, CKA-RL 9, fine-tuning 20, from-scratch 25.</b><br>"
+        "Ours is 3 complete seeds (150 points), the others 1 each (50 points)."
+    ), 78)
+    fig.update_layout(
+        title=None, plot_bgcolor=AC["bg"],
+        margin=dict(l=78, r=26, t=112, b=132),
+        legend=dict(orientation="h", x=0.0, xanchor="left", y=1.135,
+                    yanchor="bottom", bgcolor="rgba(0,0,0,0)", borderwidth=0,
+                    itemsizing="constant",
+                    font=dict(family=FONT_UI, size=FS_TICK,
+                              color=AC["text_primary"])),
+        showlegend=True)
+    export_pair(fig, "learned_vs_retained", W_FULL, 740)
 
 
 # ── Figure 2: retention across the sequence ─────────────────────────────────

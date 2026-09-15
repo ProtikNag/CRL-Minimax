@@ -60,41 +60,37 @@ Ours' point cloud sits above the no-change diagonal; every other method's sits
 below it. That is a difference in kind, not in degree, and it is the same fact
 the backward-transfer column summarises — read one task at a time.
 
-#### The shaded box: learned poorly, ended above average
+#### The shaded quadrants
 
-The box is an **intersection**, which is why it is a box and not a band: a task
-qualifies only if it was left **below 0.25** when the model moved on — barely
-above a random policy — *and* still finished **above 0.40**, the average final
-score across the four methods.
+Two dotted lines cut each panel into quadrants. Both are the **equally-weighted
+mean over the four method means** — one per axis, so a single justification
+covers both:
 
-| | tasks in the box |
-|---|---:|
-| **Min-Max (ours)** | **43** |
-| CKA-RL | 0 |
-| Fine-tuning | 0 |
-| From-scratch | 0 |
+- **0.55** on the x-axis: the mean score a task had when the model moved on.
+- **0.40** on the y-axis: the mean score a task had after all 50.
 
-Every baseline's box is empty. Ours is where its plasticity cost shows up as
-points on the left, and the box is the evidence that consolidation converts them
-rather than leaving them there.
+Averaging the *method* means rather than pooling every point matters: pooling
+would weight ours three times for having three complete seeds and quietly shift
+the very bars it is then measured against.
 
-**Neither edge is fitted to flatter anyone.** Sweeping the left edge, ours'
-recovery-rate advantage over the baselines plateaus at **+88 to +91 percentage
-points** for every value in [0.25, 0.55] — the conclusion does not depend on
-where in that range the line sits. 0.25 is the smallest value inside the plateau
-at which the baselines still have enough tasks (12 between them) to compare
-against, which makes it the conservative pick rather than the flattering one.
+Each panel shades the quadrant that characterises its method — ours the tasks it
+left below average and brought back above it, the baselines the tasks they
+learned above average and then lost:
 
-The top edge, 0.40, averages the **four method means** rather than pooling every
-point. Pooling would weight ours three times for having three complete seeds and
-quietly raise the bar it is then measured against. Using the pooled mean (0.465)
-or the pooled median (0.493) instead changes the counts to 39 / 0 / 0 / 0, so the
-result does not turn on that choice either.
+| | rescued (learned < 0.55, ended > 0.40) | lost (learned > 0.55, ended < 0.40) |
+|---|---:|---:|
+| **Min-Max (ours)** | **97 of 150** | 1 |
+| CKA-RL | 0 | 9 |
+| Fine-tuning | 0 | 20 |
+| From-scratch | 1 | 25 |
 
-**And it is not a headroom artefact.** A task left at 0.2 has more room to
-improve than one left at 0.9, so "improved" could in principle be mechanical.
-Measuring the gain as a *fraction of the headroom still available* (`1 − learned`)
-rules that out:
+The two columns are near-perfect complements. Ours rescues and does not lose;
+the baselines lose and do not rescue.
+
+**It is not a headroom artefact.** A task left at 0.2 has more room to improve
+than one left at 0.9, so "improved" could in principle be mechanical. Measuring
+the gain as a fraction of the headroom still available (`1 − learned`) rules it
+out:
 
 | | learned < 0.2 | 0.2–0.5 | > 0.5 |
 |---|---:|---:|---:|
