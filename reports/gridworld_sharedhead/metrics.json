@@ -13,7 +13,7 @@
     "perf": 0.5896245147561068,
     "forgetting": 0.11668688611918661,
     "bwt": 0.32841452303990054,
-    "fwt": -0.05519588046555184
+    "fwt": 0.00826050516271073
   },
   "biggrid50_sh_ours_seed2": {
     "tasks_done": 50,
@@ -21,7 +21,7 @@
     "perf": 0.5955583937787481,
     "forgetting": 0.11632456884319213,
     "bwt": 0.3834796267830017,
-    "fwt": 0.06024742729029969
+    "fwt": 0.10276462770217575
   },
   "biggrid50_sh_finetune_seed0": {
     "tasks_done": 50,
@@ -32,20 +32,20 @@
     "fwt": 0.16294622403984874
   },
   "biggrid50_sh_finetune_seed1": {
-    "tasks_done": 18,
-    "complete": false,
-    "perf": 0.3168925388756733,
-    "forgetting": 0.37210613306912615,
-    "bwt": -0.34539832810098064,
-    "fwt": 0.10088529533697158
+    "tasks_done": 50,
+    "complete": true,
+    "perf": 0.26693816176560997,
+    "forgetting": 0.4237083975065053,
+    "bwt": -0.37873106722418065,
+    "fwt": 0.12207399055099469
   },
   "biggrid50_sh_finetune_seed2": {
-    "tasks_done": 26,
-    "complete": false,
-    "perf": 0.34280046678451137,
-    "forgetting": 0.34457703679654633,
-    "bwt": -0.33020770565646534,
-    "fwt": 0.16555948325776948
+    "tasks_done": 50,
+    "complete": true,
+    "perf": 0.20735093834848006,
+    "forgetting": 0.481154272253072,
+    "bwt": -0.44804403727678244,
+    "fwt": 0.15644812428302887
   },
   "biggrid50_sh_baseline_seed0": {
     "tasks_done": 50,
@@ -56,19 +56,19 @@
     "fwt": null
   },
   "biggrid50_sh_baseline_seed1": {
-    "tasks_done": 26,
-    "complete": false,
-    "perf": 0.3174792417939596,
-    "forgetting": 0.4282708802384165,
-    "bwt": -0.3824307924063287,
+    "tasks_done": 50,
+    "complete": true,
+    "perf": 0.2013346287464234,
+    "forgetting": 0.5161994582581226,
+    "bwt": -0.4660054321276678,
     "fwt": null
   },
   "biggrid50_sh_baseline_seed2": {
-    "tasks_done": 15,
+    "tasks_done": 40,
     "complete": false,
-    "perf": 0.03275902964960276,
-    "forgetting": 0.6933906286994318,
-    "bwt": -0.6382045817945595,
+    "perf": 0.17640987795133345,
+    "forgetting": 0.5408291555613527,
+    "bwt": -0.500024883310884,
     "fwt": null
   },
   "biggrid50_cka_rl_seed0": {
@@ -80,19 +80,19 @@
     "fwt": 0.19668163571198632
   },
   "biggrid50_cka_rl_seed1": {
-    "tasks_done": 24,
-    "complete": false,
-    "perf": 0.44654871333740515,
-    "forgetting": 0.2552257604371256,
-    "bwt": -0.21993069888862335,
-    "fwt": 0.06135791095571223
+    "tasks_done": 50,
+    "complete": true,
+    "perf": 0.4709710002467056,
+    "forgetting": 0.24635250330951158,
+    "bwt": -0.18613602288331163,
+    "fwt": 0.16586871386003993
   },
   "biggrid50_cka_rl_seed2": {
-    "tasks_done": 8,
+    "tasks_done": 41,
     "complete": false,
-    "perf": 0.42210986902413117,
-    "forgetting": 0.341409482543234,
-    "bwt": -0.32971386315512313,
-    "fwt": 0.22168075798558862
+    "perf": 0.3835331419630251,
+    "forgetting": 0.29998235358844216,
+    "bwt": -0.2705347120742719,
+    "fwt": 0.13391411282944726
   }
 }

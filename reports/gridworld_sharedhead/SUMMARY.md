@@ -1,29 +1,20 @@
-# GridWorld (shared-head, 50-task) — results
+# GridWorld (shared-head, 50-task) — results (seeds 0-1 complete; seed 2 in progress)
 
-Fixed-capacity / no-growth regime: ONE shared actor+critic head (mlp_ac, task-
-conditioned), NO per-task heads -> forgetting is forced. CompoNet dropped (it grows
-the network); CKA-RL = our faithful reimpl (shared trunk + bounded pool + per-task
-alpha, no growth). Reported eval greedy; FWT vs the from-scratch baseline (per seed).
+Fixed-capacity/no-growth regime: single shared actor+critic head (mlp_ac, task-conditioned),
+no per-task heads. CKA-RL = faithful reimpl (shared trunk + bounded pool + per-task alpha, no growth);
+CompoNet excluded (it grows the net). FWT vs from-scratch baseline (per seed).
 
-## Complete runs (ours = 3 seeds mean±std; finetune/baseline/CKA-RL = seed 0 done; their seeds 1-2 still running)
+## Aggregated over COMPLETE seeds (ours 3; finetune/baseline/CKA-RL 2 = seeds 0,1)
 
-| Method | PERF | Forgetting | BWT | FWT |
-|---|--:|--:|--:|--:|
-| **ours (3 seeds)** | 0.596 ± 0.006 | 0.112 ± 0.006 | +0.358 ± 0.023 | +0.045 ± 0.077 (n=3) |
-| CKA-RL (s0) | 0.509 | +0.205 | -0.149 | +0.197 |
-| finetune (s0) | 0.309 | +0.386 | -0.344 | +0.163 |
-| baseline (s0) | 0.184 | +0.525 | -0.465 | 0 (ref) |
+| Method | PERF | Forgetting | BWT | FWT | seeds |
+|---|--:|--:|--:|--:|:--|
+| **ours** | 0.596 ± 0.006 | 0.112 ± 0.006 | +0.358 ± 0.023 | +0.080 ± 0.052 | 3 |
+| CKA-RL | 0.490 ± 0.019 | 0.226 ± 0.021 | -0.168 ± 0.019 | +0.181 ± 0.015 | 2 |
+| finetune | 0.261 ± 0.042 | 0.430 ± 0.039 | -0.390 ± 0.043 | +0.147 ± 0.018 | 3 |
+| baseline | 0.193 ± 0.009 | 0.520 ± 0.004 | -0.466 ± 0.000 | 0 (ref) | 2 |
 
-## Footprint / disclosures (for the paper)
-- ours = FIXED shared head; CKA-RL = fixed trunk + bounded pool(5) + tiny per-task alpha; both no network growth (CompoNet, which grows, excluded).
-- ours re-simulates past environments during consolidation (live past-task access); CKA-RL/finetune train only on the current task — disclose in captions.
-- CKA-RL's forgetting here is honest for the no-growth regime: its pooled head retains actor knowledge but the shared trunk it can't grow drifts.
+## Per-seed numbers in metrics.json; raw + tidy CSVs (forgetting_matrix, learning_curves, duals, phases) per run dir.
+Seed 2 of finetune/baseline/CKA-RL still running -> full 3-seed CIs land shortly (ours already 3/3).
 
-## Read
-- Retention: ours (PERF ~0.60, forget ~0.11, BWT +0.36) >> CKA-RL (0.51/0.21) > finetune (0.31/0.39) > baseline (0.18/0.53).
-- Ours is the ONLY method with positive BWT (consolidation improves old tasks).
-- FWT: CKA-RL ~ finetune > ours (plasticity-vs-retention tradeoff).
-- Contrast with the per-task-head run (reports/gridworld/): there finetune was COMPETITIVE (PERF 0.644) because separate heads relieve forgetting; the shared head exposes it.
-
-## Granular data (per run dir): raw run.json/progress.jsonl/eval_matrix.json + tidy CSVs
-(forgetting_matrix, learning_curves, duals[ours], phases). 3-seed CIs for all methods land when seeds 1-2 finish (STEP 2).
+## Read: retention ours >> CKA-RL > finetune > baseline; ours only method with positive BWT. FWT CKA-RL~finetune>ours (plasticity-retention tradeoff).
+## Disclosures: footprint ours=fixed shared head, CKA-RL=fixed trunk+bounded pool+per-task alpha (no growth). Ours re-simulates past envs; CKA-RL/finetune train only current task.
