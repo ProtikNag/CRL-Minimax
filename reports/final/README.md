@@ -4,14 +4,17 @@ Curated, paper-ready figures only. Exploratory and diagnostic figure sets stay
 where they were built (`reports/order_sensitivity/`, `reports/v5_clear_joint/`,
 `diagnostics/`); nothing in those folders is a deliverable.
 
-Two lines of comparison, one subfolder each.
+Three result sets. The two GridWorld/Atari tiers are the ones where tasks are
+genuinely different and the head is shared; the CKA-RL tier is the published
+benchmark, where tasks are modes of one game and each gets its own head.
 
 | Subfolder | Line | Status |
 |-----------|------|--------|
 | `atari_reversed/` | Five-game Atari sequence, reversed order, ours vs CLEAR vs the Joint ceiling | done |
+| `gridworld/` | 50-task shared-head GridWorld: ours vs CKA-RL vs fine-tuning vs from-scratch | partial runs; figures rebuild as rows land |
 | `cka_rl/` | CKA-RL (NeurIPS 25) benchmark: Meta-World CW20, SpaceInvaders, Freeway | Table 1 + per-mode success done; Meta-World still running |
 
-## Conventions shared by both lines
+## Conventions shared by every set
 
 - **The method is called Min-Max.** The internal "V5" version label does not
   appear in any finalised figure.
@@ -29,6 +32,8 @@ Two lines of comparison, one subfolder each.
 
 ```bash
 python reports/final/atari_reversed/make_figures.py
+python reports/final/gridworld/make_figures.py
+python reports/final/cka_rl/make_figures.py
 ```
 
 Each subfolder's script is self-contained and reads cached numbers, so the
