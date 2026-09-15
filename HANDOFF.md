@@ -196,7 +196,8 @@ methods do on the harder setting is the argument.
 - **Implement each once, run on both tiers.** Build against the GridWorld
   interface first — it is minutes per run, so it is the cheap correctness check
   before committing 20 GPU-hours on Atari.
-- Papers go in `docs/papers/`. CKA-RL is already there. CompoNet needs fetching.
+- Papers go in `docs/papers/`, indexed in its README. CKA-RL, CompoNet, CORA and
+  the two plasticity papers (CReLU, continual backprop) are all in.
 - A sloppy implementation is worse than none: we are adding rows to *their* table
   and the implementations will be checked.
 
