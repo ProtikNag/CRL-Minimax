@@ -65,10 +65,14 @@ def within_phase_auc(records: list[dict]) -> dict[int, float]:
     for r in records:
         if r.get("type") != "eval":
             continue
-        # within-phase = the current task evaluating itself while it trains.
+        # within-phase = the current task evaluating itself while it trains. The
+        # discriminator is iter >= 0 (end-of-phase/diagonal rows use iter == -1),
+        # NOT the phase label -- grow/finetune methods label their learning-curve
+        # records with the method name (cka_rl/finetune/componet), which the old
+        # phase filter wrongly excluded, nulling their FWT.
         if r.get("evaluated_on") != r.get("task_idx"):
             continue
-        if r.get("phase") not in ("local", "task1"):
+        if r.get("iter", -1) < 0:
             continue
         val = r.get("normalized")
         if val is not None:
