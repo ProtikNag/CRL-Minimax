@@ -1,0 +1,10 @@
+{
+  "task_idx": 49,
+  "task": "biggrid50-goal(46,3)",
+  "phase": "global",
+  "iter": 17050,
+  "cumulative_step": 17050,
+  "alive": "2026-09-15T11:30:38.346802+00:00",
+  "t_wall": 14934.715,
+  "frames_total": 17459200
+}
