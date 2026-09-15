@@ -22,7 +22,6 @@ from __future__ import annotations
 import csv
 import json
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -34,17 +33,18 @@ REPO = HERE.parent.parent.parent
 sys.path.insert(0, str(REPO / "report"))
 
 from acviz import (  # noqa: E402
-    AC, FONT_MONO, FONT_UI, W_FULL, export_figure, height_for, hex_to_rgba,
-    install_template,
+    AC, FONT_MONO, FONT_UI, W_FULL, export_figure, hex_to_rgba, install_template,
 )
 
 RUNS = REPO / "reports" / "gridworld_sharedhead"
 PNG_DIR, SVG_DIR = HERE / "png", HERE / "svg"
 N_TASKS = 50
 
-# Ours is primary; CKA-RL is the method being compared against; fine-tuning is
-# the catastrophic-forgetting case; from-scratch is a reference, so it stays
-# neutral rather than competing for attention.
+# Type scale, one step larger than the Atari set. Those were legible on screen
+# but small on paper; these are sized for a column in a two-column layout.
+FS_PANEL, FS_AXIS, FS_TICK = 13.0, 12.0, 10.5
+FS_VALUE, FS_NOTE = 11.0, 9.5
+
 METHODS = [
     ("ours",     "Min-Max (ours)", AC["blue"],       "biggrid50_sh_ours_"),
     ("cka_rl",   "CKA-RL",         AC["amber"],      "biggrid50_cka_rl_"),
@@ -105,9 +105,9 @@ def add_footnote(fig: go.Figure, text: str, left_margin: int,
     """
     fig.add_annotation(
         x=0, y=0, xref="paper", yref="paper",
-        xshift=-left_margin + 4, yshift=-(58 if clear_axis_title else 30),
+        xshift=-left_margin + 4, yshift=-(64 if clear_axis_title else 34),
         text=text, showarrow=False, xanchor="left", yanchor="top", align="left",
-        font=dict(family=FONT_UI, size=8.5, color=AC["text_muted"]))
+        font=dict(family=FONT_UI, size=FS_NOTE, color=AC["text_muted"]))
 
 
 # ── Figure 1: learned vs retained ───────────────────────────────────────────
@@ -119,191 +119,162 @@ def figure_learned_vs_retained() -> None:
     — did it end better or worse than when it was learned — and the answer
     splits the methods completely. The diagonal is "no change": above it a task
     improved after the model moved on, below it the task was forgotten.
-    """
-    fig = make_subplots(rows=1, cols=4, horizontal_spacing=0.030,
-                        shared_yaxes=True,
-                        subplot_titles=[label for _k, label, _c, _p in METHODS])
 
-    for col, (key, label, color, prefix) in enumerate(METHODS, start=1):
+    Laid out 2x2 rather than 1x4 so each panel has room for 50-150 points, and
+    the headline percentage sits above the panel rather than on top of the data.
+    """
+    fig = make_subplots(rows=2, cols=2, horizontal_spacing=0.13,
+                        vertical_spacing=0.20)
+
+    for index, (key, label, color, prefix) in enumerate(METHODS):
+        row, col = index // 2 + 1, index % 2 + 1
         runs = complete_runs(prefix)
         pairs = [learned_and_final(r) for r in runs]
         learned = np.concatenate([p[0] for p in pairs])
         final = np.concatenate([p[1] for p in pairs])
         improved = float(np.mean(final > learned))
-        suffix = f"{col if col > 1 else ''}"
 
         fig.add_trace(go.Scatter(
             x=[-0.6, 1.05], y=[-0.6, 1.05], mode="lines",
-            line=dict(color=AC["border"], width=1.2),
-            hoverinfo="skip", showlegend=False), row=1, col=col)
+            line=dict(color=AC["border"], width=1.3),
+            hoverinfo="skip", showlegend=False), row=row, col=col)
         fig.add_trace(go.Scatter(
             x=learned, y=final, mode="markers",
-            marker=dict(color=hex_to_rgba(color, 0.55), size=5,
-                        line=dict(color=color, width=0.6)),
+            marker=dict(color=hex_to_rgba(color, 0.55), size=6.5,
+                        line=dict(color=color, width=0.7)),
             hovertemplate="learned %{x:.2f} → final %{y:.2f}<extra></extra>",
-            showlegend=False), row=1, col=col)
+            showlegend=False), row=row, col=col)
 
+        # Title and headline live above the panel, clear of every point.
+        axis = f"{index + 1 if index else ''}"
         fig.add_annotation(
-            x=0.04, y=0.97, xref=f"x{suffix} domain", yref=f"y{suffix} domain",
-            text=(f"<b>{improved:.0%}</b> of tasks<br>"
-                  "<span style=\"font-size:9px\">ended better</span>"),
-            showarrow=False, xanchor="left", yanchor="top", align="left",
-            font=dict(family=FONT_UI, size=13, color=color),
-            # Never text straight over data: the pad is the house rule.
-            bgcolor="rgba(255,255,255,0.84)", borderpad=3)
+            x=0, y=1.19, xref=f"x{axis} domain", yref=f"y{axis} domain",
+            text=f"<b>{label}</b>", showarrow=False,
+            xanchor="left", yanchor="bottom",
+            font=dict(family=FONT_UI, size=FS_PANEL, color=AC["text_primary"]))
         fig.add_annotation(
-            x=0.97, y=0.03, xref=f"x{suffix} domain", yref=f"y{suffix} domain",
-            text=f"n = {len(learned)}", showarrow=False,
-            xanchor="right", yanchor="bottom",
-            font=dict(family=FONT_MONO, size=8.5, color=AC["text_faint"]))
+            x=0, y=1.035, xref=f"x{axis} domain", yref=f"y{axis} domain",
+            text=f"<b>{improved:.0%}</b> of tasks ended better than when learned",
+            showarrow=False, xanchor="left", yanchor="bottom",
+            font=dict(family=FONT_UI, size=FS_TICK, color=color))
 
     fig.update_xaxes(range=[-0.6, 1.05], dtick=0.5, showgrid=True,
                      gridcolor=AC["grid"], gridwidth=0.6, zeroline=False,
                      showline=True, linecolor=AC["axis"], linewidth=1.2,
-                     ticklen=4, tickfont=dict(family=FONT_MONO, size=9,
+                     ticklen=4, tickfont=dict(family=FONT_MONO, size=FS_TICK,
                                               color=AC["text_muted"]))
     fig.update_yaxes(range=[-0.6, 1.05], dtick=0.5, showgrid=True,
                      gridcolor=AC["grid"], gridwidth=0.6, zeroline=False,
                      showline=True, linecolor=AC["axis"], linewidth=1.2,
-                     ticklen=4, tickfont=dict(family=FONT_MONO, size=9,
+                     ticklen=4, tickfont=dict(family=FONT_MONO, size=FS_TICK,
                                               color=AC["text_muted"]))
-    fig.update_yaxes(title=dict(text="score after all 50 tasks",
-                                font=dict(family=FONT_UI, size=11,
-                                          color=AC["text_primary"])),
-                     row=1, col=1)
-    for annotation in fig.layout.annotations[:4]:
-        annotation.font = dict(family=FONT_UI, size=11.5, color=AC["text_primary"])
-        annotation.y = 1.05
+    title = dict(font=dict(family=FONT_UI, size=FS_AXIS,
+                           color=AC["text_primary"]))
+    for row in (1, 2):
+        fig.update_yaxes(title=dict(text="score after all 50 tasks", **title),
+                         row=row, col=1)
+    for col in (1, 2):
+        fig.update_xaxes(title=dict(text="score when the task was just learned",
+                                    **title), row=2, col=col)
 
-    fig.add_annotation(
-        x=0.5, y=-0.14, xref="paper", yref="paper",
-        text="score when the task was just learned", showarrow=False,
-        xanchor="center", yanchor="top",
-        font=dict(family=FONT_UI, size=11, color=AC["text_primary"]))
     add_footnote(fig, (
-"One point per task, in units of (score − random) / (1 − random). "
-              "The grey line is no change.<br>"
-              "<b>Above it, a task improved after the model moved on; below it, "
-              "the task was forgotten.</b> Ours pools its 3 complete seeds, the "
-              "others their 1 complete seed each.<br>"
-              "This is the backward-transfer column read one task at a time, "
-              "and it is where ours and CKA-RL stop being close."
-    ), 52)
+        "One point per task, in units of (score − random) / (1 − random). The "
+        "grey line is no change.<br>"
+        "<b>Above it a task improved after the model moved on; below it the task "
+        "was forgotten.</b><br>"
+        "Ours contributes <b>150 points: 50 tasks × 3 complete seeds</b>.<br>"
+        "The other three have one complete seed each so far, so 50 points "
+        "apiece; their remaining seeds are still running.<br>"
+        "This is the backward-transfer column read one task at a time, and it is "
+        "where ours and CKA-RL stop being close."), 78)
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=60, r=18, t=46, b=116))
-    export_pair(fig, "learned_vs_retained", W_FULL, height_for(W_FULL, 2.45))
+                      margin=dict(l=78, r=26, t=56, b=136))
+    export_pair(fig, "learned_vs_retained", W_FULL, 656)
 
 
-# ── Figure 2: two views of the same sequence ────────────────────────────────
-def figure_task_life() -> None:
-    """Two questions that both reduce to "how much survives", side by side.
+# ── Figure 2: retention across the sequence ─────────────────────────────────
+def figure_retention_curve() -> None:
+    """After finishing task k, how the model is doing on the k-1 tasks behind it.
 
-    They are easy to confuse, so they share a figure with the difference stated
-    on each panel. **Left** indexes by position in the sequence: after finishing
-    task k, how is the model doing on the k-1 tasks behind it. **Right** indexes
-    by time since a task was learned, pooling every task that is n phases old
-    whenever it happened. A method can be flat on the left and still decaying on
-    the right, if the later tasks happened to be easier.
+    The state of the whole system as the sequence grows: a method that forgets
+    shows a falling curve, one that consolidates shows a flat or rising one. At
+    50 tasks this is the readable form of the forgetting matrix, whose triangle
+    is far too dense to see anything in.
     """
-    fig = make_subplots(
-        rows=1, cols=2, horizontal_spacing=0.13, shared_yaxes=True,
-        subplot_titles=["Where the model is in the sequence",
-                        "What happens to a task after it is learned"])
+    fig = go.Figure()
+    ends: list[tuple[str, float, float, str]] = []
 
-    ends: list[list] = [[], []]
     for key, label, color, prefix in METHODS:
         runs = complete_runs(prefix)
-
-        per_phase = np.full((len(runs), N_TASKS), np.nan)
+        per_seed = np.full((len(runs), N_TASKS), np.nan)
         for index, run in enumerate(runs):
             grid = load_matrix(run)
             for after in range(1, N_TASKS):
                 prior = grid[after, :after]
                 if np.isfinite(prior).any():
-                    per_phase[index, after] = np.nanmean(prior)
+                    per_seed[index, after] = np.nanmean(prior)
         with np.errstate(invalid="ignore"):
-            mean_phase = np.nanmean(per_phase, axis=0)
-        valid = np.where(np.isfinite(mean_phase))[0]
+            mean = np.nanmean(per_seed, axis=0)
+            low, high = np.nanmin(per_seed, axis=0), np.nanmax(per_seed, axis=0)
+
+        # Band only where more than one seed reports. Drawing one over a single
+        # run would invent an interval that does not exist.
+        if len(runs) > 1:
+            band = np.where(np.isfinite(per_seed).sum(axis=0) >= 2)[0]
+            if band.size:
+                xs = band + 1
+                fig.add_trace(go.Scatter(
+                    x=np.concatenate([xs, xs[::-1]]),
+                    y=np.concatenate([high[band], low[band][::-1]]),
+                    fill="toself", fillcolor=hex_to_rgba(color, 0.20),
+                    line=dict(width=0), hoverinfo="skip", showlegend=False))
+
+        valid = np.where(np.isfinite(mean))[0]
         fig.add_trace(go.Scatter(
-            x=valid + 1, y=mean_phase[valid], mode="lines",
-            line=dict(color=color, width=2.2, shape="spline", smoothing=0.5),
-            hoverinfo="skip", showlegend=False), row=1, col=1)
-        ends[0].append((label, float(valid[-1] + 1),
-                        float(mean_phase[valid[-1]]), color))
+            x=valid + 1, y=mean[valid], mode="lines",
+            line=dict(color=color, width=2.6, shape="spline", smoothing=0.5),
+            hovertemplate=f"{label}<br>%{{x}} tasks: %{{y:.3f}}<extra></extra>",
+            showlegend=False))
+        ends.append((label, float(valid[-1] + 1), float(mean[valid[-1]]), color))
 
-        by_age: dict[int, list[float]] = defaultdict(list)
-        for run in runs:
-            grid = load_matrix(run)
-            end = last_phase(grid)
-            for after in range(end + 1):
-                for task in range(after + 1):
-                    if np.isfinite(grid[after, task]):
-                        by_age[after - task].append(grid[after, task])
-        ages = sorted(a for a in by_age if len(by_age[a]) >= 5)
-        means = [float(np.mean(by_age[a])) for a in ages]
-        fig.add_trace(go.Scatter(
-            x=ages, y=means, mode="lines",
-            line=dict(color=color, width=2.2, shape="spline", smoothing=0.5),
-            hoverinfo="skip", showlegend=False), row=1, col=2)
-        ends[1].append((label, ages[-1], means[-1], color))
+    positions = {label: y for label, _x, y, _c in ends}
+    for lower, upper in zip(sorted(positions, key=positions.get),
+                            sorted(positions, key=positions.get)[1:]):
+        if positions[upper] - positions[lower] < 0.055:
+            positions[upper] = positions[lower] + 0.055
+    for label, x_end, _y, color in ends:
+        fig.add_annotation(
+            x=x_end, y=positions[label], text=f"<b>{label}</b>", showarrow=False,
+            xanchor="left", xshift=10, yanchor="middle",
+            font=dict(family=FONT_UI, size=FS_AXIS, color=color))
 
-    for panel, items in enumerate(ends):
-        positions = {label: y for label, _x, y, _c in items}
-        for lower, upper in zip(sorted(positions, key=positions.get),
-                                sorted(positions, key=positions.get)[1:]):
-            if positions[upper] - positions[lower] < 0.055:
-                positions[upper] = positions[lower] + 0.055
-        for label, x_end, _y, color in items:
-            fig.add_annotation(
-                x=x_end, y=positions[label], text=f"<b>{label}</b>",
-                showarrow=False, xanchor="left", xshift=8, yanchor="middle",
-                font=dict(family=FONT_UI, size=10.5, color=color),
-                row=1, col=panel + 1)
-
-    fig.update_xaxes(title=dict(text="tasks learned so far",
-                                font=dict(family=FONT_UI, size=10.5,
-                                          color=AC["text_primary"])),
-                     range=[0, N_TASKS + 16], tickmode="array",
-                     tickvals=[0, 10, 20, 30, 40, 50], row=1, col=1)
-    fig.update_xaxes(title=dict(text="phases since the task was learned",
-                                font=dict(family=FONT_UI, size=10.5,
-                                          color=AC["text_primary"])),
-                     range=[0, N_TASKS + 16], tickmode="array",
-                     tickvals=[0, 10, 20, 30, 40, 50], row=1, col=2)
-    fig.update_xaxes(showgrid=False, zeroline=False, showline=True,
-                     linecolor=AC["axis"], linewidth=1.2, ticklen=4,
-                     tickfont=dict(family=FONT_MONO, size=9.5,
-                                   color=AC["text_muted"]))
-    fig.update_yaxes(range=[-0.02, 0.80], showgrid=True, gridcolor=AC["grid"],
-                     gridwidth=0.6, zeroline=True, zerolinecolor=AC["border"],
-                     zerolinewidth=1.0, showline=True, linecolor=AC["axis"],
-                     linewidth=1.2, ticklen=4,
-                     tickfont=dict(family=FONT_MONO, size=9.5,
-                                   color=AC["text_muted"]))
-    fig.update_yaxes(title=dict(text="mean score of past tasks",
-                                font=dict(family=FONT_UI, size=11,
-                                          color=AC["text_primary"])),
-                     row=1, col=1)
-    for annotation in fig.layout.annotations[:2]:
-        annotation.font = dict(family=FONT_UI, size=11.5, color=AC["text_primary"])
-        annotation.y = 1.07
+    fig.update_xaxes(
+        title=dict(text="tasks learned so far",
+                   font=dict(family=FONT_UI, size=FS_AXIS,
+                             color=AC["text_primary"])),
+        range=[0, N_TASKS + 1], dtick=10, showgrid=False, zeroline=False,
+        showline=True, linecolor=AC["axis"], linewidth=1.2, ticklen=4,
+        tickfont=dict(family=FONT_MONO, size=FS_TICK, color=AC["text_muted"]))
+    fig.update_yaxes(
+        title=dict(text="mean score of the tasks already learned",
+                   font=dict(family=FONT_UI, size=FS_AXIS,
+                             color=AC["text_primary"])),
+        range=[-0.02, 0.80], showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
+        zeroline=True, zerolinecolor=AC["border"], zerolinewidth=1.0,
+        showline=True, linecolor=AC["axis"], linewidth=1.2, ticklen=4,
+        tickfont=dict(family=FONT_MONO, size=FS_TICK, color=AC["text_muted"]))
 
     add_footnote(fig, (
-"Same runs, two indexes, two different questions.<br>"
-              "<b>Left:</b> after finishing task k, how the model does on the "
-              "k−1 tasks behind it — the state of the whole system as the "
-              "sequence grows.<br>"
-              "<b>Right:</b> every task that is n phases old, pooled whenever it "
-              "occurred — the life of a single task.<br>"
-              "A method can be flat on the left and still decaying on the "
-              "right, if the later tasks were easier.<br>"
-              "The right panel is where ours differs in kind: it starts "
-              "<i>lowest</i> at age 0 and is the only curve that rises.<br>"
-              "Complete runs only — ours 3 seeds, the others 1 each."
-    ), 58)
-    fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=62, r=20, t=52, b=148))
-    export_pair(fig, "task_life", W_FULL, height_for(W_FULL, 1.80))
+        "After finishing task k, the mean score over the k−1 tasks learned "
+        "before it, in units of (score − random) / (1 − random).<br>"
+        "The just-learned task is excluded, because including it lets a method "
+        "that merely learns the newest task well post a flattering curve.<br>"
+        "<b>The shaded band is the min-max over ours' 3 complete seeds.</b><br>"
+        "The other three have one complete seed each so far, so they carry no "
+        "band; their remaining seeds are still running."), 74)
+    fig.update_layout(title=None, showlegend=False,
+                      margin=dict(l=74, r=150, t=24, b=122))
+    export_pair(fig, "retention_curve", W_FULL, 446)
 
 
 # ── Figure 3: raw against normalised ────────────────────────────────────────
@@ -317,7 +288,7 @@ def figure_raw_vs_normalised() -> None:
     case that the separation normalisation exposes is real rather than an
     artefact of the normaliser.
     """
-    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.10,
+    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.09,
                         subplot_titles=["Raw discounted return",
                                         "Normalised against each task's random floor"])
 
@@ -325,265 +296,250 @@ def figure_raw_vs_normalised() -> None:
         for index, (key, label, color, prefix) in enumerate(METHODS):
             values = np.concatenate([learned_and_final(r, column)[1]
                                      for r in complete_runs(prefix)])
-            jitter = (np.random.default_rng(index).random(len(values)) - 0.5) * 0.34
+            jitter = (np.random.default_rng(index).random(len(values)) - 0.5) * 0.28
             fig.add_trace(go.Scatter(
                 x=values, y=index + jitter, mode="markers",
-                marker=dict(color=hex_to_rgba(color, 0.38), size=4.5,
+                marker=dict(color=hex_to_rgba(color, 0.30), size=5,
                             line=dict(width=0)),
                 hovertemplate="%{x:.3f}<extra></extra>", showlegend=False,
             ), row=1, col=col)
+            # The median rule is drawn after the points so it sits on top, and
+            # runs taller than the cloud: at this density a short tick vanishes.
             median = float(np.median(values))
             fig.add_trace(go.Scatter(
-                x=[median, median], y=[index - 0.26, index + 0.26], mode="lines",
-                line=dict(color=color, width=2.8),
+                x=[median, median], y=[index - 0.33, index + 0.33], mode="lines",
+                line=dict(color=color, width=4.5),
                 hoverinfo="skip", showlegend=False), row=1, col=col)
             fig.add_annotation(
-                x=median, y=index - 0.40, text=f"<b>{median:.2f}</b>",
-                showarrow=False, xanchor="center", yanchor="bottom",
-                font=dict(family=FONT_MONO, size=9, color=color),
-                # Sits in the gutter between rows, so it needs the pad to stay
-                # legible over the neighbouring row's points.
-                bgcolor="rgba(255,255,255,0.88)", borderpad=2,
+                x=median, y=index - 0.35, text=f"<b>{median:.2f}</b>",
+                showarrow=False, xanchor="center", yanchor="bottom", yshift=3,
+                font=dict(family=FONT_MONO, size=FS_VALUE, color=color),
+                bgcolor="rgba(255,255,255,0.90)", borderpad=2,
                 row=1, col=col)
 
     fig.update_yaxes(tickmode="array", tickvals=list(range(len(METHODS))),
                      ticktext=[m[1] for m in METHODS],
-                     range=[len(METHODS) - 0.4, -0.7], showgrid=False,
+                     range=[len(METHODS) - 0.35, -0.90], showgrid=False,
                      zeroline=False, showline=False, ticklen=0,
-                     tickfont=dict(family=FONT_UI, size=10,
+                     tickfont=dict(family=FONT_UI, size=FS_AXIS,
                                    color=AC["text_primary"]))
     fig.update_yaxes(showticklabels=False, row=1, col=2)
     fig.update_xaxes(showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
                      zeroline=False, showline=True, linecolor=AC["axis"],
                      linewidth=1.2, ticklen=4,
-                     tickfont=dict(family=FONT_MONO, size=9.5,
+                     tickfont=dict(family=FONT_MONO, size=FS_TICK,
                                    color=AC["text_muted"]))
+    axis_title = dict(font=dict(family=FONT_UI, size=FS_AXIS,
+                                color=AC["text_muted"]))
     fig.update_xaxes(range=[0.55, 1.02], dtick=0.1, row=1, col=1,
-                     title=dict(text="discounted return",
-                                font=dict(family=FONT_UI, size=10.5,
-                                          color=AC["text_muted"])))
+                     title=dict(text="discounted return", **axis_title))
     fig.update_xaxes(range=[-0.55, 1.05], dtick=0.5, zeroline=True,
                      zerolinecolor=AC["border"], zerolinewidth=1.0, row=1, col=2,
-                     title=dict(text="0 = random policy, 1 = solved",
-                                font=dict(family=FONT_UI, size=10.5,
-                                          color=AC["text_muted"])))
+                     title=dict(text="0 = random policy, 1 = solved", **axis_title))
     for annotation in fig.layout.annotations[:2]:
-        annotation.font = dict(family=FONT_UI, size=11.5, color=AC["text_primary"])
-        annotation.y = 1.08
+        annotation.font = dict(family=FONT_UI, size=FS_PANEL,
+                               color=AC["text_primary"])
+        annotation.y = 1.09
 
     add_footnote(fig, (
-"One point per task after all 50 are learned; the heavy tick is "
-              "the median. <b>Both panels are the same runs.</b><br>"
-              "A random policy already collects most of the raw return here, so "
-              "raw scores crowd into [0.59, 0.99] and the methods look "
-              "closer than they are.<br>"
-              "The random floor also varies per task, from 0.55 to 0.87, so "
-              "the same raw number is a different achievement on different "
-              "tasks.<br>"
-              "Normalising against each task's own floor is what makes them "
-              "comparable."
-    ), 96)
+        "One point per task after all 50 are learned; the heavy rule is the "
+        "median. <b>Both panels are the same runs.</b><br>"
+        "A random policy already collects most of the raw return here, so raw "
+        "scores crowd into [0.59, 0.99] and the methods look closer than they "
+        "are.<br>"
+        "The random floor also varies per task, from 0.55 to 0.87, so the same "
+        "raw number is a different achievement on different tasks.<br>"
+        "Normalising against each task's own floor is what makes them "
+        "comparable. Ours is 3 complete seeds, the others 1 each."), 118)
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=100, r=20, t=52, b=124))
-    export_pair(fig, "raw_vs_normalised", W_FULL, height_for(W_FULL, 2.55))
+                      margin=dict(l=118, r=26, t=56, b=136))
+    export_pair(fig, "raw_vs_normalised", W_FULL, 440)
 
 
 # ── Figure 4: compute cost ──────────────────────────────────────────────────
 def figure_compute_cost() -> None:
-    """What the retention costs, in wall-clock and in environment frames."""
-    panels = [("wall", "Wall-clock", 1 / 60.0, "minutes, one 50-task run"),
-              ("frames", "Environment frames", 1 / 1e6,
-               "millions of environment frames")]
-    fig = make_subplots(rows=1, cols=2, horizontal_spacing=0.13,
-                        shared_yaxes=True,
-                        subplot_titles=[t for _k, t, _s, _u in panels])
+    """Wall-clock for one complete 50-task run."""
+    fig = go.Figure()
+    totals = {key: np.array([
+        sum(float(r["wall_s_phase"]) for r in load_phases(run)) / 60.0
+        for run in complete_runs(prefix)])
+        for key, _label, _color, prefix in METHODS}
 
-    totals: dict[str, dict[str, np.ndarray]] = {}
-    for key, _label, _color, prefix in METHODS:
-        wall, frames = [], []
-        for run in complete_runs(prefix):
-            rows = load_phases(run)
-            wall.append(sum(float(r["wall_s_phase"]) for r in rows))
-            frames.append(sum(float(r["frames_phase"]) for r in rows))
-        totals[key] = {"wall": np.array(wall), "frames": np.array(frames)}
+    reference = float(np.mean(totals["ours"]))
+    top = max(float(v.max()) for v in totals.values())
 
-    for col, (metric, _title, scale, unit) in enumerate(panels, start=1):
-        ref = float(np.mean(totals["ours"][metric])) * scale
-        top = 0.0
-        for index, (key, label, color, _prefix) in enumerate(METHODS):
-            values = totals[key][metric] * scale
-            mean = float(np.mean(values))
-            top = max(top, float(values.max()))
+    for index, (key, label, color, _prefix) in enumerate(METHODS):
+        values = totals[key]
+        mean = float(np.mean(values))
+        fig.add_trace(go.Scatter(
+            x=[0, top * 1.32], y=[index, index], mode="lines",
+            line=dict(color=AC["grid"], width=0.9),
+            hoverinfo="skip", showlegend=False))
+        fig.add_trace(go.Scatter(
+            x=[0, mean], y=[index, index], mode="lines",
+            line=dict(color=hex_to_rgba(color, 0.40), width=4),
+            hoverinfo="skip", showlegend=False))
+        if len(values) > 1:
             fig.add_trace(go.Scatter(
-                x=[0, mean], y=[index, index], mode="lines",
-                line=dict(color=hex_to_rgba(color, 0.40), width=3),
-                hoverinfo="skip", showlegend=False), row=1, col=col)
-            if len(values) > 1:
+                x=[values.min(), values.max()], y=[index, index], mode="lines",
+                line=dict(color=color, width=2.4),
+                hoverinfo="skip", showlegend=False))
+            for edge in (values.min(), values.max()):
                 fig.add_trace(go.Scatter(
-                    x=[values.min(), values.max()], y=[index, index],
-                    mode="lines", line=dict(color=color, width=2),
-                    hoverinfo="skip", showlegend=False), row=1, col=col)
-            fig.add_trace(go.Scatter(
-                x=[mean], y=[index], mode="markers",
-                marker=dict(color=color, size=11,
-                            line=dict(color=AC["bg"], width=1.8)),
-                hovertemplate="%{x:.1f}<extra></extra>", showlegend=False,
-            ), row=1, col=col)
-            tail = "" if key == "ours" else (
-                f"<span style=\"font-size:8.5px;color:{AC['text_muted']}\">"
-                f"  {mean / ref:.2f}×</span>")
-            body = f"{mean:,.0f}" if metric == "wall" else f"{mean:.1f}"
-            fig.add_annotation(
-                x=float(values.max()), y=index, text=f"<b>{body}</b>{tail}",
-                showarrow=False, xanchor="left", yanchor="middle", xshift=9,
-                font=dict(family=FONT_MONO, size=10, color=AC["text_primary"]),
-                row=1, col=col)
-        fig.update_xaxes(range=[0, top * 1.40], row=1, col=col,
-                         title=dict(text=unit,
-                                    font=dict(family=FONT_UI, size=10.5,
-                                              color=AC["text_muted"])))
+                    x=[edge, edge], y=[index - 0.11, index + 0.11], mode="lines",
+                    line=dict(color=color, width=2.4),
+                    hoverinfo="skip", showlegend=False))
+        fig.add_trace(go.Scatter(
+            x=[mean], y=[index], mode="markers",
+            marker=dict(color=color, size=13,
+                        line=dict(color=AC["bg"], width=2)),
+            hovertemplate="%{x:.0f} min<extra></extra>", showlegend=False))
+        tail = "" if key == "ours" else (
+            f"<span style=\"font-size:{FS_TICK}px;color:{AC['text_muted']}\">"
+            f"  {mean / reference:.2f}×</span>")
+        fig.add_annotation(
+            x=float(values.max()), y=index, text=f"<b>{mean:,.0f} min</b>{tail}",
+            showarrow=False, xanchor="left", yanchor="middle", xshift=11,
+            font=dict(family=FONT_MONO, size=FS_VALUE, color=AC["text_primary"]))
 
-    fig.update_xaxes(showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
-                     zeroline=False, showline=True, linecolor=AC["border"],
-                     ticklen=0, tickfont=dict(family=FONT_MONO, size=9.5,
-                                              color=AC["text_muted"]))
+    fig.update_xaxes(
+        title=dict(text="wall-clock minutes for one complete 50-task run",
+                   font=dict(family=FONT_UI, size=FS_AXIS,
+                             color=AC["text_primary"])),
+        range=[0, top * 1.32], showgrid=True, gridcolor=AC["grid"],
+        gridwidth=0.6, zeroline=False, showline=True, linecolor=AC["border"],
+        ticklen=0, tickfont=dict(family=FONT_MONO, size=FS_TICK,
+                                 color=AC["text_muted"]))
     fig.update_yaxes(tickmode="array", tickvals=list(range(len(METHODS))),
                      ticktext=[m[1] for m in METHODS],
                      range=[len(METHODS) - 0.5, -0.5], showgrid=False,
                      zeroline=False, showline=False, ticklen=0,
-                     tickfont=dict(family=FONT_UI, size=10.5,
+                     tickfont=dict(family=FONT_UI, size=FS_AXIS,
                                    color=AC["text_primary"]))
-    for annotation in fig.layout.annotations[:2]:
-        annotation.font = dict(family=FONT_UI, size=11.5, color=AC["text_primary"])
-        annotation.y = 1.12
 
     add_footnote(fig, (
-"× is relative to ours. Complete runs only; the segment on ours is "
-              "its min-max over 3 seeds, the others are single runs.<br>"
-              "<b>Ours is the most expensive, and the frames panel says why:</b><br>"
-              "consolidation re-simulates past environments, so it spends frames "
-              "on tasks it has already learned.<br>"
-              "Wall-clock came off a shared, contended cluster and is the softer "
-              "of the two; frames is the number to quote."
-    ), 100)
+        "× is relative to ours. Complete runs only; the capped segment on ours "
+        "is its min-max over 3 seeds, the others are single runs.<br>"
+        "<b>Ours is the most expensive because consolidation re-simulates past "
+        "environments</b>, spending time on tasks it has already learned.<br>"
+        "Measured on a shared, contended cluster, so read it as indicative."), 122)
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=104, r=24, t=52, b=120))
-    export_pair(fig, "compute_cost", W_FULL, height_for(W_FULL, 2.95))
+                      margin=dict(l=122, r=126, t=20, b=116))
+    export_pair(fig, "compute_cost", W_FULL, 300)
 
 
-# ── Figure 5: headline metrics ──────────────────────────────────────────────
-def figure_headline_metrics() -> None:
-    """The four continual-learning metrics, one panel each."""
+# ── Figure 5: headline metrics, as a table ──────────────────────────────────
+def figure_headline_table() -> None:
+    """The four continual-learning metrics as a booktabs table.
+
+    A table rather than four lollipop panels: there are sixteen numbers and the
+    reader wants to compare them exactly, which is what a table is for.
+    """
     data = metrics()
-    panels = [("perf", "Average performance", "higher is better"),
-              ("forgetting", "Forgetting", "lower is better"),
-              ("bwt", "Backward transfer", "higher is better"),
-              ("fwt", "Forward transfer", "higher is better")]
-
-    fig = make_subplots(rows=1, cols=4, horizontal_spacing=0.055,
-                        subplot_titles=[t for _m, t, _s in panels])
+    rows = [("perf", "Average performance", "higher is better", +1),
+            ("forgetting", "Forgetting", "lower is better", -1),
+            ("bwt", "Backward transfer", "higher is better", +1),
+            ("fwt", "Forward transfer", "higher is better", +1)]
 
     def values_for(prefix: str, metric: str) -> list[float]:
         return [data[r][metric] for r in complete_runs(prefix)
                 if data[r].get(metric) is not None]
 
-    order = sorted(METHODS, key=lambda m: -float(np.mean(values_for(m[3], "perf"))))
-    row_of = {m[0]: i for i, m in enumerate(order)}
+    label_x = 0.0
+    col_x = [40.0, 58.0, 76.0, 94.0]
+    right_edge = col_x[-1] + 2
 
-    for col, (metric, _title, _sense) in enumerate(panels, start=1):
-        ours_values = values_for("biggrid50_sh_ours_", metric)
-        lent_sd = float(np.std(ours_values, ddof=1)) if len(ours_values) > 1 else 0.0
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers",
+                             hoverinfo="skip", showlegend=False))
 
-        rows = []
-        for key, label, color, prefix in order:
-            values = values_for(prefix, metric)
+    def rule(y: float, width: float, color: str) -> None:
+        fig.add_shape(type="line", x0=label_x - 1, x1=right_edge, y0=y, y1=y,
+                      line=dict(color=color, width=width), layer="above")
+
+    header_y = 0.60
+    rule(header_y + 0.62, 1.4, AC["axis"])
+    rule(header_y - 0.52, 1.1, AC["axis"])
+    fig.add_annotation(
+        x=label_x, y=header_y, text="<b>normalised units</b>", showarrow=False,
+        xanchor="left", yanchor="middle",
+        font=dict(family=FONT_UI, size=FS_TICK, color=AC["text_muted"]))
+    for x, (_key, label, color, _prefix) in zip(col_x, METHODS):
+        fig.add_annotation(
+            x=x, y=header_y, text=f"<b>{label}</b>", showarrow=False,
+            xanchor="right", yanchor="middle",
+            font=dict(family=FONT_UI, size=FS_AXIS, color=color))
+
+    for index, (metric, label, sense, better) in enumerate(rows):
+        y = -index - 0.55
+        fig.add_annotation(
+            x=label_x, y=y, text=label, showarrow=False, yshift=6,
+            xanchor="left", yanchor="middle",
+            font=dict(family=FONT_UI, size=FS_AXIS, color=AC["text_primary"]))
+        fig.add_annotation(
+            x=label_x, y=y, text=sense, showarrow=False, yshift=-9,
+            xanchor="left", yanchor="middle",
+            font=dict(family=FONT_UI, size=FS_NOTE, color=AC["text_faint"]))
+
+        present = {key: values_for(prefix, metric)
+                   for key, _l, _c, prefix in METHODS}
+        # From-scratch is forward transfer's own reference, so it scores 0 by
+        # construction there and cannot compete for the best value.
+        contenders = {k: float(np.mean(v)) for k, v in present.items() if v}
+        best = ((max(contenders.values()) if better > 0
+                 else min(contenders.values())) if contenders else None)
+
+        ours_values = present["ours"]
+        lent_sd = (float(np.std(ours_values, ddof=1))
+                   if len(ours_values) > 1 else 0.0)
+
+        for x, (key, _label, _color, _prefix) in zip(col_x, METHODS):
+            values = present[key]
             if not values:
                 fig.add_annotation(
-                    x=0, y=row_of[key], text="0, by construction", showarrow=False,
-                    xanchor="left", yanchor="middle", xshift=6,
-                    font=dict(family=FONT_UI, size=8.5, color=AC["text_faint"]),
-                    row=1, col=col)
+                    x=x, y=y, text="0, by construction", showarrow=False,
+                    xanchor="right", yanchor="middle",
+                    font=dict(family=FONT_UI, size=FS_NOTE,
+                              color=AC["text_faint"]))
                 continue
             mean = float(np.mean(values))
-            if len(values) > 1:
-                sd, measured = float(np.std(values, ddof=1)), True
-            else:
-                sd, measured = lent_sd, False
-            rows.append((row_of[key], color, mean, sd, measured))
-
-        for index, color, mean, sd, measured in rows:
-            fig.add_trace(go.Scatter(
-                x=[0, mean], y=[index, index], mode="lines",
-                line=dict(color=hex_to_rgba(color, 0.40), width=3),
-                hoverinfo="skip", showlegend=False), row=1, col=col)
+            measured = len(values) > 1
+            sd = float(np.std(values, ddof=1)) if measured else lent_sd
+            body = f"{mean:+.2f}" if metric == "bwt" else f"{mean:.2f}"
+            if best is not None and abs(mean - best) < 1e-9:
+                body = f"<b>{body}</b>"
             if sd > 1e-9:
-                fig.add_trace(go.Scatter(
-                    x=[mean - sd, mean + sd], y=[index, index], mode="lines",
-                    line=dict(color=color, width=2 if measured else 1.4,
-                              dash=None if measured else "dot"),
-                    hoverinfo="skip", showlegend=False), row=1, col=col)
-                if measured:
-                    for edge in (mean - sd, mean + sd):
-                        fig.add_trace(go.Scatter(
-                            x=[edge, edge], y=[index - 0.13, index + 0.13],
-                            mode="lines", line=dict(color=color, width=2),
-                            hoverinfo="skip", showlegend=False), row=1, col=col)
-            fig.add_trace(go.Scatter(
-                x=[mean], y=[index], mode="markers",
-                marker=dict(color=color, size=10,
-                            line=dict(color=AC["bg"], width=1.6)),
-                hovertemplate="%{x:.3f}<extra></extra>", showlegend=False,
-            ), row=1, col=col)
-            text = f"{mean:+.2f}" if metric == "bwt" else f"{mean:.2f}"
-            dagger = "" if measured else (
-                f"<span style=\"font-size:8px;color:{AC['text_muted']}\">†</span>")
+                dagger = "" if measured else "†"
+                body += (f"<span style=\"font-size:{FS_NOTE}px;"
+                         f"color:{AC['text_faint']}\"> ±{sd:.2f}{dagger}</span>")
             fig.add_annotation(
-                x=mean + sd, y=index, text=f"<b>{text}</b>{dagger}",
-                showarrow=False, xanchor="left", yanchor="middle", xshift=8,
-                font=dict(family=FONT_MONO, size=9.5, color=AC["text_primary"]),
-                row=1, col=col)
+                x=x, y=y, text=body, showarrow=False,
+                xanchor="right", yanchor="middle",
+                font=dict(family=FONT_MONO, size=FS_VALUE,
+                          color=AC["text_primary"]))
 
-        span = [r[2] + r[3] for r in rows] + [r[2] - r[3] for r in rows]
-        lo, hi = min(0.0, min(span)), max(span)
-        pad = (hi - lo) * 0.40
-        fig.update_xaxes(range=[lo - pad * 0.12, hi + pad], row=1, col=col,
-                         showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
-                         zeroline=True, zerolinecolor=AC["border"],
-                         zerolinewidth=1.0, showline=False, ticklen=0, nticks=4,
-                         tickfont=dict(family=FONT_MONO, size=8.5,
-                                       color=AC["text_muted"]))
-        fig.update_yaxes(
-            tickmode="array", tickvals=list(range(len(order))),
-            ticktext=[m[1] for m in order] if col == 1 else ["" for _ in order],
-            range=[len(order) - 0.5, -0.5], showgrid=False, zeroline=False,
-            showline=False, ticklen=0,
-            tickfont=dict(family=FONT_UI, size=10, color=AC["text_primary"]),
-            row=1, col=col)
-
-    for annotation, (_m, _t, _s) in zip(fig.layout.annotations[:4], panels):
-        annotation.font = dict(family=FONT_UI, size=11, color=AC["text_primary"])
-        annotation.y = 1.10
-    for col, (_m, _t, sense) in enumerate(panels, start=1):
-        fig.add_annotation(
-            x=0.5, y=1.015, xref=f"x{col if col > 1 else ''} domain",
-            yref="paper", text=sense, showarrow=False, xanchor="center",
-            yanchor="bottom",
-            font=dict(family=FONT_UI, size=8.5, color=AC["text_muted"]))
-
-    add_footnote(fig, (
-"Complete 50-task runs only; partial seeds are excluded rather "
-              "than averaged in. Rows keep one order in every panel, best "
-              "average performance first.<br>"
-              "Ours is the mean over 3 seeds, its bar ±1 s.d. across them — "
-              "measured, solid, capped.<br>"
+    bottom = -len(rows) - 0.1
+    rule(bottom, 1.4, AC["axis"])
+    fig.add_annotation(
+        x=label_x - 1, y=bottom - 0.35,
+        text=("Complete 50-task runs only; partial seeds are excluded rather "
+              "than averaged in. <b>Bold</b> is the best value in each row.<br>"
+              "Ours is the mean over 3 seeds and its ±1 s.d. is measured across "
+              "them.<br>"
               "<b>† marks a placeholder:</b> the other three have one complete "
-              "seed each, so they carry ours' s.d. until their own land. "
-              "A lent interval is not a measurement, which is why it is dotted "
-              "and uncapped."
-    ), 100)
+              "seed each,<br>"
+              "so they carry ours' s.d. on that metric until their own land. A "
+              "lent interval is not a measurement.<br>"
+              "Forward transfer is measured against the from-scratch run, which "
+              "is therefore 0 by construction."),
+        showarrow=False, xanchor="left", yanchor="top", align="left",
+        font=dict(family=FONT_UI, size=FS_NOTE, color=AC["text_muted"]))
+
+    fig.update_xaxes(visible=False, range=[label_x - 2, right_edge + 1])
+    fig.update_yaxes(visible=False, range=[bottom - 2.6, header_y + 1.2])
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=104, r=20, t=54, b=104))
-    export_pair(fig, "headline_metrics", W_FULL, height_for(W_FULL, 2.35))
+                      margin=dict(l=20, r=20, t=14, b=12))
+    export_pair(fig, "headline_metrics", W_FULL, 356)
 
 
 # ── Export ──────────────────────────────────────────────────────────────────
@@ -599,10 +555,10 @@ def main() -> int:
     install_template()
     print("reports/final/gridworld")
     figure_learned_vs_retained()
-    figure_task_life()
+    figure_retention_curve()
     figure_raw_vs_normalised()
     figure_compute_cost()
-    figure_headline_metrics()
+    figure_headline_table()
     return 0
 
 

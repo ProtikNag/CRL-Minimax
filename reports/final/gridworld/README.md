@@ -15,11 +15,11 @@ shared task-conditioned head**. Capacity is fixed and interference is forced.
 
 | Stem | What it shows |
 |---|---|
-| `learned_vs_retained` | Every task's score when learned against its score at the end. **The separator.** |
-| `task_life` | Two views of the sequence: system state as it grows, and the life of one task |
-| `headline_metrics` | PERF, forgetting, backward and forward transfer |
+| `learned_vs_retained` | Every task's score when learned against its score at the end, 2×2. **The separator.** |
+| `retention_curve` | Mean score of everything learned so far, as the sequence grows |
+| `headline_metrics` | PERF, forgetting, backward and forward transfer, as a table |
 | `raw_vs_normalised` | Final per-task score on both scales, and why the choice matters |
-| `compute_cost` | Wall-clock and environment frames |
+| `compute_cost` | Wall-clock for one complete 50-task run |
 
 All in `png/` (300 dpi) and `svg/` (vector, verified zero embedded raster).
 
@@ -62,9 +62,9 @@ the backward-transfer column summarises — read one task at a time.
 
 ### The trade, stated plainly
 
-`task_life`'s right panel is not flattering in every direction:
+The per-task detail behind the aggregate is not flattering in every direction:
 
-| | just learned | age ≥ 10 |
+| | mean score when just learned | mean score at the end |
 |---|---:|---:|
 | **Min-Max (ours)** | 0.25 | **0.63** |
 | CKA-RL | 0.64 | 0.42 |
@@ -83,19 +83,20 @@ global consolidation, which maximises return over *all* seen tasks, does most of
 the learning. With 50 related layouts there is a lot of positive transfer
 available, and consolidation is what harvests it.
 
-### The two panels of `task_life` are not the same plot
+### `retention_curve`
 
-They are easy to confuse, which is why they share a figure:
+After finishing task *k*, the mean score over the *k−1* tasks learned before it.
+The just-learned task is excluded: including it lets a method that merely learns
+the newest task well post a flattering curve.
 
-- **Left** indexes by **position in the sequence**. After finishing task *k*, how
-  is the model doing on the *k−1* tasks behind it? This is the state of the whole
-  system as the sequence grows — *does the method still work at 50 tasks*.
-- **Right** indexes by **time since a task was learned**, pooling every task that
-  is *n* phases old whenever it happened. This is the life of a single task.
+This is the readable form of the forgetting matrix. At 50 tasks the triangle is
+far too dense to see anything in, but its row means are not, and they answer the
+question the matrix was there for — *does the method still work at 50 tasks*.
+Ours is flat at ≈0.60 while the others sit at 0.45, 0.30 and 0.17.
 
-A method can be flat on the left and still decaying on the right, if the later
-tasks happened to be easier. The right panel is where ours differs in kind: it
-starts *lowest* at age 0 and is the only curve that rises.
+The shaded band is the min-max over ours' 3 complete seeds. The other three
+methods have one complete seed each so far, so they carry no band; a band over a
+single run would be an invented interval.
 
 ### Raw against normalised
 
@@ -116,8 +117,7 @@ artefact of the normaliser.
 
 ### Forward transfer, and the budget asymmetry behind it
 
-Ours is last on FWT (0.05 against CKA-RL's 0.20), and the age-0 column above is
-why: forward transfer measures how fast a task is learned in its own phase, and
+Ours is last on FWT (0.05 against CKA-RL's 0.20), and the table above is why: forward transfer measures how fast a task is learned in its own phase, and
 ours deliberately spends less there.
 
 **The per-task budgets are not matched.** Ours' local phase runs 150–250
@@ -127,17 +127,16 @@ reference, so its value is 0 by construction and it is omitted from that panel.
 
 ### Compute
 
-| | wall-clock | frames | vs ours |
-|---|---:|---:|---:|
-| **Min-Max (ours)** | 244 min | 18.1 M | — |
-| CKA-RL | 177 min | 13.1 M | 0.73× |
-| Fine-tuning | 140 min | 14.3 M | 0.79× |
-| From-scratch | 156 min | 15.4 M | 0.85× |
+| | wall-clock | vs ours |
+|---|---:|---:|
+| **Min-Max (ours)** | 244 min | — |
+| CKA-RL | 177 min | 0.72× |
+| Fine-tuning | 140 min | 0.57× |
+| From-scratch | 156 min | 0.64× |
 
-Ours is the most expensive and the frames panel says why: consolidation
-re-simulates past environments, so it spends frames on tasks it already learned.
-Wall-clock came off a shared, contended cluster and is the softer of the two;
-**frames is the number to quote**.
+Ours is the most expensive because consolidation re-simulates past environments,
+spending time on tasks it has already learned. Measured on a shared, contended
+cluster, so read it as indicative rather than exact.
 
 ## Disclosures for any caption
 
@@ -150,8 +149,9 @@ Wall-clock came off a shared, contended cluster and is the softer of the two;
   fixed footprint (ours a fixed shared head, CKA-RL a fixed trunk plus a bounded
   pool of 5 and a small per-task α).
 - **Seeds:** ours 3 complete, the others 1 each so far. `headline_metrics` lends
-  ours' standard deviation to the single-seed methods as a **placeholder**, drawn
-  dotted and uncapped and marked `†` so it cannot be mistaken for a measurement.
+  ours' standard deviation to the single-seed methods as a **placeholder**,
+  marked `†` so it cannot be mistaken for a measurement. Replace as their seeds
+  land — the script picks them up with no edits.
 
 ## Rebuild
 
