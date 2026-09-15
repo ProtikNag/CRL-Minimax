@@ -201,6 +201,10 @@ class LocalTrainer(PPOTrainer):
             for it in range(num_iters):
                 batch = collector.collect(policy, self.ppo.gae_lambda)
                 stats = self.optimize_batches(policy, optimizer, [batch], [1.0])
+                # Continual-backprop generate-and-test fires AFTER the optimizer step
+                # (Dohare 2024). No-op for policies without cbp_step (all but CbpNet).
+                if hasattr(policy, "cbp_step"):
+                    policy.cbp_step(optimizer)
                 if probe is not None:
                     probe(phase_type, current_task)
                 gscore = self._stop_score(policy, task, it + 1)
