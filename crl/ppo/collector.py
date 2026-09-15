@@ -103,9 +103,12 @@ class RolloutCollector:
         """Roll out ``n_steps`` under ``policy`` (as pi_old); return a batch."""
         device, tid = self.device, self.task_id
         T, n = self.n_steps, self.n_envs
-        C, H, W = self.next_obs.shape[1:]
+        # Obs shape/dtype are taken from the live stream, so this works for both
+        # Atari (uint8 [C,H,W] frames) and flat-vector envs (float [obs_dim]).
+        obs_shape = tuple(self.next_obs.shape[1:])
+        obs_dtype = self.next_obs.dtype
 
-        obs_buf = torch.empty((T, n, C, H, W), dtype=torch.uint8, device=device)
+        obs_buf = torch.empty((T, n, *obs_shape), dtype=obs_dtype, device=device)
         act_buf = torch.empty((T, n), dtype=torch.long, device=device)
         logp_buf = torch.empty((T, n), device=device)
         rew_buf = torch.empty((T, n), device=device)
@@ -144,7 +147,7 @@ class RolloutCollector:
             self.gamma, gae_lambda,
         )
         return RolloutBatch(
-            obs=obs_buf.reshape(T * n, C, H, W),
+            obs=obs_buf.reshape(T * n, *obs_shape),
             actions=act_buf.reshape(T * n),
             logprobs=logp_buf.reshape(T * n),
             advantages=advantages.reshape(T * n),

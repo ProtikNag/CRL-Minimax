@@ -31,6 +31,7 @@ from crl.logging_utils import RunLogger
 from crl.policies.base import Policy, clone_policy
 from crl.ppo.evaluate import evaluate_value_and_score
 from crl.ppo.trainer import GlobalTrainer, LocalTrainer
+from crl.run_logging import ContractLogger
 
 
 class PPOAlternationTrainer:
@@ -67,6 +68,13 @@ class PPOAlternationTrainer:
         self.eval_matrix: list[list[float]] = []
         self.cumulative_step = 0
         self._resource: dict = {}      # per-game per-phase iters/wall/early-stop (#1)
+
+        # Logging-contract emitter (docs/LOGGING_CONTRACT.md), created in run().
+        self.clog: ContractLogger | None = None
+        frame_skip = int(config.env.params.get("frame_skip", 1))  # gridworld = 1
+        self._frames_per_iter = self.ppo.n_envs * self.ppo.n_steps * frame_skip
+        self._hb_task = 0            # heartbeat context, updated per probe
+        self._hb_phase = "init"
 
     # ------------------------------------------------------------------ #
     # helpers
@@ -135,9 +143,50 @@ class PPOAlternationTrainer:
             stds.append(std)
         return row, stds
 
+    def _init_contract(self) -> None:
+        """Build the ContractLogger + normalization reference. ``random`` is the
+        FRESH (untrained) policy's greedy score per task, measured once at run start;
+        ``ceiling`` is per-task from config (default 1.0 = proximity max for gridworld
+        / a normalized ceiling elsewhere). On resume, run.json already exists so its
+        reference is preserved and we skip the (now-invalid) fresh-policy measurement."""
+        tasks = [t.spec.name for t in self.family.tasks]
+        if (self.logger.run_dir / "run.json").exists():
+            random: list[float] = []            # preserved from the original run.json
+            ceiling: list[float] = []
+        else:
+            random = [self._eval_report(self.global_policy, t)[0]
+                      for t in self.family.tasks]
+            ceiling = [float(t.spec.params.get("ceiling", 1.0))
+                       for t in self.family.tasks]
+        self.clog = ContractLogger(
+            self.logger.run_dir, method=self.method, seed=self.seed,
+            env_family=self._config.env.family, tasks=tasks,
+            task_order=str(self._config.env.params.get("task_order", "as_configured")),
+            reference={"random": random, "ceiling": ceiling},
+            config=self._config.to_dict(), frames_per_iter=self._frames_per_iter)
+
+    def _emit_row(self, k: int, row: list[float], phase: str, episodes: int) -> None:
+        """Emit one contract eval record per SEEN task from an end-of-task row
+        (the end-of-phase / end-of-run all-seen cadence, on the global policy)."""
+        if self.clog is None:
+            return
+        for j, sc in enumerate(row):
+            self.clog.eval(task_idx=k - 1, phase=phase, it=-1, evaluated_on=j,
+                           evaluated_on_task=self.family.tasks[j].spec.name,
+                           raw=float(sc), episodes=episodes, greedy=True, seen=True)
+
     def _probe(self, phase_type: str, current_task: int) -> None:
         """Record the global policy's score on every task vs cumulative iters."""
         self.cumulative_step += 1
+        # Keep the contract frame counter + heartbeat live for mid-flight checks.
+        if self.clog is not None:
+            self.clog.frames_total = self.cumulative_step * self._frames_per_iter
+            self._hb_task, self._hb_phase = current_task, phase_type
+            if self.cumulative_step % 50 == 0:
+                self.clog.heartbeat(task_idx=current_task - 1,
+                                    task=self.family.tasks[current_task - 1].spec.name,
+                                    phase=phase_type, iter=self.cumulative_step,
+                                    cumulative_step=self.cumulative_step)
         every = self.ppo.eval_every
         if not every or self.cumulative_step % every != 0:
             return
@@ -161,8 +210,20 @@ class PPOAlternationTrainer:
     # main loop
     # ------------------------------------------------------------------ #
 
+    def _phase_end(self, k: int, phase: str, summ: dict | None) -> None:
+        """Emit a contract phase_end from a trainer summary (iters/wall -> frames)."""
+        if self.clog is None or summ is None:
+            return
+        iters = int(summ.get("iters_run", 0))
+        self.clog.phase_end(task_idx=k - 1, task=self.family.tasks[k - 1].spec.name,
+                            phase=phase, iters=iters,
+                            frames_phase=iters * self._frames_per_iter,
+                            wall_s_phase=float(summ.get("wall_s", 0.0)))
+
     def _train_first_task(self) -> None:
         """Standard PPO on task 1 (the global model; no past tasks, no constraint)."""
+        if self.clog is not None:
+            self.clog.phase_start(0, self.family.tasks[0].spec.name, "task1")
         summ = self.local_trainer.train(
             self.global_policy,
             self.family.tasks[0],
@@ -171,7 +232,9 @@ class PPOAlternationTrainer:
             current_task=1,
             phase_type="task1",
             probe=self._probe,
+            clog=self.clog,
         )
+        self._phase_end(1, "task1", summ)
         self._record_resource(1, "task1", summ)
         # Task 1 has no local phase -> the task1 model IS its specialist; record its
         # greedy score as the local reference (used by the V5 all-tasks retention stop).
@@ -180,7 +243,9 @@ class PPOAlternationTrainer:
 
     def _finetune_task(self, k: int) -> None:
         """Naive baseline: keep fine-tuning the one shared net on task k."""
-        self.local_trainer.train(
+        if self.clog is not None:
+            self.clog.phase_start(k - 1, self.family.tasks[k - 1].spec.name, "finetune")
+        summ = self.local_trainer.train(
             self.global_policy,
             self.family.tasks[k - 1],
             num_iters=self.ppo.local_iters + self.ppo.global_iters,
@@ -188,7 +253,32 @@ class PPOAlternationTrainer:
             current_task=k,
             phase_type="finetune",
             probe=self._probe,
+            clog=self.clog,
         )
+        self._phase_end(k, "finetune", summ)
+
+    def _baseline_task(self, k: int) -> None:
+        """From-scratch FWT baseline: train task k on a FRESH policy (no transfer,
+        no constraint), so its within-phase learning curve is the AUC_i^b reference
+        for forward transfer. The trained-from-scratch model is discarded -- only the
+        current task's own head/trunk matter, and the global policy is left holding
+        task k so the end-of-task eval row still reports it. Each task is independent,
+        which is the definition of the CKA-RL / Continual-World baseline."""
+        from crl.policies import make_policy
+        fresh = make_policy(self._config.policy, self.family).to(self.device)
+        if self.clog is not None:
+            self.clog.phase_start(k - 1, self.family.tasks[k - 1].spec.name, "task1")
+        summ = self.local_trainer.train(
+            fresh, self.family.tasks[k - 1],
+            num_iters=self.ppo.local_iters + self.ppo.global_iters,
+            seed=self.seed + 1000 * k, current_task=k,
+            phase_type="task1",           # from-scratch => same cadence label as task 1
+            probe=self._probe, clog=self.clog,
+        )
+        self._phase_end(k, "task1", summ)
+        # Copy the freshly-trained task-k head + trunk into the reported global policy
+        # so the end-of-task row measures the from-scratch model on task k.
+        self.global_policy.load_state_dict(fresh.state_dict())
 
     def _clear_task(self, k: int) -> None:
         """CLEAR baseline: PPO on task k + replay/behavioral/value cloning on the
@@ -209,12 +299,16 @@ class PPOAlternationTrainer:
             local_policy = clone_policy(self.global_policy, trainable=True)
             game = getattr(task_k, "game", task_k.spec.name)
             n_local = self.ppo.local_iters_per_task.get(game, self.ppo.local_iters)
+            if self.clog is not None:
+                self.clog.phase_start(k - 1, task_k.spec.name, "local")
             loc_summ = self.local_trainer.train(
                 local_policy, task_k,
                 num_iters=n_local,
                 seed=self.seed + 1000 * k + 13 * cycle,
                 current_task=k, phase_type="local", probe=self._probe,
+                clog=self.clog,
             )
+            self._phase_end(k, "local", loc_summ)
             self._record_resource(k, "local", loc_summ)
             frozen_local = clone_policy(local_policy, trainable=False)
             # Retain the local model + its greedy-100 score: for Part A (experts NOT
@@ -243,6 +337,8 @@ class PPOAlternationTrainer:
                 # to past_tasks + [task_k]; the global stops only when ALL are >= frac.
                 refs = [self._resource.get(t.spec.name, {}).get("local_greedy")
                         for t in past_tasks + [task_k]]
+            if self.clog is not None:
+                self.clog.phase_start(k - 1, task_k.spec.name, "global")
             glob_summ = self.global_trainer.train(
                 self.global_policy, task_k, past_tasks,
                 ref_current=ref_current, mu_ctrl=self.mu_ctrl, omega=omega,
@@ -252,7 +348,9 @@ class PPOAlternationTrainer:
                 current_task=k, probe=self._probe,
                 local_policy=frozen_local,  # for KL-gap logging + optional BC term
                 retention_refs=refs, retention_frac=self.ppo.global_retention_frac,
+                clog=self.clog,
             )
+            self._phase_end(k, "global", glob_summ)
             self._record_resource(k, "global", glob_summ)
             if self.ppo.global_probe_head_only:  # restore full trainability
                 for p in self.global_policy.parameters():
@@ -357,6 +455,18 @@ class PPOAlternationTrainer:
             self._resource = _json.load(open(rsrc))
             print(f"[resume] reloaded resource_usage (local refs for "
                   f"{len(self._resource)} games)")
+        # Restore the optimiser/dual state (contract §5): cumulative_step (eval-cadence
+        # + frame counter) and the persistent mu. mu/local optimizer are reinitialised
+        # each phase, so cumulative_step is the only cross-phase state to carry.
+        optp = _os.path.join(_os.path.dirname(str(ckpt_path)),
+                             "checkpoints", f"optim_after_task{after_task}.pt")
+        if _os.path.exists(optp):
+            st = torch.load(optp, map_location=self.device, weights_only=False)
+            self.cumulative_step = int(st.get("cumulative_step", 0))
+            if getattr(self.dual_cfg, "warm_start", False) and "mu_value" in st:
+                self.mu_ctrl.value = float(st["mu_value"])
+            print(f"[resume] restored optim state (cumulative_step="
+                  f"{self.cumulative_step})")
         self._start_task = after_task + 1
 
     def _save_progress(self, k: int) -> None:
@@ -368,6 +478,48 @@ class PPOAlternationTrainer:
         self.logger.save_json("resource_usage.json", self._resource)
         torch.save(self.global_policy.state_dict(),
                    self.logger.run_dir / f"global_after_task{k}.pt")
+        # Contract checkpoints (checkpoints/): global + local specialist + optim/dual
+        # state (cumulative_step + mu) so resume restores the method exactly, not just
+        # the weights. mu/local optimizer are phase-local (reinit each phase), so at a
+        # task boundary cumulative_step is the only cross-phase state to carry.
+        if self.clog is not None:
+            local_sd = None
+            lp = self.logger.run_dir / f"local_after_task{k}.pt"
+            if lp.exists():
+                local_sd = torch.load(lp, map_location="cpu", weights_only=False)
+            optim_state = {"cumulative_step": self.cumulative_step,
+                           "mu_value": float(getattr(self.mu_ctrl, "value", 0.0))}
+            self.clog.save_checkpoint(k, self.global_policy.state_dict(),
+                                      local_sd, optim_state)
+
+    def _record_eval_row(self, k: int, n: int) -> None:
+        """End-of-task eval + logging, honoring the matrix_eval_every cadence.
+
+        Full seen-row (O(k)) only every ``matrix_eval_every`` tasks and at the final
+        task; otherwise eval ONLY the just-finished task (its diagonal, O(1)) and
+        carry the prior columns forward so eval_matrix stays dense. The scalar metrics
+        (PERF/BWT/forgetting/retention) come from the diagonal + the exact final row,
+        so this is metric-preserving; only the intermediate forgetting-trajectory is
+        coarsened."""
+        every = self.ppo.matrix_eval_every
+        full = every <= 0 or k % every == 0 or k == n
+        if full:
+            row, stds = self._evaluate_row(k)
+            self._emit_row(k, row, "global", self.ppo.eval_episodes)
+        else:
+            cur, _ = self._eval_report(self.global_policy, self.family.tasks[k - 1])
+            prev = list(self.eval_matrix[-1]) if self.eval_matrix else []
+            row = (prev + [0.0] * (k - len(prev)))[:k]
+            row[k - 1] = cur          # fresh diagonal; other columns carried forward
+            if self.clog is not None:  # emit only the fresh EXACT measurement
+                self.clog.eval(task_idx=k - 1, phase="global", it=-1,
+                               evaluated_on=k - 1,
+                               evaluated_on_task=self.family.tasks[k - 1].spec.name,
+                               raw=float(cur), episodes=self.ppo.eval_episodes,
+                               greedy=True, seen=True)
+        self.eval_matrix.append(row)
+        self.logger.log({"phase": "eval", "task": k, "values": row})
+        self._save_progress(k)
 
     def run(self) -> list[list[float]]:
         if self.method == "joint":
@@ -379,16 +531,16 @@ class PPOAlternationTrainer:
                                                self._log_every)
             self._clear_replay = ReplayStore()
 
+        self._init_contract()
         start = getattr(self, "_start_task", 1)
+        if start > 1 and self.clog is not None:
+            self.clog.note(f"resumed after task {start - 1}")
         if start <= 1:
             self._train_first_task()
             if self.method == "clear":  # store task-1 behavior as a cloning target
                 self._clear_trainer.snapshot(self.global_policy, self.family.tasks[0],
                                              self._clear_replay)
-            row, stds = self._evaluate_row(1)
-            self.eval_matrix.append(row)
-            self.logger.log({"phase": "eval", "task": 1, "values": row, "stds": stds})
-            self._save_progress(1)
+            self._record_eval_row(1, len(self.family))
 
         for k in range(max(2, start), len(self.family) + 1):
             if self.method == "finetune":
@@ -397,18 +549,20 @@ class PPOAlternationTrainer:
                 self._clear_task(k)
             elif self.method == "constrained":
                 self._constrained_task(k)
+            elif self.method == "baseline":
+                self._baseline_task(k)
             else:
                 raise KeyError(
                     f"Unknown ppo.method '{self.method}'; available: "
-                    "constrained, finetune, clear, joint"
+                    "constrained, finetune, clear, baseline, joint"
                 )
-            row, stds = self._evaluate_row(k)
-            self.eval_matrix.append(row)
-            self.logger.log({"phase": "eval", "task": k, "values": row, "stds": stds})
-            self._save_progress(k)
+            self._record_eval_row(k, len(self.family))
 
         self.logger.save_json("eval_matrix.json", self.eval_matrix)
         torch.save(
             self.global_policy.state_dict(), self.logger.run_dir / "final_policy.pt"
         )
+        if self.clog is not None:
+            self.clog.note("run complete")
+            self.clog.close()
         return self.eval_matrix

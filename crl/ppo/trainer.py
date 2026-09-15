@@ -186,6 +186,7 @@ class LocalTrainer(PPOTrainer):
         current_task: int,
         phase_type: str = "local",
         probe: ProbeHook | None = None,
+        clog=None,
     ) -> dict:
         optimizer = self._new_optimizer(policy)
         collector = RolloutCollector(
@@ -203,6 +204,22 @@ class LocalTrainer(PPOTrainer):
                 if probe is not None:
                     probe(phase_type, current_task)
                 gscore = self._stop_score(policy, task, it + 1)
+                # Within-phase FWT learning curve (contract): the training policy's
+                # greedy score on its OWN task, on the eval_every cadence -- decoupled
+                # from the threshold-gated stop check, but REUSING its score when they
+                # coincide so there is no double eval. Without this there is no p_i(t)
+                # and forward transfer cannot be recovered from a finished run.
+                if (clog is not None and self.ppo.eval_every
+                        and (it + 1) % self.ppo.eval_every == 0):
+                    fwt = gscore
+                    if fwt is None:
+                        _, fwt, _, _ = evaluate_value_and_score(
+                            policy, task, self.ppo.stop_eval_episodes, self.ppo.n_envs,
+                            self.device, seed=self.ppo.eval_seed, greedy=True)
+                    clog.eval(task_idx=current_task - 1, phase=phase_type, it=it + 1,
+                              evaluated_on=current_task - 1,
+                              evaluated_on_task=task.spec.name, raw=float(fwt),
+                              episodes=self.ppo.stop_eval_episodes, greedy=True, seen=True)
                 if gscore is not None:
                     met = met + 1 if gscore >= thr else 0
                     if self.ppo.select_best_local and gscore > best_score:
@@ -392,6 +409,7 @@ class GlobalTrainer(PPOTrainer):
         local_policy: Policy | None = None,
         retention_refs: list[float] | None = None,
         retention_frac: float = 0.7,
+        clog=None,
     ) -> dict:
         """Consolidate the global policy (Part A -- experts NOT stored).
 
@@ -455,7 +473,17 @@ class GlobalTrainer(PPOTrainer):
                     shortfall = max(0.0, ref_current - v_k_g)  # [V_k^L - V_k^G]_+
                     constraint = shortfall * shortfall          # F_k (eq 26)
                     mu = mu_ctrl.update(constraint, eps)        # eq 47 (threshold eps)
+                    _mu_refreshed = True
+                else:
+                    _mu_refreshed = False
                 coeff_k = mu * 2.0 * shortfall  # differentiated hinge, eqs 38/40
+                if clog is not None and _mu_refreshed:
+                    # Dual record (contract §3). Global has only mu; the per-past
+                    # lambda + past-shortfall + grad_share are local/diagnostic-only
+                    # -> null here (a field a method cannot fill is null).
+                    clog.dual(task_idx=current_task - 1, it=it, mu=float(mu), lam=None,
+                              shortfall_current=float(shortfall), shortfall_past=None,
+                              coeff_current=float(coeff_k), grad_share_past=None)
 
                 if cfg.diagnostics and it % max(1, cfg.diag_every) == 0:
                     self._log_diagnostics(

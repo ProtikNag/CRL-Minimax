@@ -43,6 +43,22 @@ class Task(ABC):
     def make_env(self) -> gym.Env:
         """Instantiate a Gymnasium environment for this task."""
 
+    def make_vector_env(self, num_envs: int, async_mode: bool = False, **kwargs):
+        """A vectorized bank of ``num_envs`` copies of :meth:`make_env`.
+
+        Generic default for flat-observation families (e.g. gridworld) so they can
+        run through the PPO backend's :class:`RolloutCollector`, which is otherwise
+        Atari-specific. Uses ``SAME_STEP`` autoreset to match the collector's GAE
+        bootstrap convention. Atari overrides this with its wrapper-aware version;
+        Atari-only kwargs (``clip_rewards``/``noop_override``/...) are accepted and
+        ignored here.
+        """
+        from gymnasium.vector import AsyncVectorEnv, AutoresetMode, SyncVectorEnv
+
+        fns = [self.make_env for _ in range(int(num_envs))]
+        cls = AsyncVectorEnv if async_mode else SyncVectorEnv
+        return cls(fns, autoreset_mode=AutoresetMode.SAME_STEP)
+
 
 class TabularTask(Task):
     """A task that additionally exposes exact MDP tensors.

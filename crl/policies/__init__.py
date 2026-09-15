@@ -14,7 +14,11 @@ from crl.policies.impala import (
     ImpalaActorCriticPolicy,
     ImpalaMultiHeadActorCriticPolicy,
 )
-from crl.policies.mlp import MLPPolicy, MultiHeadMLPPolicy
+from crl.policies.mlp import (
+    MLPMultiHeadActorCriticPolicy,
+    MLPPolicy,
+    MultiHeadMLPPolicy,
+)
 from crl.policies.tabular import TabularPolicy
 
 
@@ -32,6 +36,17 @@ def make_policy(cfg: PolicyConfig, family: TaskFamily) -> Policy:
         )
     if cfg.kind == "multihead":
         return MultiHeadMLPPolicy(
+            obs_dim=family.obs_dim,
+            num_actions=family.num_actions,
+            hidden_sizes=list(cfg.hidden_sizes),
+            num_tasks=len(family),
+            task_conditioned=cfg.task_conditioned,
+        )
+    if cfg.kind == "mlp_ac_multihead":
+        # MLP actor-critic (per-task actor+critic heads) for the PPO backend on
+        # flat-vector families (gridworld) -- the non-image analogue of
+        # impala_ac_multihead / cnn_ac_multihead.
+        return MLPMultiHeadActorCriticPolicy(
             obs_dim=family.obs_dim,
             num_actions=family.num_actions,
             hidden_sizes=list(cfg.hidden_sizes),
@@ -84,7 +99,8 @@ def make_policy(cfg: PolicyConfig, family: TaskFamily) -> Policy:
         )
     raise KeyError(
         f"Unknown policy kind '{cfg.kind}'; available: tabular, mlp, multihead, "
-        "cnn, cnn_multihead, cnn_ac, cnn_ac_multihead, impala_ac, impala_ac_multihead"
+        "mlp_ac_multihead, cnn, cnn_multihead, cnn_ac, cnn_ac_multihead, "
+        "impala_ac, impala_ac_multihead"
     )
 
 

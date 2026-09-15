@@ -263,6 +263,14 @@ class PPOConfig:
     eval_greedy_episodes: int = 100_000
     eval_seed: int = 100_000  # fixed base seed for evaluation rollouts
     eval_every: int = 0  # probe the global policy every N cumulative iters (0=off)
+    # End-of-task forgetting-matrix cadence. The scalar metrics (PERF, BWT,
+    # forgetting, retention) need only each task's diagonal (its score right after
+    # its own phase) + the final all-seen row, i.e. O(n) evals. Evaluating ALL seen
+    # tasks after EVERY task is O(n^2) and only buys the full forgetting-trajectory
+    # heatmap. matrix_eval_every>0 evaluates the full seen-row only every N tasks
+    # (plus always the final task); other tasks eval only the current task and carry
+    # prior columns forward. 0 = full row every task (fine for short Atari sequences).
+    matrix_eval_every: int = 0
     # --- Global-phase DIAGNOSTICS (heavy; off by default) --------------------
     # When on, the global (consolidation) phase logs, every `diag_every` iters, a
     # rich "global_diag" row: V_k^L / V_k^G and their gap (oscillation), mu, the

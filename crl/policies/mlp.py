@@ -112,3 +112,67 @@ class MultiHeadMLPPolicy(Policy):
             raise IndexError(f"task_id {task_id} out of range [0, {self.num_tasks})")
         features = self.trunk(self._augment(obs, task_id))
         return Categorical(logits=self.heads[task_id](features))
+
+
+class MLPMultiHeadActorCriticPolicy(Policy):
+    """MLP actor-critic with a shared trunk + per-task actor AND critic heads.
+
+    The MLP analogue of :class:`crl.policies.cnn_ac.AtariMultiHeadActorCriticPolicy`
+    for the PPO backend on flat-vector families (gridworld). A narrow shared Tanh
+    trunk is where cross-task interference / forgetting lives (protected by the
+    min-max constraint); ``task_id`` routes to that task's own actor and critic
+    head. Only the ACTOR is ever constrained (global phase); the critic is standard
+    PPO value regression and feeds GAE advantages only -- the constraint value
+    V_i stays Monte-Carlo (paper-faithful), exactly as on Atari.
+    """
+
+    def __init__(
+        self,
+        obs_dim: int,
+        num_actions: int,
+        hidden_sizes: list[int],
+        num_tasks: int,
+        task_conditioned: bool = False,
+    ) -> None:
+        super().__init__()
+        if num_tasks <= 0:
+            raise ValueError("MLPMultiHeadActorCriticPolicy requires num_tasks > 0.")
+        self.num_tasks = num_tasks
+        self.task_conditioned = task_conditioned
+        input_dim = obs_dim + (num_tasks if task_conditioned else 0)
+        self.trunk, last = _mlp_trunk(input_dim, hidden_sizes)
+        self.actors = nn.ModuleList(
+            [nn.Linear(last, num_actions) for _ in range(num_tasks)])
+        self.critics = nn.ModuleList(
+            [nn.Linear(last, 1) for _ in range(num_tasks)])
+        for actor in self.actors:
+            _init_head(actor)               # small init -> near-uniform start
+        for critic in self.critics:
+            nn.init.orthogonal_(critic.weight, gain=1.0)
+            nn.init.zeros_(critic.bias)
+
+    def _augment(self, obs: torch.Tensor, task_id: int) -> torch.Tensor:
+        if not self.task_conditioned:
+            return obs
+        one_hot = torch.zeros(obs.shape[0], self.num_tasks, device=obs.device,
+                              dtype=obs.dtype)
+        one_hot[:, task_id] = 1.0
+        return torch.cat([obs, one_hot], dim=-1)
+
+    def _check(self, task_id: int) -> None:
+        if not 0 <= task_id < self.num_tasks:
+            raise IndexError(f"task_id {task_id} out of range [0, {self.num_tasks})")
+
+    def dist(self, obs: torch.Tensor, task_id: int) -> Categorical:
+        self._check(task_id)
+        return Categorical(logits=self.actors[task_id](self.trunk(self._augment(obs, task_id))))
+
+    def value(self, obs: torch.Tensor, task_id: int) -> torch.Tensor:
+        self._check(task_id)
+        return self.critics[task_id](self.trunk(self._augment(obs, task_id))).squeeze(-1)
+
+    def dist_value(self, obs: torch.Tensor, task_id: int):
+        self._check(task_id)
+        feats = self.trunk(self._augment(obs, task_id))
+        return (Categorical(logits=self.actors[task_id](feats)),
+                self.critics[task_id](feats).squeeze(-1))
