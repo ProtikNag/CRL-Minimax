@@ -255,12 +255,20 @@ class PPOAlternationTrainer:
 
     def _train_first_task(self) -> None:
         """Standard PPO on task 1 (the global model; no past tasks, no constraint)."""
+        task0 = self.family.tasks[0]
+        # Task 1 uses its PER-GAME budget too (not just task1_iters). In the reversed
+        # Atari order SpaceInvaders is task 1: with task1_iters=1500 it under-trained
+        # (local ~588 vs achievable ~906), capping the global. Consult
+        # local_iters_per_task[game] first so SI gets its 3000 (early-stops at its
+        # threshold otherwise). Falls back to task1_iters for games not listed.
+        game0 = getattr(task0, "game", task0.spec.name)
+        n_iters = self.ppo.local_iters_per_task.get(game0, self.ppo.task1_iters)
         if self.clog is not None:
-            self.clog.phase_start(0, self.family.tasks[0].spec.name, "task1")
+            self.clog.phase_start(0, task0.spec.name, "task1")
         summ = self.local_trainer.train(
             self.global_policy,
-            self.family.tasks[0],
-            num_iters=self.ppo.task1_iters,
+            task0,
+            num_iters=n_iters,
             seed=self.seed + 1000,
             current_task=1,
             phase_type="task1",
