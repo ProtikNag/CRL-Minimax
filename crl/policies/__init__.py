@@ -16,6 +16,7 @@ from crl.policies.impala import (
 )
 from crl.policies.cka_rl import CkaRlPolicy
 from crl.policies.cka_rl_cnn import CkaRlCNNPolicy
+from crl.policies.mlp_ac_crelu import MLPActorCriticCReLUPolicy
 from crl.policies.componet import CompoNetPolicy
 from crl.policies.componet_cnn import CompoNetCNNPolicy
 from crl.policies.mlp import (
@@ -78,6 +79,13 @@ def make_policy(cfg: PolicyConfig, family: TaskFamily) -> Policy:
             pool_size=cfg.pool_size,
             task_conditioned=cfg.task_conditioned,
         )
+    if cfg.kind == "mlp_ac_crelu":
+        # CReLUs plasticity baseline (Abbas 2023): shared-head MLP-AC with CReLU
+        # activations; run with method finetune (naive sequential). Fixed capacity.
+        return MLPActorCriticCReLUPolicy(
+            obs_dim=family.obs_dim, num_actions=family.num_actions,
+            hidden_sizes=list(cfg.hidden_sizes), num_tasks=len(family),
+            task_conditioned=cfg.task_conditioned)
     if cfg.kind == "mlp_ac_multihead":
         # MLP actor-critic (per-task actor+critic heads) for the PPO backend on
         # flat-vector families (gridworld) -- the non-image analogue of
