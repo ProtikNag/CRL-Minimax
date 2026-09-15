@@ -1,119 +1,157 @@
 # GridWorld: 50 tasks, one shared head
 
-The tier that removes the two crutches the CKA-RL benchmark leans on.
+The tier that removes the two things making the CKA-RL benchmark easy.
 
 There, the tasks are **modes of one game** and every method gets **its own head
-per task**. Both make the problem easier than it looks: performance ceilings sit
-near 0.99, so there is almost nothing left to separate methods by, and a
-per-task head means a large part of each task's solution never has to share
-capacity with anything else.
+per task**. Both make the problem easier than it looks: ceilings sit near 0.99,
+so there is almost nothing left to separate methods by, and a per-task head means
+much of each task's solution never competes for capacity.
 
-Here there are **50 genuinely different layouts** — varying obstacle density and
-type, slipperiness, and reward and penalty magnitudes on a 50×50 grid — and
-**one shared task-conditioned head**. Capacity is fixed, interference is forced,
-and forgetting has somewhere to live.
-
-## Status: partial
-
-| Run | Tasks done |
-|---|---|
-| ours seed 0 | 45 / 50 |
-| ours seed 1 | 44 / 50 |
-| ours seed 2 | **50 / 50** |
-| CKA-RL seed 0 | 41 / 50 |
-| Fine-tuning seed 0 | **50 / 50** |
-| From-scratch seed 0 | **50 / 50** |
-
-Every figure draws each method to its own last completed phase and says so.
-Forgetting and backward transfer for the unfinished runs are **lower bounds**
-that will edge up as the last tasks land. Re-running the script picks up new rows
-automatically — nothing needs editing when the runs finish.
+Here there are **50 different layouts** — varying obstacle density and type,
+slipperiness, and reward and penalty magnitudes on a 50×50 grid — under **one
+shared task-conditioned head**. Capacity is fixed and interference is forced.
 
 ## Figures
 
 | Stem | What it shows |
 |---|---|
-| `retention_trajectory` | Mean retention of all prior tasks as the sequence grows. The headline. |
-| `headline_metrics` | PERF, forgetting, backward and forward transfer, four methods |
-| `forgetting_matrices` | The full 50×50 lower triangle per method |
-| `retention_by_age` | Retention against phases-since-learned — the decay curve |
+| `learned_vs_retained` | Every task's score when learned against its score at the end. **The separator.** |
+| `task_life` | Two views of the sequence: system state as it grows, and the life of one task |
+| `headline_metrics` | PERF, forgetting, backward and forward transfer |
+| `raw_vs_normalised` | Final per-task score on both scales, and why the choice matters |
+| `compute_cost` | Wall-clock and environment frames |
 
 All in `png/` (300 dpi) and `svg/` (vector, verified zero embedded raster).
 
-## What the numbers say
-
 Normalisation is `(score − random) / (1 − random)`, so **0 is a random policy and
-1 is a solved task**. Random is per-task and sits around 0.72 raw, which is why
-the normalised span is the honest one to read.
+1 is a solved task**. The random floor is per task and averages ≈0.72 raw.
+
+## Status
+
+Complete 50-task runs: **ours ×3 seeds**, and one seed each of CKA-RL,
+fine-tuning and from-scratch. Their seeds 1–2 are still running. Partial runs are
+**excluded from every aggregate** rather than averaged in — mixing a 50-task run
+with a 24-task one produces a number that belongs to neither. Which runs count is
+read from `metrics.json`, so finished seeds join automatically on a re-run.
+
+## What the numbers say
 
 | | PERF | Forgetting | BWT | FWT |
 |---|---:|---:|---:|---:|
-| **Min-Max (ours)** | **0.61** | **0.10** | **+0.37** | 0.09 |
-| CKA-RL | 0.39 | 0.30 | −0.26 | **0.18** |
+| **Min-Max (ours)** | **0.60** | **0.11** | **+0.36** | 0.05 |
+| CKA-RL | 0.51 | 0.21 | −0.15 | **0.20** |
 | Fine-tuning | 0.31 | 0.39 | −0.34 | 0.16 |
 | From-scratch | 0.18 | 0.52 | −0.47 | 0 (reference) |
 
-Ours roughly **doubles** the next-best average performance and is the only
-method with **positive backward transfer**. Every other method ends below where
-it started on old tasks; ours ends above.
+### Why `learned_vs_retained` is the figure to lead with
+
+On average performance ours and CKA-RL sit 0.09 apart, which is easy to wave
+away. Ask a yes/no question of every task instead — *did it end better or worse
+than when it was learned* — and the methods separate completely:
+
+| | tasks that ended **better** |
+|---|---:|
+| **Min-Max (ours)** | **91%** |
+| CKA-RL | 12% |
+| Fine-tuning | 4% |
+| From-scratch | 8% |
+
+Ours' point cloud sits above the no-change diagonal; every other method's sits
+below it. That is a difference in kind, not in degree, and it is the same fact
+the backward-transfer column summarises — read one task at a time.
 
 ### The trade, stated plainly
 
-`retention_by_age` is the figure that explains the rest, and it is not flattering
-in every direction:
+`task_life`'s right panel is not flattering in every direction:
 
-| | just learned (age 0) | age ≥ 10 | change |
-|---|---:|---:|---:|
-| **Min-Max (ours)** | 0.25 | **0.63** | **+0.38** |
-| CKA-RL | 0.64 | 0.42 | −0.22 |
-| Fine-tuning | 0.65 | 0.31 | −0.34 |
-| From-scratch | 0.64 | 0.17 | −0.47 |
+| | just learned | age ≥ 10 |
+|---|---:|---:|
+| **Min-Max (ours)** | 0.25 | **0.63** |
+| CKA-RL | 0.64 | 0.42 |
+| Fine-tuning | 0.65 | 0.31 |
+| From-scratch | 0.64 | 0.17 |
 
 **Ours learns each new task to less than half the immediate level the others
-reach**, and then climbs past all of them within two or three phases. The other
-three start where a specialist would and decay from there.
+reach**, then climbs past all of them within two or three phases. So its positive
+backward transfer is partly earned and partly structural: it is easier to improve
+a task left at 0.25 than one left at 0.65. Better to say so than to let a
+reviewer find it. The claims that survive are the **final state** after 50 tasks
+and the **shape** — flat for ours, falling for everyone else.
 
-So ours' positive backward transfer is partly earned and partly structural: it is
-easier to improve on a task you left at 0.25 than one you left at 0.65. That is
-worth saying in the paper rather than letting a reviewer find it. The claim that
-survives it is the one about **final state** — after 50 tasks ours holds 0.61
-against 0.39, 0.31 and 0.18 — and about the shape of the curve, which is flat for
-ours and falling for everyone else.
+The likely mechanism: the local phase here is short (150–250 iterations) and the
+global consolidation, which maximises return over *all* seen tasks, does most of
+the learning. With 50 related layouts there is a lot of positive transfer
+available, and consolidation is what harvests it.
 
-The likely mechanism is that the local phase here is short (150–250 iterations)
-and the global consolidation, which maximises return over *all* seen tasks, does
-most of the learning. With 50 related layouts there is a great deal of positive
-transfer available, and consolidation is what harvests it.
+### The two panels of `task_life` are not the same plot
 
-### Forward transfer
+They are easy to confuse, which is why they share a figure:
 
-Ours is last on FWT (0.09 against CKA-RL's 0.18), and the age-0 column above is
+- **Left** indexes by **position in the sequence**. After finishing task *k*, how
+  is the model doing on the *k−1* tasks behind it? This is the state of the whole
+  system as the sequence grows — *does the method still work at 50 tasks*.
+- **Right** indexes by **time since a task was learned**, pooling every task that
+  is *n* phases old whenever it happened. This is the life of a single task.
+
+A method can be flat on the left and still decaying on the right, if the later
+tasks happened to be easier. The right panel is where ours differs in kind: it
+starts *lowest* at age 0 and is the only curve that rises.
+
+### Raw against normalised
+
+A random policy already collects most of the raw discounted return on this grid,
+so raw scores crowd into [0.59, 0.99] and every method looks close. The random
+floor also varies per task (0.55 to 0.87), so the same raw number is a different
+achievement on different tasks. Median final score:
+
+| | raw | normalised |
+|---|---:|---:|
+| **Min-Max (ours)** | 0.92 | **0.67** |
+| CKA-RL | 0.88 | 0.55 |
+| Fine-tuning | 0.81 | 0.21 |
+| From-scratch | 0.78 | 0.10 |
+
+Showing both is the point: the separation normalisation exposes is real, not an
+artefact of the normaliser.
+
+### Forward transfer, and the budget asymmetry behind it
+
+Ours is last on FWT (0.05 against CKA-RL's 0.20), and the age-0 column above is
 why: forward transfer measures how fast a task is learned in its own phase, and
-ours deliberately spends less there. Two things belong in the caption.
+ours deliberately spends less there.
 
 **The per-task budgets are not matched.** Ours' local phase runs 150–250
-iterations; fine-tuning, from-scratch and CKA-RL run 150–500. Ours uses *more*
-total optimisation (≈17.5k iterations against 14k, 15k and 10k) but less of it
-inside any single task's own learning phase.
+iterations; the others run 150–500. Ours uses *more* total optimisation but less
+of it inside any single task's own learning phase. From-scratch is the FWT
+reference, so its value is 0 by construction and it is omitted from that panel.
 
-**From-scratch is the FWT reference**, so its value is 0 by construction and it
-is omitted from that panel rather than drawn as a competitor.
+### Compute
+
+| | wall-clock | frames | vs ours |
+|---|---:|---:|---:|
+| **Min-Max (ours)** | 244 min | 18.1 M | — |
+| CKA-RL | 177 min | 13.1 M | 0.73× |
+| Fine-tuning | 140 min | 14.3 M | 0.79× |
+| From-scratch | 156 min | 15.4 M | 0.85× |
+
+Ours is the most expensive and the frames panel says why: consolidation
+re-simulates past environments, so it spends frames on tasks it already learned.
+Wall-clock came off a shared, contended cluster and is the softer of the two;
+**frames is the number to quote**.
 
 ## Disclosures for any caption
 
-- **Ours re-simulates past environments during consolidation.** CKA-RL,
-  fine-tuning and from-scratch train only on the current task. This is live
-  past-task environment access and is a stronger assumption than a replay buffer,
-  not a weaker one.
+- **Ours re-simulates past environments during consolidation.** The others train
+  only on the current task. This is live past-task environment access — a
+  stronger assumption than a replay buffer, not a weaker one.
 - **CKA-RL here is our own reimplementation**, adapted to the shared-head setting
   the original does not target. Say so in the paper.
-- **CompoNet is excluded** because it grows the network; every method compared
-  here has a fixed footprint (ours a fixed shared head, CKA-RL a fixed trunk plus
-  a bounded pool of 5 and a small per-task α).
-- **Seeds:** ours has 3, everything else has 1. `headline_metrics` lends ours'
-  standard deviation to the single-seed methods as a **placeholder**, drawn
+- **CompoNet is excluded** because it grows the network; every method here has a
+  fixed footprint (ours a fixed shared head, CKA-RL a fixed trunk plus a bounded
+  pool of 5 and a small per-task α).
+- **Seeds:** ours 3 complete, the others 1 each so far. `headline_metrics` lends
+  ours' standard deviation to the single-seed methods as a **placeholder**, drawn
   dotted and uncapped and marked `†` so it cannot be mistaken for a measurement.
-  Replace it as their seeds land.
 
 ## Rebuild
 
@@ -122,4 +160,5 @@ python reports/final/gridworld/make_figures.py
 ```
 
 Reads `reports/gridworld_sharedhead/*/` per `docs/LOGGING_CONTRACT.md`. Nothing
-is transcribed or duplicated into this folder.
+is transcribed or duplicated into this folder, and no edits are needed when the
+remaining seeds land.
