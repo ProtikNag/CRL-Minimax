@@ -14,7 +14,10 @@ from crl.policies.impala import (
     ImpalaActorCriticPolicy,
     ImpalaMultiHeadActorCriticPolicy,
 )
+from crl.policies.cka_rl import CkaRlPolicy
+from crl.policies.componet import CompoNetPolicy
 from crl.policies.mlp import (
+    MLPActorCriticPolicy,
     MLPMultiHeadActorCriticPolicy,
     MLPPolicy,
     MultiHeadMLPPolicy,
@@ -40,6 +43,37 @@ def make_policy(cfg: PolicyConfig, family: TaskFamily) -> Policy:
             num_actions=family.num_actions,
             hidden_sizes=list(cfg.hidden_sizes),
             num_tasks=len(family),
+            task_conditioned=cfg.task_conditioned,
+        )
+    if cfg.kind == "mlp_ac":
+        # Single shared actor+critic head (no per-task heads); pair with
+        # task_conditioned or a goal-in-obs family so the critic stays well-posed.
+        return MLPActorCriticPolicy(
+            obs_dim=family.obs_dim,
+            num_actions=family.num_actions,
+            hidden_sizes=list(cfg.hidden_sizes),
+            num_tasks=len(family),
+            task_conditioned=cfg.task_conditioned,
+        )
+    if cfg.kind == "componet":
+        # CompoNet (Malagón et al. ICML'24): per-task self-composing modules with
+        # attention over frozen predecessors. Driven by ppo.method == "componet".
+        return CompoNetPolicy(
+            obs_dim=family.obs_dim,
+            num_actions=family.num_actions,
+            hidden_sizes=list(cfg.hidden_sizes),
+            num_tasks=len(family),
+            task_conditioned=cfg.task_conditioned,
+        )
+    if cfg.kind == "cka_rl":
+        # CKA-RL (Hu et al. NeurIPS'25): FuseLinear actor head combining a pool of
+        # frozen past-task deltas via a learned alpha. Driven by ppo.method=="cka_rl".
+        return CkaRlPolicy(
+            obs_dim=family.obs_dim,
+            num_actions=family.num_actions,
+            hidden_sizes=list(cfg.hidden_sizes),
+            num_tasks=len(family),
+            pool_size=cfg.pool_size,
             task_conditioned=cfg.task_conditioned,
         )
     if cfg.kind == "mlp_ac_multihead":
@@ -99,8 +133,8 @@ def make_policy(cfg: PolicyConfig, family: TaskFamily) -> Policy:
         )
     raise KeyError(
         f"Unknown policy kind '{cfg.kind}'; available: tabular, mlp, multihead, "
-        "mlp_ac_multihead, cnn, cnn_multihead, cnn_ac, cnn_ac_multihead, "
-        "impala_ac, impala_ac_multihead"
+        "mlp_ac, mlp_ac_multihead, componet, cka_rl, cnn, cnn_multihead, cnn_ac, "
+        "cnn_ac_multihead, impala_ac, impala_ac_multihead"
     )
 
 

@@ -51,7 +51,16 @@ class PPOAlternationTrainer:
         self.family = family
         self.global_policy = global_policy
         self.logger = logger
-        self.device = next(global_policy.parameters()).device
+        # Grow-methods (CompoNet) build their modules lazily in add_task, so the
+        # policy can have NO parameters at construction -> fall back to the config
+        # device. Eager policies are unchanged (first param's device).
+        _first = next(global_policy.parameters(), None)
+        if _first is not None:
+            self.device = _first.device
+        else:
+            _dev = config.experiment.device
+            self.device = torch.device(
+                "cuda" if _dev in ("auto", "cuda") and torch.cuda.is_available() else "cpu")
         self.seed = config.experiment.seed
         self.method = config.ppo.method
         log_every = config.experiment.log_every
@@ -154,8 +163,15 @@ class PPOAlternationTrainer:
             random: list[float] = []            # preserved from the original run.json
             ceiling: list[float] = []
         else:
-            random = [self._eval_report(self.global_policy, t)[0]
-                      for t in self.family.tasks]
+            # Random reference per task. Grow-methods (CompoNet) have no modules for
+            # future tasks yet at run start, so their fresh-policy eval fails -> fall
+            # back to a uniform-random-action rollout (the canonical random floor).
+            random = []
+            for t in self.family.tasks:
+                try:
+                    random.append(self._eval_report(self.global_policy, t)[0])
+                except (IndexError, KeyError, StopIteration, RuntimeError, AttributeError):
+                    random.append(self._uniform_ref(t))
             ceiling = [float(t.spec.params.get("ceiling", 1.0))
                        for t in self.family.tasks]
         self.clog = ContractLogger(
@@ -164,6 +180,23 @@ class PPOAlternationTrainer:
             task_order=str(self._config.env.params.get("task_order", "as_configured")),
             reference={"random": random, "ceiling": ceiling},
             config=self._config.to_dict(), frames_per_iter=self._frames_per_iter)
+
+    def _uniform_ref(self, task) -> float:
+        """Random floor = mean score of a uniform-random-action policy on ``task``.
+        Used when the method's own policy cannot be evaluated pre-training (CompoNet's
+        modules are added lazily)."""
+        n_actions = self.family.num_actions
+        dev = self.device
+
+        class _Uniform:
+            def dist(self, obs, task_id):
+                return torch.distributions.Categorical(
+                    logits=torch.zeros(obs.shape[0], n_actions, device=obs.device))
+
+        _, score, _, _ = evaluate_value_and_score(
+            _Uniform(), task, self.ppo.eval_episodes, self.ppo.n_envs, dev,
+            seed=self.ppo.eval_seed, greedy=False)  # sample => true random walk
+        return score
 
     def _emit_row(self, k: int, row: list[float], phase: str, episodes: int) -> None:
         """Emit one contract eval record per SEEN task from an end-of-task row
@@ -256,6 +289,29 @@ class PPOAlternationTrainer:
             clog=self.clog,
         )
         self._phase_end(k, "finetune", summ)
+
+    def _grow_task(self, k: int) -> None:
+        """CompoNet / CKA-RL: expand the architecture for task k (policy.add_task(k)
+        freezes/combines the frozen past), then standard PPO on the CURRENT task only
+        (the fresh optimizer sees only the newly-trainable params). No local/global
+        min-max split -- these are their own continual methods. store_eval_head(k)
+        (CKA-RL) then freezes task k's effective head for faithful past-task eval."""
+        task = self.family.tasks[k - 1]
+        if hasattr(self.global_policy, "add_task"):
+            self.global_policy.add_task(k)
+        if self.clog is not None:
+            self.clog.phase_start(k - 1, task.spec.name, self.method)
+        n_iters = (self.ppo.task1_iters if k == 1
+                   else self.ppo.local_iters + self.ppo.global_iters)
+        summ = self.local_trainer.train(
+            self.global_policy, task, num_iters=n_iters,
+            seed=self.seed + 1000 * k, current_task=k, phase_type=self.method,
+            probe=self._probe, clog=self.clog,
+        )
+        self._phase_end(k, self.method, summ)
+        self._record_resource(k, self.method, summ)
+        if hasattr(self.global_policy, "store_eval_head"):
+            self.global_policy.store_eval_head(k)
 
     def _baseline_task(self, k: int) -> None:
         """From-scratch FWT baseline: train task k on a FRESH policy (no transfer,
@@ -536,10 +592,13 @@ class PPOAlternationTrainer:
         if start > 1 and self.clog is not None:
             self.clog.note(f"resumed after task {start - 1}")
         if start <= 1:
-            self._train_first_task()
-            if self.method == "clear":  # store task-1 behavior as a cloning target
-                self._clear_trainer.snapshot(self.global_policy, self.family.tasks[0],
-                                             self._clear_replay)
+            if self.method in ("componet", "cka_rl"):
+                self._grow_task(1)
+            else:
+                self._train_first_task()
+                if self.method == "clear":  # store task-1 behavior as a cloning target
+                    self._clear_trainer.snapshot(self.global_policy,
+                                                 self.family.tasks[0], self._clear_replay)
             self._record_eval_row(1, len(self.family))
 
         for k in range(max(2, start), len(self.family) + 1):
@@ -551,10 +610,12 @@ class PPOAlternationTrainer:
                 self._constrained_task(k)
             elif self.method == "baseline":
                 self._baseline_task(k)
+            elif self.method in ("componet", "cka_rl"):
+                self._grow_task(k)
             else:
                 raise KeyError(
-                    f"Unknown ppo.method '{self.method}'; available: "
-                    "constrained, finetune, clear, baseline, joint"
+                    f"Unknown ppo.method '{self.method}'; available: constrained, "
+                    "finetune, clear, baseline, componet, cka_rl, joint"
                 )
             self._record_eval_row(k, len(self.family))
 

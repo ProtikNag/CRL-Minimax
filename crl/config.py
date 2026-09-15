@@ -47,6 +47,9 @@ class PolicyConfig:
     hidden_sizes: list[int] = field(default_factory=lambda: [64, 64])
     # Append a one-hot task id to observations (decide early; README risk 2).
     task_conditioned: bool = False
+    # CKA-RL knowledge-pool size (kind == "cka_rl"): the pool merges down to this
+    # many tau vectors by cosine-similarity averaging (their default is 5).
+    pool_size: int = 5
 
 
 @dataclass

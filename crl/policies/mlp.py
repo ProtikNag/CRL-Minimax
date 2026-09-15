@@ -114,6 +114,58 @@ class MultiHeadMLPPolicy(Policy):
         return Categorical(logits=self.heads[task_id](features))
 
 
+class MLPActorCriticPolicy(Policy):
+    """MLP actor-critic with a SINGLE shared actor head + single critic head.
+
+    The shared-head counterpart of :class:`MLPMultiHeadActorCriticPolicy`: there are
+    NO per-task heads, so ALL weights (trunk + the one actor/critic head) are shared
+    across tasks and that is where forgetting lives -- the hard setting where naive
+    fine-tuning must overwrite shared parameters. On the PPO/actor-critic backend a
+    single critic cannot value distinct tasks from a signal-less observation, so this
+    policy is meant to be used with ``task_conditioned: true`` (task one-hot appended
+    to the input) or a goal-in-obs family, which keeps the critic well-posed while
+    still forcing all tasks to contend for one shared head."""
+
+    def __init__(
+        self,
+        obs_dim: int,
+        num_actions: int,
+        hidden_sizes: list[int],
+        num_tasks: int = 0,
+        task_conditioned: bool = False,
+    ) -> None:
+        super().__init__()
+        if task_conditioned and num_tasks <= 0:
+            raise ValueError("task_conditioned=True requires num_tasks > 0.")
+        self.task_conditioned = task_conditioned
+        self.num_tasks = num_tasks
+        input_dim = obs_dim + (num_tasks if task_conditioned else 0)
+        self.trunk, last = _mlp_trunk(input_dim, hidden_sizes)
+        self.actor = nn.Linear(last, num_actions)
+        self.critic = nn.Linear(last, 1)
+        _init_head(self.actor)
+        nn.init.orthogonal_(self.critic.weight, gain=1.0)
+        nn.init.zeros_(self.critic.bias)
+
+    def _augment(self, obs: torch.Tensor, task_id: int) -> torch.Tensor:
+        if not self.task_conditioned:
+            return obs
+        one_hot = torch.zeros(obs.shape[0], self.num_tasks, device=obs.device,
+                              dtype=obs.dtype)
+        one_hot[:, task_id] = 1.0
+        return torch.cat([obs, one_hot], dim=-1)
+
+    def dist(self, obs: torch.Tensor, task_id: int) -> Categorical:
+        return Categorical(logits=self.actor(self.trunk(self._augment(obs, task_id))))
+
+    def value(self, obs: torch.Tensor, task_id: int) -> torch.Tensor:
+        return self.critic(self.trunk(self._augment(obs, task_id))).squeeze(-1)
+
+    def dist_value(self, obs: torch.Tensor, task_id: int):
+        feats = self.trunk(self._augment(obs, task_id))
+        return Categorical(logits=self.actor(feats)), self.critic(feats).squeeze(-1)
+
+
 class MLPMultiHeadActorCriticPolicy(Policy):
     """MLP actor-critic with a shared trunk + per-task actor AND critic heads.
 
