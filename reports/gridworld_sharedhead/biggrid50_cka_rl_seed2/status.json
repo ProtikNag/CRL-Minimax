@@ -1,10 +1,10 @@
 {
-  "task_idx": 41,
-  "task": "biggrid50-goal(33,38)",
+  "task_idx": 49,
+  "task": "biggrid50-goal(46,3)",
   "phase": "cka_rl",
-  "iter": 11350,
-  "cumulative_step": 11350,
-  "alive": "2026-09-15T21:43:03.719192+00:00",
-  "t_wall": 8018.685,
-  "frames_total": 11622400
+  "iter": 13650,
+  "cumulative_step": 13650,
+  "alive": "2026-09-15T22:27:52.428279+00:00",
+  "t_wall": 10707.394,
+  "frames_total": 13977600
 }

@@ -1,0 +1,10 @@
+{
+  "task_idx": 32,
+  "task": "biggrid50-goal(40,10)",
+  "phase": "finetune",
+  "iter": 8050,
+  "cumulative_step": 8050,
+  "alive": "2026-09-16T00:23:12.286472+00:00",
+  "t_wall": 5202.863,
+  "frames_total": 8243200
+}
