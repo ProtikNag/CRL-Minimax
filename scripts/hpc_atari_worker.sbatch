@@ -14,10 +14,16 @@
 set -euo pipefail
 cd /work/pnag/CRL-Minimax
 CONFIG=${1:?config}; SEED=${2:?seed}
+RESUME_FROM=${3:-}; RESUME_AFTER=${4:-0}   # optional: global_after_task{k}.pt, k
 module load python3/anaconda/2023.7 2>/dev/null || true
 module load cuda 2>/dev/null || true
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
 export PYTHONPATH=/work/pnag/CRL-Minimax
-echo "host=$(hostname) config=$CONFIG seed=$SEED commit=$(git rev-parse --short HEAD)"
+echo "host=$(hostname) config=$CONFIG seed=$SEED commit=$(git rev-parse --short HEAD) resume_from=${RESUME_FROM:-none} resume_after=$RESUME_AFTER"
 python -c "import torch; print('cuda', torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '-')"
-python -m experiments.run --config "$CONFIG" --seed "$SEED"
+if [ -n "$RESUME_FROM" ]; then
+  python -m experiments.run --config "$CONFIG" --seed "$SEED" \
+    --resume-from "$RESUME_FROM" --resume-after "$RESUME_AFTER"
+else
+  python -m experiments.run --config "$CONFIG" --seed "$SEED"
+fi

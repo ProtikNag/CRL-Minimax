@@ -18,15 +18,15 @@ env:
     clip_rewards: true
   tasks:
   - game: SpaceInvaders
-    threshold: 800
+    threshold: 900
   - game: Boxing
-    threshold: 55
+    threshold: 67
   - game: Breakout
-    threshold: 80
+    threshold: 285
   - game: Pong
-    threshold: 18
+    threshold: 20
   - game: Qbert
-    threshold: 4000
+    threshold: 4260
 policy:
   kind: componet_cnn
   hidden_sizes:

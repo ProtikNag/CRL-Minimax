@@ -32,6 +32,46 @@ older per-iteration configs were removed in the 2026-09-08 cleanup.)
 
 Everything below the sprint section is background. This section is the plan.
 
+---
+
+## ►► LATEST STATUS (2026-09-16) — read this over the 2026-09-11 state below
+
+**GridWorld (Lane A) — DONE.** 50-task shared-head, **6 methods × 3 seeds**,
+committed `reports/gridworld_sharedhead/` (metrics.json + SUMMARY.md + per-run
+raw/CSVs; builder `analysis/build_gridworld_table.py`). PERF (normalized,
+mean±95%CI): **Ours 0.596±0.017** (only method with +BWT, +0.358) ≫ CKA-RL 0.470 >
+CReLUs 0.328 > Finetune 0.261 ≈ CbpNet 0.258 > Baseline 0.158. Regime =
+no-growth/shared-head; comparison = ours + 3 recent (CKA-RL, CReLUs, CbpNet) + 2
+basic (finetune, baseline).
+
+**Atari (Lane B/C) — RUNNING, threshold bug found+fixed.** Reversed 5-game
+(SI→Boxing→Breakout→Pong→Qbert). BUG: per-task `threshold`s were far below
+achievable, so the local phase early-stopped and **undertrained** tasks (Breakout
+stopped at 122 vs expert ~285). FIX: set every threshold to the **joint-model
+score** (`results/atari5_joint_6m_seed0`): SI 900, Boxing 67, Breakout 285, Pong 20,
+Qbert 4260 — in all 3 configs (`atari5_reversed{,_componet,_cka_rl}.yaml`).
+VALIDATED: ours' Breakout now trains to **~396**. Resume works only for ours
+(multihead, pre-allocated heads) via `--resume-from global_after_task{k}.pt
+--resume-after k` (sbatch now takes optional $3/$4); the GROW methods (CompoNet,
+CKA-RL) **cannot resume mid-sequence** (add_task ordering / α-pool shape) → relaunched
+from scratch. Jobs: ours 21920589 (resumed after Boxing), CompoNet 21920734, CKA-RL
+21920888. Ours' full 5-game ≈ 1–1.5 days (global cost grows with #past under
+`past_task_sampling: all`).
+
+**Meta-World — in sibling clone `/work/pnag/CKA-RL-compare` (branch
+`ours-minmax-row`, SAC backend).** Old slow run (66h→task 10) replaced by a
+user-approved speedup stack: **CrossQ** critic + **windowed critic value-gap**
+(frozen-local critic for BOTH V(S_0)/V(S_H), γ^H bootstrap, global-policy rollout) +
+**needy** consolidation. code-verifier PASS; CL-expert = POSSIBLE_VIOLATION on the
+bootstrap being a biased proxy → instrumented with a live boot-vs-MC diagnostic.
+Findings: parallel envs give **no GPU speedup** (transfer-bound); real lever =
+CrossQ sample-eff + adequate budget. **150k/task FAILED** (hard tasks
+hammer/push-wall don't learn → garbage critics → broken bootstrap). Now: **full
+20-task @300k bootstrap (job 21921681, L40S)** running speculatively alongside a
+3-way parallel validation (do hammer/push-wall learn at 300k? does boot track MC?,
+~3.5h). Details in the clone's `reports/RESULTS.md` + memory
+`metaworld-speedup-design`.
+
 **Where the paper stands.** The method works and the line-1 and line-2 figures are
 built and committed under `reports/final/`. What is missing is breadth: one seed,
 two baselines, a stale GridWorld tier, and one config bug that holds our own

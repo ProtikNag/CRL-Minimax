@@ -1,6 +1,5 @@
-# === REVERSED 5-game Atari, CKA_RL baseline (Lane C, CNN) — separate heads OK ===
 experiment:
-  name: atari5_rev_cka_rl
+  name: atari_rev_componet_smoke
   seed: 0
   results_dir: results
   device: auto
@@ -18,17 +17,11 @@ env:
     clip_rewards: true
   tasks:
   - game: SpaceInvaders
-    threshold: 900
+    threshold: 800
   - game: Boxing
-    threshold: 67
-  - game: Breakout
-    threshold: 285
-  - game: Pong
-    threshold: 20
-  - game: Qbert
-    threshold: 4260
+    threshold: 55
 policy:
-  kind: cka_rl_cnn
+  kind: componet_cnn
   hidden_sizes:
   - 512
   task_conditioned: false
@@ -44,10 +37,10 @@ trainer:
   eps: 0.04
   eval_all_tasks: false
 ppo:
-  method: cka_rl
+  method: componet
   async_envs: true
-  n_envs: 16
-  n_steps: 128
+  n_envs: 8
+  n_steps: 32
   ppo_epochs: 3
   num_minibatches: 4
   clip_ratio: 0.1
@@ -59,27 +52,25 @@ ppo:
   target_kl: 0.03
   select_best_local: true
   normalize_advantage: true
-  task1_iters: 1500
-  local_iters: 3000
+  task1_iters: 20
+  local_iters: 20
   local_iters_per_task:
-    Pong: 1500
-    Breakout: 3000
-    Boxing: 4000
-    SpaceInvaders: 3000
-  global_iters: 2000
-  min_iters: 500
+    SpaceInvaders: 20
+    Boxing: 20
+  global_iters: 20
+  min_iters: 5
   patience: 3
-  global_stop_all_tasks: true
+  global_stop_all_tasks: false
   global_retention_frac: 0.7
-  stop_eval_every: 200
-  stop_eval_episodes: 3
+  stop_eval_every: 10
+  stop_eval_episodes: 2
   past_task_sampling: all
-  constraint_episodes: 16
-  constraint_every: 20
+  constraint_episodes: 4
+  constraint_every: 5
   eval_max_ep_steps: 10000
   eval_noop_enumerate: false
-  eval_episodes: 100
+  eval_episodes: 4
   eval_greedy: true
-  eval_greedy_episodes: 100
+  eval_greedy_episodes: 4
   eval_seed: 100000
-  eval_every: 200
+  eval_every: 10
