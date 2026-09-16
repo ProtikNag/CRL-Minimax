@@ -20,8 +20,6 @@ shared task-conditioned head**. Capacity is fixed and interference is forced.
 | `headline_metrics` | PERF, forgetting, backward and forward transfer, as a table |
 | `raw_vs_normalised` | Final per-task score on both scales, and why the choice matters |
 | `compute_cost` | Wall-clock for one complete 50-task run |
-| `forward_transfer` | What forward transfer measures, drawn as the two areas it is a ratio of |
-| `forward_transfer_spread` | Every task's forward transfer, and how much the methods overlap |
 
 All in `png/` (300 dpi) and `svg/` (vector, verified zero embedded raster).
 
@@ -237,49 +235,6 @@ reference, so its value is 0 by construction and it is omitted from that column.
 Expect a reviewer to press on this. The answer is the division of labour above:
 the plasticity methods win this column and lose every retention column, which is
 what their own papers claim they do.
-
-#### Two figures that make this column legible
-
-`forward_transfer` draws the metric instead of asserting it. Eq. 9 is
-`(AUC − AUC_b) / (1 − AUC_b)` and both terms are areas on the same axes: the
-numerator is the band between a method's learning curve and a from-scratch run
-on the same task, the denominator is everything between that from-scratch run
-and a solved task. Forward transfer is **the share of the room the baseline left
-that the method takes**. Four tasks, one per quarter of the sequence, chosen so
-their mean reproduces each method's overall value to within 0.005 — a stated
-rule rather than four tasks that happened to look good.
-
-Two things it exposes that the number alone does not:
-
-- Ours is not failing to learn these tasks. On task 31 it captures half the
-  available room. It spends less of its budget inside each task's own phase and
-  makes the rest up during consolidation, which this metric by construction
-  cannot see.
-- The x-axis has to be normalised per method, because each method is averaged
-  over its own phase and the phases differ in length. That is what the metric
-  does, and it is also what it hides.
-
-`forward_transfer_spread` is the check on how much any of this is worth. Every
-task's value, all 50, per method:
-
-| | mean | median | tasks made worse |
-|---|---:|---:|---:|
-| CReLUs | +0.25 | +0.30 | 12 of 50 |
-| CKA-RL | +0.20 | +0.17 | 15 of 50 |
-| CbpNet | +0.18 | +0.17 | 14 of 50 |
-| Fine-tuning | +0.16 | +0.12 | 16 of 50 |
-| **Min-Max (ours)** | +0.13 | +0.12 | 17 of 50 |
-
-**The per-task spread is far wider than the gap between the means.** Individual
-tasks run from −1.11 to +0.92 while every method's mean sits between +0.13 and
-+0.25, and the distributions overlap almost completely. Ours and fine-tuning
-share a median of +0.12. Every method, ours included, makes between 12 and 17 of
-the 50 tasks *worse* than learning them from scratch.
-
-So the forward-transfer column orders the methods but does not separate them,
-and it is worth saying so rather than letting the ordering carry more weight
-than it can. The retention columns do separate them, which is the asymmetry the
-paper should lean on.
 
 ### Compute
 
