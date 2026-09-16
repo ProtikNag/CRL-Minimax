@@ -47,30 +47,6 @@
     "bwt": -0.22725547759039014,
     "fwt": 0.12209908628184986
   },
-  "biggrid50_cbp_seed0": {
-    "tasks_done": 50,
-    "complete": true,
-    "perf": 0.2838878943062586,
-    "forgetting": 0.4314979044309134,
-    "bwt": -0.3943095294109653,
-    "fwt": 0.17548197259612686
-  },
-  "biggrid50_cbp_seed1": {
-    "tasks_done": 24,
-    "complete": false,
-    "perf": 0.2061212796193761,
-    "forgetting": 0.5102854719725163,
-    "bwt": -0.49425284569933303,
-    "fwt": 0.03501777907892796
-  },
-  "biggrid50_cbp_seed2": {
-    "tasks_done": 28,
-    "complete": false,
-    "perf": 0.3314714098956835,
-    "forgetting": 0.41729839468381363,
-    "bwt": -0.39279738902750555,
-    "fwt": 0.12896699989119023
-  },
   "biggrid50_crelu_seed0": {
     "tasks_done": 50,
     "complete": true,
@@ -80,12 +56,44 @@
     "fwt": 0.25061691413158116
   },
   "biggrid50_crelu_seed1": {
-    "tasks_done": 4,
-    "complete": false,
-    "perf": 0.5451478833844567,
-    "forgetting": 0.34919468686454797,
-    "bwt": -0.34919468686454797,
-    "fwt": 0.18930707400980268
+    "tasks_done": 50,
+    "complete": true,
+    "perf": 0.284705367798712,
+    "forgetting": 0.43845610066989354,
+    "bwt": -0.4083008889711023,
+    "fwt": 0.12190374094216772
+  },
+  "biggrid50_crelu_seed2": {
+    "tasks_done": 50,
+    "complete": true,
+    "perf": 0.3707783135677933,
+    "forgetting": 0.328369865492876,
+    "bwt": -0.297310062267266,
+    "fwt": 0.16318035578556742
+  },
+  "biggrid50_cbp_seed0": {
+    "tasks_done": 50,
+    "complete": true,
+    "perf": 0.2838878943062586,
+    "forgetting": 0.4314979044309134,
+    "bwt": -0.3943095294109653,
+    "fwt": 0.17548197259612686
+  },
+  "biggrid50_cbp_seed1": {
+    "tasks_done": 50,
+    "complete": true,
+    "perf": 0.22547433910132877,
+    "forgetting": 0.4958199994277125,
+    "bwt": -0.45776530922751374,
+    "fwt": 0.12263372641161506
+  },
+  "biggrid50_cbp_seed2": {
+    "tasks_done": 50,
+    "complete": true,
+    "perf": 0.26364485006693844,
+    "forgetting": 0.47343121607845884,
+    "bwt": -0.438281942764884,
+    "fwt": 0.17067363417561446
   },
   "biggrid50_sh_finetune_seed0": {
     "tasks_done": 50,
@@ -134,5 +142,79 @@
     "forgetting": 0.6352977677539746,
     "bwt": -0.5869290927770492,
     "fwt": null
+  },
+  "_aggregate": {
+    "ours": {
+      "label": "Ours (min-max)",
+      "n_seeds": 3,
+      "perf_mean": 0.5961565227163875,
+      "perf_ci": 0.017019415639610316,
+      "forgetting_mean": 0.11200010617639804,
+      "forgetting_ci": 0.01939291153442346,
+      "bwt_mean": 0.35777403068586416,
+      "bwt_ci": 0.06885045243165544,
+      "fwt_mean": 0.07711954492198092,
+      "fwt_ci": 0.15540927068235538
+    },
+    "cka_rl": {
+      "label": "CKA-RL",
+      "n_seeds": 3,
+      "perf_mean": 0.47020350110090764,
+      "perf_ci": 0.09854372846627872,
+      "forgetting_mean": 0.2365154922995747,
+      "forgetting_ci": 0.06895035663211567,
+      "bwt_mean": -0.1874935484680689,
+      "bwt_ci": 0.09713972217699172,
+      "fwt_mean": 0.16154981195129203,
+      "fwt_ci": 0.09310896769879183
+    },
+    "crelu": {
+      "label": "CReLUs",
+      "n_seeds": 3,
+      "perf_mean": 0.328018126911402,
+      "perf_ci": 0.10692376346517186,
+      "forgetting_mean": 0.39135045090379905,
+      "forgetting_ci": 0.14094662397565513,
+      "bwt_mean": -0.3589362927172636,
+      "bwt_ci": 0.14037064143564867,
+      "fwt_mean": 0.1785670036197721,
+      "fwt_ci": 0.16327474304520445
+    },
+    "cbp": {
+      "label": "CbpNet",
+      "n_seeds": 3,
+      "perf_mean": 0.2576690278248419,
+      "perf_ci": 0.0736897888435585,
+      "forgetting_mean": 0.4669163733123616,
+      "forgetting_ci": 0.08111907736665037,
+      "bwt_mean": -0.4301189271344544,
+      "bwt_ci": 0.08075570979538567,
+      "fwt_mean": 0.1562631110611188,
+      "fwt_ci": 0.07259972766531564
+    },
+    "finetune": {
+      "label": "Finetune",
+      "n_seeds": 3,
+      "perf_mean": 0.26103450267126743,
+      "perf_ci": 0.12667320675347654,
+      "forgetting_mean": 0.4304283567291096,
+      "forgetting_ci": 0.11855787403501147,
+      "bwt_mean": -0.3903806495934303,
+      "bwt_ci": 0.13120092476141626,
+      "fwt_mean": 0.14233883924935997,
+      "fwt_ci": 0.05077557417533529
+    },
+    "baseline": {
+      "label": "Baseline (scratch)",
+      "n_seeds": 3,
+      "perf_mean": 0.15750201355125462,
+      "perf_ci": 0.1528995114739873,
+      "forgetting_mean": 0.5587283922052564,
+      "forgetting_ci": 0.16507610625979477,
+      "bwt_mean": -0.5060450273701002,
+      "bwt_ci": 0.17402493869594554,
+      "fwt_mean": null,
+      "fwt_ci": null
+    }
   }
 }

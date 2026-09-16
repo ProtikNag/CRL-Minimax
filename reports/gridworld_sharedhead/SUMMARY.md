@@ -1,20 +1,12 @@
-# GridWorld (shared-head, 50-task) — 6-method comparison
+# GridWorld (50-task, shared-head) — 6-method × 3-seed comparison
 
-Fixed-capacity / no-growth regime (single shared actor+critic head, task-conditioned).
-3 recent methods (CKA-RL, CbpNet, CReLUs) + 2 basic (finetune, baseline) vs ours.
-FWT vs from-scratch baseline (per seed). Aggregated over COMPLETE seeds.
+Fixed-capacity / no-growth regime. PERF/FWT/BWT normalized (0=random, 1=expert-ceiling); mean ± 95% CI over 3 seeds. FWT paired to seed-matched from-scratch baseline.
 
-| Method | PERF | Forgetting | BWT | FWT | seeds |
-|---|--:|--:|--:|--:|:--|
-| **ours** | 0.596 ± 0.006 | 0.112 ± 0.006 | +0.358 ± 0.023 | +0.077 ± 0.051 | 3 |
-| CKA-RL | 0.470 ± 0.032 | 0.237 ± 0.023 | -0.187 ± 0.032 | +0.162 ± 0.031 | 3 |
-| CbpNet | 0.284 ± 0.000 | 0.431 ± 0.000 | -0.394 ± 0.000 | +0.175 ± 0.000 | 1 |
-| CReLUs | 0.329 ± 0.000 | 0.407 ± 0.000 | -0.371 ± 0.000 | +0.251 ± 0.000 | 1 |
-| finetune | 0.261 ± 0.042 | 0.430 ± 0.039 | -0.390 ± 0.043 | +0.142 ± 0.017 | 3 |
-| baseline | 0.158 ± 0.050 | 0.559 ± 0.054 | -0.506 ± 0.057 | 0 (ref) | 3 |
-
-(ours/CKA-RL/finetune/baseline = 3 seeds; CbpNet/CReLUs = 1 seed so far, s1/s2 running -> 3-seed CIs soon.)
-
-## Read: ours >> CKA-RL (retention) > CbpNet/CReLUs (plasticity methods, forget ~like finetune, high FWT) ~ finetune > baseline. Ours only method with positive BWT.
-## Footprint (all no-growth): ours=fixed head; CKA-RL=fixed trunk+bounded pool+alpha; CbpNet=fixed+unit resets; CReLUs=fixed+CReLU act. Disclosure: ours re-simulates past envs.
-## Per-run raw + tidy CSVs (forgetting_matrix, learning_curves, duals, phases) per dir.
+| Method | PERF ↑ | FWT ↑ | BWT ↑ | Forgetting ↓ | seeds |
+|---|---|---|---|---|---|
+| Ours (min-max) | 0.596 ± 0.017 | +0.077 | +0.358 ± 0.069 | 0.112 ± 0.019 | 3 |
+| CKA-RL | 0.470 ± 0.099 | +0.162 | -0.187 ± 0.097 | 0.237 ± 0.069 | 3 |
+| CReLUs | 0.328 ± 0.107 | +0.179 | -0.359 ± 0.140 | 0.391 ± 0.141 | 3 |
+| Finetune | 0.261 ± 0.127 | +0.142 | -0.390 ± 0.131 | 0.430 ± 0.119 | 3 |
+| CbpNet | 0.258 ± 0.074 | +0.156 | -0.430 ± 0.081 | 0.467 ± 0.081 | 3 |
+| Baseline (scratch) | 0.158 ± 0.153 | — | -0.506 ± 0.174 | 0.559 ± 0.165 | 3 |
