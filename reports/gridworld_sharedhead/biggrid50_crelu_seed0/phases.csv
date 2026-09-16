@@ -43,3 +43,9 @@ finetune,40,"biggrid50-goal(40,38)",finetune,500,512000,652.2,6937.107,9369600
 finetune,41,"biggrid50-goal(33,38)",finetune,450,460800,600.6,7548.838,9830400
 finetune,42,"biggrid50-goal(9,45)",finetune,150,153600,204.7,7764.991,9984000
 finetune,43,"biggrid50-goal(9,38)",finetune,150,153600,208.8,7985.467,10137600
+finetune,44,"biggrid50-goal(9,3)",finetune,500,512000,705.6,8702.976,10649600
+finetune,45,"biggrid50-goal(40,24)",finetune,150,153600,217.4,8932.656,10803200
+finetune,46,"biggrid50-goal(33,31)",finetune,150,153600,217.8,9163.022,10956800
+finetune,47,"biggrid50-goal(46,45)",finetune,150,153600,219.9,9395.374,11110400
+finetune,48,"biggrid50-goal(3,38)",finetune,150,153600,224.5,9632.697,11264000
+finetune,49,"biggrid50-goal(46,3)",finetune,500,512000,768.7,10414.425,11776000

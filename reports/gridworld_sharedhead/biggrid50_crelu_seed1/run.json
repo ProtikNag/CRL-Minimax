@@ -1,0 +1,734 @@
+{
+  "run_name": "biggrid50_crelu_seed1",
+  "method": "finetune",
+  "seed": 1,
+  "git_sha": "3adc78a",
+  "started": "2026-09-16T01:52:59.344980+00:00",
+  "env_family": "biggrid",
+  "tasks": [
+    "biggrid50-goal(40,31)",
+    "biggrid50-goal(9,31)",
+    "biggrid50-goal(15,31)",
+    "biggrid50-goal(9,24)",
+    "biggrid50-goal(21,17)",
+    "biggrid50-goal(27,3)",
+    "biggrid50-goal(3,31)",
+    "biggrid50-goal(33,10)",
+    "biggrid50-goal(27,45)",
+    "biggrid50-goal(21,45)",
+    "biggrid50-goal(33,3)",
+    "biggrid50-goal(21,24)",
+    "biggrid50-goal(21,3)",
+    "biggrid50-goal(3,17)",
+    "biggrid50-goal(15,45)",
+    "biggrid50-goal(3,24)",
+    "biggrid50-goal(3,10)",
+    "biggrid50-goal(46,31)",
+    "biggrid50-goal(46,24)",
+    "biggrid50-goal(3,45)",
+    "biggrid50-goal(21,10)",
+    "biggrid50-goal(40,3)",
+    "biggrid50-goal(15,38)",
+    "biggrid50-goal(40,45)",
+    "biggrid50-goal(15,17)",
+    "biggrid50-goal(15,24)",
+    "biggrid50-goal(21,38)",
+    "biggrid50-goal(33,17)",
+    "biggrid50-goal(27,17)",
+    "biggrid50-goal(3,3)",
+    "biggrid50-goal(9,10)",
+    "biggrid50-goal(46,17)",
+    "biggrid50-goal(40,10)",
+    "biggrid50-goal(46,38)",
+    "biggrid50-goal(27,31)",
+    "biggrid50-goal(21,31)",
+    "biggrid50-goal(46,10)",
+    "biggrid50-goal(9,17)",
+    "biggrid50-goal(33,24)",
+    "biggrid50-goal(40,17)",
+    "biggrid50-goal(40,38)",
+    "biggrid50-goal(33,38)",
+    "biggrid50-goal(9,45)",
+    "biggrid50-goal(9,38)",
+    "biggrid50-goal(9,3)",
+    "biggrid50-goal(40,24)",
+    "biggrid50-goal(33,31)",
+    "biggrid50-goal(46,45)",
+    "biggrid50-goal(3,38)",
+    "biggrid50-goal(46,3)"
+  ],
+  "task_order": "as_configured",
+  "reference": {
+    "random": [
+      0.6758502721786499,
+      0.7598639130592346,
+      0.7680271863937378,
+      0.7806122899055481,
+      0.741836667060852,
+      0.6914965510368347,
+      0.7047618627548218,
+      0.8530611395835876,
+      0.6384353637695312,
+      0.7190476655960083,
+      0.8380952477455139,
+      0.7738094329833984,
+      0.7176870107650757,
+      0.775170087814331,
+      0.7642857432365417,
+      0.7221088409423828,
+      0.6639455556869507,
+      0.6880951523780823,
+      0.8499998450279236,
+      0.5863945484161377,
+      0.7323129177093506,
+      0.8925169110298157,
+      0.7653061151504517,
+      0.5880952477455139,
+      0.8377550840377808,
+      0.8006802201271057,
+      0.7809523344039917,
+      0.8554421067237854,
+      0.7442176938056946,
+      0.6363945007324219,
+      0.7588434815406799,
+      0.720748245716095,
+      0.6819727420806885,
+      0.6819727420806885,
+      0.8231292366981506,
+      0.7646258473396301,
+      0.6608842611312866,
+      0.7819727063179016,
+      0.8112245202064514,
+      0.7727890014648438,
+      0.6465986371040344,
+      0.7030612230300903,
+      0.6659863591194153,
+      0.6724489331245422,
+      0.6700679659843445,
+      0.8778910040855408,
+      0.7908163070678711,
+      0.5979592204093933,
+      0.6476190090179443,
+      0.7499998807907104
+    ],
+    "ceiling": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "config": {
+    "experiment": {
+      "name": "biggrid50_crelu",
+      "seed": 1,
+      "results_dir": "results",
+      "device": "auto",
+      "log_every": 50
+    },
+    "env": {
+      "family": "biggrid",
+      "params": {
+        "size": 50,
+        "gamma": 0.99,
+        "max_steps": 160,
+        "goal_in_obs": false,
+        "slip": 0.1,
+        "obstacle_seed": 12345
+      },
+      "tasks": [
+        {
+          "goal": [
+            40,
+            31
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            31
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            15,
+            31
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            24
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            17
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            27,
+            3
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            31
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            10
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            27,
+            45
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            45
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            3
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            24
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            3
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            17
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            15,
+            45
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            24
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            10
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            31
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            24
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            45
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            10
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            3
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            15,
+            38
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            45
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            15,
+            17
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            15,
+            24
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            38
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            17
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            27,
+            17
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            3
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            10
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            17
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            10
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            38
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            27,
+            31
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            21,
+            31
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            10
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            17
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            24
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            17
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            38
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            38
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            45
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            38
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            9,
+            3
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            40,
+            24
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            33,
+            31
+          ],
+          "slip": 0.2,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            45
+          ],
+          "slip": 0.3,
+          "obstacle_density": 0.15,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            3,
+            38
+          ],
+          "slip": 0.0,
+          "obstacle_density": 0.0,
+          "threshold": 0.85
+        },
+        {
+          "goal": [
+            46,
+            3
+          ],
+          "slip": 0.1,
+          "obstacle_density": 0.08,
+          "threshold": 0.85
+        }
+      ]
+    },
+    "policy": {
+      "kind": "mlp_ac_crelu",
+      "hidden_sizes": [
+        64
+      ],
+      "task_conditioned": true,
+      "pool_size": 5
+    },
+    "estimator": {
+      "kind": "exact",
+      "episodes_per_eval": 16,
+      "episodes_per_grad": 16,
+      "episodes_per_ref": 64,
+      "baseline": "batch_mean",
+      "time_discount_weighting": true
+    },
+    "duals": {
+      "kind": "projected_ascent",
+      "lr": 0.3,
+      "init": 0.0,
+      "max_value": 5.0,
+      "warm_start": false,
+      "kp": 0.05,
+      "ki": 0.01,
+      "kd": 0.0
+    },
+    "trainer": {
+      "cycles_per_task": 1,
+      "local_steps": 50,
+      "global_steps": 50,
+      "task1_steps": 200,
+      "lr_local": 0.05,
+      "lr_global": 0.05,
+      "optimizer": "sgd",
+      "eps": 0.04,
+      "omega": null,
+      "past_task_sampling": "all",
+      "entropy_coef": 0.0,
+      "eval_episodes": 32,
+      "eval_all_tasks": false,
+      "eval_probe_every": 25,
+      "report_return": false,
+      "kind": "ppo",
+      "local_unconstrained": false
+    },
+    "ppo": {
+      "method": "finetune",
+      "past_task_sampling": "sample",
+      "constraint_greedy": false,
+      "eval_noop_enumerate": false,
+      "eval_max_ep_steps": 0,
+      "joint_iters": 2000,
+      "joint_single_iters": 600,
+      "global_bc_coef": 0.0,
+      "clear_policy_clone_cost": 0.01,
+      "clear_value_clone_cost": 0.005,
+      "clear_snapshot_batches": 2,
+      "clear_replay_task_per_step": 1,
+      "async_envs": false,
+      "n_envs": 16,
+      "n_steps": 64,
+      "ppo_epochs": 4,
+      "target_kl": 0.0,
+      "num_minibatches": 4,
+      "clip_ratio": 0.2,
+      "gae_lambda": 0.95,
+      "vf_coef": 0.5,
+      "ent_coef": 0.01,
+      "max_grad_norm": 0.5,
+      "lr": 0.00025,
+      "normalize_advantage": true,
+      "task1_iters": 300,
+      "local_iters": 250,
+      "local_iters_per_task": {},
+      "select_best_local": true,
+      "global_stop_all_tasks": true,
+      "global_retention_frac": 0.7,
+      "global_iters": 250,
+      "min_iters": 50,
+      "patience": 3,
+      "stop_eval_every": 50,
+      "stop_eval_episodes": 10,
+      "constraint_episodes": 16,
+      "constraint_every": 5,
+      "eval_episodes": 30,
+      "eval_greedy": true,
+      "eval_greedy_episodes": 30,
+      "eval_seed": 100000,
+      "eval_every": 10,
+      "matrix_eval_every": 0,
+      "diagnostics": false,
+      "diag_every": 25,
+      "diag_score_episodes": 6,
+      "global_probe_head_only": false
+    }
+  }
+}

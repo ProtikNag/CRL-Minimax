@@ -1,0 +1,5 @@
+method,task_idx,task,phase,iters,frames_phase,wall_s_phase,t_wall,frames_total
+finetune,0,"biggrid50-goal(40,31)",task1,250,256000,52.1,53.895,256000
+finetune,1,"biggrid50-goal(9,31)",finetune,150,153600,35.5,89.917,409600
+finetune,2,"biggrid50-goal(15,31)",finetune,150,153600,39.5,129.953,563200
+finetune,3,"biggrid50-goal(9,24)",finetune,150,153600,43.9,174.656,716800

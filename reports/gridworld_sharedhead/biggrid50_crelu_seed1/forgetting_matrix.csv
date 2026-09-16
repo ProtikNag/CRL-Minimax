@@ -1,0 +1,11 @@
+method,after_task,after_task_name,eval_task,eval_task_name,raw,normalized
+finetune,0,"biggrid50-goal(40,31)",0,"biggrid50-goal(40,31)",0.9778909087181091,0.9317935836920526
+finetune,1,"biggrid50-goal(9,31)",0,"biggrid50-goal(40,31)",0.815646231174469,0.43126970963512695
+finetune,1,"biggrid50-goal(9,31)",1,"biggrid50-goal(9,31)",0.9397958517074585,0.7492915410610812
+finetune,2,"biggrid50-goal(15,31)",0,"biggrid50-goal(40,31)",0.8527209758758545,0.5456450785443325
+finetune,2,"biggrid50-goal(15,31)",1,"biggrid50-goal(9,31)",0.8874149322509766,0.5311613960928958
+finetune,2,"biggrid50-goal(15,31)",2,"biggrid50-goal(15,31)",0.938095211982727,0.7331377455189784
+finetune,3,"biggrid50-goal(9,24)",0,"biggrid50-goal(40,31)",0.734013557434082,0.17943339223621957
+finetune,3,"biggrid50-goal(9,24)",1,"biggrid50-goal(9,31)",0.893197238445282,0.5552406849160361
+finetune,3,"biggrid50-goal(9,24)",2,"biggrid50-goal(15,31)",0.9146258234977722,0.6319647325262124
+finetune,3,"biggrid50-goal(9,24)",3,"biggrid50-goal(9,24)",0.9591835141181946,0.8139527238593588

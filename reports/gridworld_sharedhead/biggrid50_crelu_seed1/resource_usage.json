@@ -1,0 +1,13 @@
+{
+  "biggrid50-goal(40,31)": {
+    "task": 1,
+    "task1": {
+      "iters_run": 250,
+      "early_stopped": true,
+      "wall_s": 52.1,
+      "final_greedy": 0.9795916676521301,
+      "best_greedy": 0.9795916676521301
+    },
+    "local_greedy": 0.9778909087181091
+  }
+}
