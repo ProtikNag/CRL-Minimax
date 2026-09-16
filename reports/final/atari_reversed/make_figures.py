@@ -58,15 +58,34 @@ ORDER_KEY = "reversed"
 COLOR = {
     "MinMax": AC["blue"],
     "CLEAR": AC["amber"],
+    "CkaRl": AC["violet"],
+    "CompoNet": AC["teal"],
     "Local": AC["text_faint"],
     "Joint": AC["green"],
 }
 NAME = {
     "MinMax": "Min-Max (ours)",
     "CLEAR": "CLEAR",
+    "CkaRl": "CKA-RL",
+    "CompoNet": "CompoNet",
     "Local": "Local specialist",
     "Joint": "Joint ceiling",
 }
+
+# Panel order for the 2x2 matrix grid and the column order everywhere else.
+# (key, source, live-name). "cache" reads the completed transcription,
+# "live" reads the in-progress snapshot.
+PANELS = [
+    ("MinMax",   "live",  "ours"),
+    ("CLEAR",    "cache", "clear_reversed"),
+    ("CkaRl",    "live",  "cka_rl"),
+    ("CompoNet", "live",  "componet"),
+]
+
+# Marks a cell that was NOT measured and is standing in for a run still going.
+PLACEHOLDER = "\u2021"      # double dagger
+# Marks a forward-transfer figure whose from-scratch baseline is being redone.
+PENDING_BASE = "*"
 
 # ── Retention colour scale ──────────────────────────────────────────────────
 # Clamped at the ceiling: z is min(retention, 1.0), so every cell at or above
@@ -95,6 +114,71 @@ CEILING_TICKTEXT = ["0%", "25%", f"{PIVOT:.0%}", "≥100%"]
 def load_data() -> dict:
     """Load the cached eval matrices transcribed from the cluster runs."""
     return json.loads(DATA.read_text(encoding="utf-8"))
+
+
+LIVE = HERE / "data_live.json"
+
+
+def load_live() -> dict:
+    """The in-progress reversed-order run, transcribed from the cluster.
+
+    Separate from the cached transcription because it is a DIFFERENT run: it is
+    the rerun with per-task thresholds raised to the jointly-trained model's
+    score. Task 1 alone moved 588.5 -> 1318.1 on SpaceInvaders, so the two
+    sources are not interchangeable and are never averaged together.
+    """
+    return json.loads(LIVE.read_text(encoding="utf-8"))
+
+
+def padded(rows: list) -> np.ndarray:
+    """Jagged lower-triangular rows -> dense 5x5 with NaN for what is missing."""
+    grid = np.full((5, 5), np.nan)
+    for i, row in enumerate(rows):
+        grid[i, : len(row)] = [np.nan if v is None else float(v) for v in row]
+    return grid
+
+
+def source_matrix(data: dict, live: dict, source: str, name: str) -> np.ndarray:
+    if source == "live":
+        return padded(live["methods"][name]["eval_matrix"])
+    return padded(data["matrices"][name])
+
+
+def filled(data: dict, live: dict) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """Every method as (matrix, measured_mask), missing rows standing in.
+
+    The stand-in rule is the one that was asked for: a task a method has not
+    reached is assumed to go as well as it went for ours. Ours' own unreached
+    rows fall back to its completed pre-threshold-fix run, the only five-task
+    run of ours that exists.
+
+    NOTHING here is measured data for the filled cells, and the mask is what
+    every figure uses to mark them. A figure that cannot mark them must not use
+    this function.
+    """
+    live_ours = source_matrix(data, live, "live", "ours")
+    old_ours = padded(data["matrices"][f"v5_{ORDER_KEY}"])
+    # Row i of the stand-in: ours' live row if it reached that task, else ours'
+    # completed older run.
+    stand_in = np.where(np.isfinite(live_ours).any(axis=1)[:, None],
+                        live_ours, old_ours)
+
+    out = {}
+    for key, source, name in PANELS:
+        grid = source_matrix(data, live, source, name)
+        measured = np.isfinite(grid).any(axis=1)          # per row
+        complete = np.where(measured[:, None], grid, stand_in)
+        # Mask is per CELL and only true where the run actually produced it.
+        cell_mask = np.isfinite(grid) & measured[:, None]
+        out[key] = (complete, cell_mask)
+    return out
+
+
+def measured_rows(data: dict, live: dict) -> dict[str, int]:
+    """Completed tasks per method, for captions that must not be typed."""
+    return {key: int(np.isfinite(source_matrix(data, live, source, name)
+                                 ).any(axis=1).sum())
+            for key, source, name in PANELS}
 
 
 def reference_in_order(data: dict, key: str, order: list[str]) -> np.ndarray:
@@ -131,7 +215,7 @@ def random_scores() -> dict[str, float]:
     raise RuntimeError("RANDOM_SCORES not found in crl/envs/atari.py")
 
 
-def transfer_metrics(data: dict, key: str) -> dict:
+def transfer_metrics(data: dict, key, order: list[str] | None = None) -> dict:
     """Backward transfer and the aggregates it travels with, in normalised units.
 
     Scores are put on a common scale as ``(raw - random) / (ceiling - random)``
@@ -143,12 +227,12 @@ def transfer_metrics(data: dict, key: str) -> dict:
     forgetting. The final task has nothing trained after it, so it has no
     backward transfer and is excluded from every mean.
     """
-    order = data["orders"][ORDER_KEY]
+    order = order if order is not None else data["orders"][ORDER_KEY]
     joint = reference_in_order(data, "joint", order)
     random_by_game = random_scores()
     floor = np.array([random_by_game[game] for game in order], dtype=float)
 
-    scores = matrix(data, key)
+    scores = key if isinstance(key, np.ndarray) else matrix(data, key)
     normalised = (scores - floor[None, :]) / (joint - floor)[None, :]
 
     count = len(order)
@@ -198,50 +282,67 @@ def scale_color(fraction: float) -> str:
 
 # ── Figure 1: forgetting matrices ───────────────────────────────────────────
 def figure_matrices(data: dict) -> None:
-    """Min-Max vs CLEAR retention matrices, reversed order, clamped colour."""
+    """Retention matrices for all four methods, 2x2, clamped colour.
+
+    Cells a run has not reached yet are stood in for, and every such cell is
+    drawn washed out with a dashed border and a double dagger. The distinction
+    has to survive a reader who only looks at the picture, so it is carried by
+    three redundant channels, not by the caption alone.
+    """
+    live = load_live()
     order = data["orders"][ORDER_KEY]
     labels = data["short_labels"]
     joint = reference_in_order(data, "joint", order)
-    panels = [
-        (NAME["MinMax"], retention_matrix(matrix(data, f"v5_{ORDER_KEY}"), joint)),
-        (NAME["CLEAR"], retention_matrix(matrix(data, f"clear_{ORDER_KEY}"), joint)),
-    ]
+    merged = filled(data, live)
+    panels = [(NAME[key], retention_matrix(merged[key][0], joint), merged[key][1])
+              for key, _src, _name in PANELS]
     axis_labels = [labels[game] for game in order]
 
     fig = make_subplots(
-        rows=1, cols=2, horizontal_spacing=0.15,
-        subplot_titles=[name for name, _ in panels],
+        rows=2, cols=2, horizontal_spacing=0.17, vertical_spacing=0.175,
+        subplot_titles=[name for name, _v, _m in panels],
     )
 
     size = len(axis_labels)
     gap = 0.035  # emulates the heatmap's xgap/ygap without a raster trace
 
-    for column, (_name, values) in enumerate(panels, start=1):
-        suffix = "" if column == 1 else str(column)
+    for index, (_name, values, mask) in enumerate(panels):
+        row, column = index // 2 + 1, index % 2 + 1
+        suffix = "" if index == 0 else str(index + 1)
         for row_index in range(size):
             for column_index in range(row_index + 1):
                 value = values[row_index, column_index]
+                real = bool(mask[row_index, column_index])
                 # Colour is clamped at the ceiling; the printed number is always
                 # the true value, however far above 100% it runs.
                 shade = min(max(value, 0.0), 1.0)
+                fill = scale_color(shade)
                 fig.add_shape(
                     type="rect", layer="below",
                     x0=column_index + gap, x1=column_index + 1 - gap,
                     y0=row_index + gap, y1=row_index + 1 - gap,
                     xref=f"x{suffix}", yref=f"y{suffix}",
-                    fillcolor=scale_color(shade), line=dict(width=0),
+                    fillcolor=fill if real else hex_to_rgba(fill, 0.28),
+                    line=dict(width=0) if real else dict(
+                        color=AC["text_muted"], width=1.1, dash="dot"),
                 )
-                # White only on the two saturated ends of the ramp.
-                light = shade < 0.26 or shade > 0.93
+                # White only on the two saturated ends of the ramp, and never on
+                # a washed-out stand-in cell.
+                light = real and (shade < 0.26 or shade > 0.93)
                 on_diagonal = row_index == column_index
+                text = f"{value:.0%}"
+                if on_diagonal and real:
+                    text = f"<b>{text}</b>"
+                if not real:
+                    text = f"<i>{text}{PLACEHOLDER}</i>"
                 fig.add_annotation(
                     x=column_index + 0.5, y=row_index + 0.5,
                     xref=f"x{suffix}", yref=f"y{suffix}",
-                    text=f"<b>{value:.0%}</b>" if on_diagonal else f"{value:.0%}",
-                    showarrow=False,
+                    text=text, showarrow=False,
                     font=dict(
                         family=FONT_MONO, size=10,
-                        color=AC["bg"] if light else AC["text_primary"],
+                        color=AC["bg"] if light
+                        else (AC["text_muted"] if not real else AC["text_primary"]),
                     ),
                 )
 
@@ -251,7 +352,7 @@ def figure_matrices(data: dict) -> None:
             x=[None], y=[None], mode="markers", hoverinfo="skip", showlegend=False,
             marker=dict(
                 color=[0], colorscale=RETENTION_SCALE, cmin=0.0, cmax=1.0,
-                showscale=(column == 2), opacity=0,
+                showscale=(index == 1), opacity=0,
                 colorbar=dict(
                     title=dict(
                         text="retained vs ceiling",
@@ -265,23 +366,29 @@ def figure_matrices(data: dict) -> None:
                     tickfont=dict(family=FONT_MONO, size=9, color=AC["text_muted"]),
                 ),
             ),
-        ), row=1, col=column)
+        ), row=row, col=column)
 
-    for annotation in fig.layout.annotations[:2]:
+    for annotation in fig.layout.annotations[:len(panels)]:
         annotation.font = dict(family=FONT_UI, size=12.5, color=AC["text_primary"])
-        annotation.y = 1.04
+        annotation.yshift = 6
 
     # Numeric axes with cells on the unit lattice, ticks re-labelled at the cell
     # centres. Category axes cannot address the fractional edges the rectangles
     # need, and the reader sees exactly the same labels either way.
     centres = [i + 0.5 for i in range(size)]
     fig.update_xaxes(
-        title=dict(text="evaluated on  (learning order →)",
-                   font=dict(family=FONT_UI, size=10.5, color=AC["text_muted"])),
         range=[0, size], tickmode="array", tickvals=centres, ticktext=axis_labels,
         showgrid=False, ticklen=0, side="bottom", showline=False, zeroline=False,
         tickfont=dict(family=FONT_UI, size=9, color=AC["text_muted"]),
     )
+    # Only the bottom row carries the x title. On the top row it landed on the
+    # panel titles of the row beneath it.
+    for panel_col in (1, 2):
+        fig.update_xaxes(
+            title=dict(text="evaluated on  (learning order →)",
+                       font=dict(family=FONT_UI, size=10.5,
+                                 color=AC["text_muted"])),
+            row=2, col=panel_col)
     fig.update_yaxes(
         range=[size, 0], tickmode="array", tickvals=centres, ticktext=axis_labels,
         showgrid=False, ticklen=0, showline=False, zeroline=False,
@@ -304,13 +411,19 @@ def figure_final_scores(data: dict) -> None:
     labels = data["short_labels"]
     joint = reference_in_order(data, "joint", order)
     local = reference_in_order(data, f"local_{ORDER_KEY}", order)
-    minmax = matrix(data, f"v5_{ORDER_KEY}")[-1]
-    clear = matrix(data, f"clear_{ORDER_KEY}")[-1]
+    live = load_live()
+    merged = filled(data, live)
 
-    # Bars are the two methods plus the specialist. The ceiling is a rule, not a
-    # bar: it is a threshold to clear, and drawing it as a fourth bar made the
-    # panel read as a four-way race with no reference at all.
-    series = [("Local", local), ("MinMax", minmax), ("CLEAR", clear)]
+    # Bars are the four methods plus the specialist. The ceiling is a rule, not a
+    # bar: it is a threshold to clear, and drawing it as another bar made the
+    # panel read as a race with no reference at all.
+    #
+    # The final row of a method that has not finished is entirely stand-in, so
+    # its bars are hatched. `real` is per game and comes from the mask.
+    series = [("Local", local, np.ones(len(order), dtype=bool))]
+    for key, _src, _name in PANELS:
+        grid, mask = merged[key]
+        series.append((key, grid[-1], mask[-1]))
 
     # The ceiling value rides in the panel subtitle rather than beside its rule.
     # Beside the rule it either collided with a bar label (Pong: ceiling 20.7
@@ -325,15 +438,25 @@ def figure_final_scores(data: dict) -> None:
 
     for column, _game in enumerate(order, start=1):
         index = column - 1
-        for key, values in series:
+        for key, values, real_flags in series:
             value = float(values[index])
+            real = bool(real_flags[index])
+            # A stand-in bar keeps the series colour and stays a solid fill:
+            # the palette is the palette. It is set apart by alpha plus a dashed
+            # outline in the same hue, which is the encoding the style file
+            # already uses for a de-emphasised mark, not by a texture.
+            marker = dict(color=COLOR[key], line=dict(width=0))
+            if not real:
+                marker = dict(color=hex_to_rgba(COLOR[key], 0.26),
+                              line=dict(color=COLOR[key], width=1.3))
+            label = format_score(value) + ("" if real else PLACEHOLDER)
             fig.add_trace(go.Bar(
                 x=[NAME[key]], y=[value],
                 name=NAME[key], legendgroup=key, showlegend=(column == 1),
-                marker=dict(color=COLOR[key], line=dict(width=0)),
-                width=0.62,
-                text=[format_score(value)], textposition="outside", cliponaxis=False,
-                textfont=dict(family=FONT_MONO, size=9.5, color=AC["text_primary"]),
+                marker=marker, width=0.62,
+                text=[label], textposition="outside", cliponaxis=False,
+                textfont=dict(family=FONT_MONO, size=9.5,
+                              color=AC["text_primary"] if real else AC["text_muted"]),
                 hovertemplate="%{x}: %{y:,.1f}<extra></extra>",
             ), row=1, col=column)
 
@@ -346,16 +469,17 @@ def figure_final_scores(data: dict) -> None:
         # Bars need headroom for their outside labels; the ceiling rule carries
         # its label beside it and needs far less. Giving the rule the same 1.26
         # headroom as a bar left a third of every panel empty.
-        bar_top = max(float(v[index]) for _, v in series)
+        bar_top = max(float(v[index]) for _k, v, _r in series)
         top = max(bar_top * 1.20, ceiling * 1.04)
         fig.update_yaxes(range=[0, top], row=1, col=column)
 
     # Q*bert is the one panel where a bar runs away from the ceiling; say by how
     # much rather than leaving the reader to divide two four-digit numbers.
     last = len(order)
+    clear_final = merged["CLEAR"][0][-1]
     fig.add_annotation(
         x=0.02, y=0.72, xref=f"x{last} domain", yref=f"y{last} domain",
-        text=f"<b>{clear[-1] / joint[-1]:.1f}×</b> ceiling", showarrow=False,
+        text=f"<b>{clear_final[-1] / joint[-1]:.1f}×</b> ceiling", showarrow=False,
         xanchor="left", yanchor="middle",
         font=dict(family=FONT_UI, size=10, color=COLOR["CLEAR"]),
     )
@@ -396,8 +520,32 @@ def figure_final_scores(data: dict) -> None:
         line=dict(color=COLOR["Joint"], width=1.3, dash="dash"),
         showlegend=True, hoverinfo="skip",
     ), row=1, col=1)
+    fig.add_trace(go.Bar(
+        x=[None], y=[None], name=f"not measured ({PLACEHOLDER}), run still going",
+        marker=dict(color=hex_to_rgba(AC["text_muted"], 0.26),
+                    line=dict(color=AC["text_muted"], width=1.3)),
+        showlegend=True, hoverinfo="skip",
+    ), row=1, col=1)
 
-    export_pair(fig, "final_scores", W_FULL, height_for(W_FULL, 1.52))
+    counts = measured_rows(data, live)
+    fig.add_annotation(
+        x=0, y=0, xref="paper", yref="paper", xshift=-54, yshift=-30,
+        text=("Scores after the final task. <b>Faded, outlined bars are NOT "
+              "MEASURED</b>: that run has not<br>"
+              "reached the end of the sequence, so the bar stands in at ours' "
+              "value.<br>"
+              "Tasks completed: "
+              + ", ".join(f"{NAME[k]} {counts[k]}/5" for k, _s, _n in PANELS)
+              + ".<br>"
+              "<b>Only CLEAR has finished</b>, and it predates the threshold "
+              "fix. Ours has not finished either,<br>"
+              "so ours, CKA-RL and CompoNet all stand in at the same values and "
+              "are not distinguishable here."),
+        showarrow=False, xanchor="left", yanchor="top", align="left",
+        font=dict(family=FONT_UI, size=9, color=AC["text_muted"]))
+    fig.update_layout(margin=dict(l=58, r=14, t=98, b=96))
+
+    export_pair(fig, "final_scores", W_FULL, height_for(W_FULL, 1.52) + 74)
 
 
 # ── Figure: backward-transfer matrix ────────────────────────────────────────
@@ -520,11 +668,11 @@ def figure_bwt_matrix(data: dict) -> None:
                                   color=AC["text_muted"]),
                 ),
             ),
-        ), row=1, col=column)
+        ), row=row, col=column)
 
-    for annotation in fig.layout.annotations[:2]:
+    for annotation in fig.layout.annotations[:len(panels)]:
         annotation.font = dict(family=FONT_UI, size=12.5, color=AC["text_primary"])
-        annotation.y = 1.04
+        annotation.yshift = 6
 
     centres = [i + 0.5 for i in range(size)]
     fig.update_xaxes(
@@ -600,41 +748,73 @@ def figure_transfer_table(data: dict) -> None:
     initialisation until that task arrives, so a zero-shot number would measure
     an untrained head rather than transfer through the shared trunk.
     """
-    minmax = transfer_metrics(data, f"v5_{ORDER_KEY}")
-    clear = transfer_metrics(data, f"clear_{ORDER_KEY}")
+    live = load_live()
+    counts = measured_rows(data, live)
+    keys = [key for key, _s, _n in PANELS]
     labels = data["labels"]
-    order = minmax["games"]
+    order = data["orders"][ORDER_KEY]
     last = len(order) - 1
 
-    # (kind, label, minmax cell, clear cell). "tint" cells carry a background.
-    rows: list[tuple[str, str, str, str]] = [("section", "Backward transfer", "", "")]
+    # Every number here is computed over the tasks a method has ACTUALLY
+    # finished, not over a grid padded with ours' values.
+    #
+    # The padding is right for the matrix and the bars, where a stand-in cell is
+    # visibly a stand-in. It is wrong here, because these are DERIVED numbers:
+    # pairing a live diagonal with a padded final row produced a backward
+    # transfer of -0.80 for ours on SpaceInvaders when the live run actually
+    # shows SpaceInvaders recovering 498.5 -> 793.2. A fabricated input makes a
+    # fabricated output, and a dagger on it does not make it readable.
+    metrics = {}
+    for key, source, name in PANELS:
+        grid = source_matrix(data, live, source, name)
+        n = counts[key]
+        metrics[key] = transfer_metrics(data, grid[:n, :n], order[:n])
+
+    def cells(fn) -> list[str]:
+        return [fn(metrics[key]) for key in keys]
+
+    def row_cells(index: int) -> list[str]:
+        out = []
+        for key in keys:
+            n = counts[key]
+            if index >= n:
+                out.append("·")          # not reached yet
+            elif index == n - 1:
+                out.append("—")          # last task of this run: no BWT by design
+            else:
+                out.append(f"{metrics[key]['bwt'][index]:+.2f}")
+        return out
+
+    # (kind, label, cells...). "tint" cells carry a background.
+    rows: list[tuple] = [("section", "Backward transfer", *[""] * len(keys))]
     for i, game in enumerate(order):
-        if i == last:
-            rows.append(("muted", f"{i + 1}.  {labels[game]}", "—", "—"))
-        else:
-            rows.append(("tint", f"{i + 1}.  {labels[game]}",
-                         f"{minmax['bwt'][i]:+.2f}", f"{clear['bwt'][i]:+.2f}"))
-    rows.append(("rule", "", "", ""))
-    rows.append(("total", "Mean", f"{minmax['bwt_mean']:+.2f}",
-                 f"{clear['bwt_mean']:+.2f}"))
-    rows.append(("section", "Aggregate", "", ""))
-    rows.append(("plain", "Forgetting",
-                 f"{minmax['forgetting']:.2f}", f"{clear['forgetting']:.2f}"))
-    rows.append(("plain", "Average performance, all 5 tasks",
-                 f"{minmax['ap_all']:.2f}", f"{clear['ap_all']:.2f}"))
-    rows.append(("plain", "Average performance, prior 4 tasks",
-                 f"{minmax['ap_prior']:.2f}", f"{clear['ap_prior']:.2f}"))
-    rows.append(("section", "Forward transfer", "", ""))
-    rows.append(("muted", "Zero-shot, before training on the task", "—", "—"))
+        cells_i = row_cells(i)
+        kind = "muted" if all(c in ("—", "·") for c in cells_i) else "tint"
+        rows.append((kind, f"{i + 1}.  {labels[game]}", *cells_i))
+    rows.append(("rule", "", *[""] * len(keys)))
+    rows.append(("total", "Mean", *cells(lambda m: f"{m['bwt_mean']:+.2f}")))
+    rows.append(("section", "Aggregate, over the tasks each run has finished",
+                 *[""] * len(keys)))
+    rows.append(("plain", "Forgetting", *cells(lambda m: f"{m['forgetting']:.2f}")))
+    rows.append(("plain", "Average performance, all finished tasks",
+                 *cells(lambda m: f"{m['ap_all']:.2f}")))
+    rows.append(("plain", "Average performance, prior tasks only",
+                 *cells(lambda m: f"{m['ap_prior']:.2f}")))
+    rows.append(("section", "Forward transfer", *[""] * len(keys)))
+    rows.append(("muted", f"Zero-shot, before training on the task{PENDING_BASE}",
+                 *["—"] * len(keys)))
 
     # Geometry in arbitrary units; the axes are hidden and only host the layout.
     # Rows advance a cursor downward by their own height, so a separator costs a
     # third of a row rather than a whole empty one.
-    label_x, col_x = 0.0, [66.0, 92.0]
-    tint_half = 11.0
+    # Four method columns rather than two, so the label column gives up width
+    # and the columns pack tighter. tint_half follows the column pitch.
+    label_x = 0.0
+    col_x = [52.0 + 16.0 * i for i in range(len(keys))]
+    tint_half = 7.0
     ROW_HEIGHT = {"rule": 0.34, "section": 0.92}
 
-    placed: list[tuple[tuple[str, str, str, str], float]] = []
+    placed: list[tuple[tuple, float]] = []
     cursor = 0.0
     for row in rows:
         height = ROW_HEIGHT.get(row[0], 1.0)
@@ -649,11 +829,19 @@ def figure_transfer_table(data: dict) -> None:
 
     # Header: the two method columns, over the top rule.
     header_y = 0.62
-    for x, name in zip(col_x, [NAME["MinMax"], NAME["CLEAR"]]):
+    for x, key in zip(col_x, keys):
+        done = counts[key]
         fig.add_annotation(
-            x=x, y=header_y, text=f"<b>{name}</b>", showarrow=False,
+            x=x, y=header_y + 0.26, text=f"<b>{NAME[key]}</b>", showarrow=False,
             xanchor="right", yanchor="middle",
-            font=dict(family=FONT_UI, size=11, color=AC["text_primary"]),
+            font=dict(family=FONT_UI, size=10, color=COLOR[key]),
+        )
+        fig.add_annotation(
+            x=x, y=header_y - 0.30,
+            text=f"{done}/5 tasks" + ("" if done == len(order) else " so far"),
+            showarrow=False, xanchor="right", yanchor="middle",
+            font=dict(family=FONT_UI, size=8,
+                      color=AC["text_faint"] if done == len(order) else AC["red"]),
         )
     fig.add_annotation(
         x=label_x, y=header_y,
@@ -666,10 +854,10 @@ def figure_transfer_table(data: dict) -> None:
         fig.add_shape(type="line", x0=label_x - 1, x1=col_x[-1] + 1, y0=y, y1=y,
                       line=dict(color=color, width=width), layer="above")
 
-    rule(header_y + 0.55, 1.3, AC["axis"])   # top rule
-    rule(header_y - 0.48, 1.0, AC["axis"])   # under the header
+    rule(header_y + 0.66, 1.3, AC["axis"])   # top rule
+    rule(header_y - 0.60, 1.0, AC["axis"])   # under the header
 
-    for (kind, label, left_cell, right_cell), depth in placed:
+    for (kind, label, *method_cells), depth in placed:
         y = -depth
         if kind == "rule":
             rule(y, 0.7, AC["border"])
@@ -690,20 +878,29 @@ def figure_transfer_table(data: dict) -> None:
             xanchor="left", yanchor="middle",
             font=dict(family=FONT_UI, size=10.5, color=label_color),
         )
-        for x, cell in zip(col_x, [left_cell, right_cell]):
-            if kind == "tint":
+        for x, cell in zip(col_x, method_cells):
+            stand_in = cell.endswith(PLACEHOLDER)
+            numeric = cell.rstrip(PLACEHOLDER)
+            if kind == "tint" and numeric not in ("—", "·", ""):
+                tint = bwt_color(float(numeric))
                 fig.add_shape(
                     type="rect", layer="below",
                     x0=x - 2 * tint_half, x1=x + 1.5,
                     y0=y - 0.42, y1=y + 0.42,
-                    fillcolor=bwt_color(float(cell)), line=dict(width=0),
+                    fillcolor=tint if not stand_in else hex_to_rgba(tint, 0.30),
+                    line=dict(width=0) if not stand_in else dict(
+                        color=AC["text_muted"], width=0.8, dash="dot"),
                 )
+            text = f"<b>{cell}</b>" if bold else cell
+            if stand_in:
+                text = f"<i>{text}</i>"
             fig.add_annotation(
-                x=x, y=y, text=f"<b>{cell}</b>" if bold else cell,
+                x=x, y=y, text=text,
                 showarrow=False, xanchor="right", yanchor="middle",
-                font=dict(family=FONT_MONO, size=10.5,
+                font=dict(family=FONT_MONO, size=9.5,
                           color=AC["text_faint"] if kind == "muted"
-                          else AC["text_primary"]),
+                          else (AC["text_muted"] if stand_in
+                                else AC["text_primary"])),
             )
 
     rule(-body_bottom - 0.12, 1.3, AC["axis"])  # bottom rule
@@ -713,10 +910,21 @@ def figure_transfer_table(data: dict) -> None:
     # hand: Plotly annotations do not reflow.
     footnote = (
         "Normalised as (score − random) / (Joint ceiling − random).<br>"
-        "Backward transfer is final − just-learned; the last task has none.<br>"
-        "— Forward transfer is not measurable here: every task has its own head,<br>"
-        "&nbsp;&nbsp;&nbsp;untrained until that task arrives, and no task is "
-        "evaluated before it is trained."
+        "Backward transfer is final − just-learned.<br>"
+        "<b>Every number is computed over the tasks that run has finished</b>, "
+        "counted under each heading.<br>"
+        "Nothing is extrapolated, so the columns are not comparable: a mean "
+        "over 3 tasks is not a mean over 5.<br>"
+        "· not reached yet.&nbsp;&nbsp;— last task of that run, no backward "
+        "transfer by construction.<br>"
+        "<b>Only CLEAR is complete, and it predates the threshold fix</b>, so "
+        "it trained each task to a lower bar.<br>"
+        f"{PENDING_BASE} Forward transfer unresolved. Not measurable from these "
+        "runs (per-task heads, untrained until<br>"
+        "&nbsp;&nbsp;&nbsp;that task arrives), and the from-scratch baseline the "
+        "AUC form needs is being recomputed.<br>"
+        "&nbsp;&nbsp;&nbsp;Treat every forward-transfer number in this project "
+        "as provisional."
     )
     fig.add_annotation(
         x=label_x - 1, y=-body_bottom - 0.5, text=footnote,
@@ -725,11 +933,15 @@ def figure_transfer_table(data: dict) -> None:
     )
 
     fig.update_xaxes(visible=False, range=[label_x - 2, col_x[-1] + 2])
-    fig.update_yaxes(visible=False, range=[-body_bottom - 3.1, header_y + 1.1])
+    # Room for the footnote is derived from its own line count, so adding a
+    # line cannot silently clip it.
+    note_lines = footnote.count("<br>") + 1
+    fig.update_yaxes(visible=False,
+                     range=[-body_bottom - 1.0 - 0.52 * note_lines, header_y + 1.5])
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
                       margin=dict(l=16, r=16, t=14, b=10))
 
-    export_pair(fig, "transfer_table", W_ONE_HALF, 330)
+    export_pair(fig, "transfer_table", W_FULL, 500)
 
 
 # ── Figure 4: compute cost ──────────────────────────────────────────────────
@@ -873,9 +1085,7 @@ def main() -> int:
     print("reports/final/atari_reversed")
     figure_matrices(data)
     figure_final_scores(data)
-    figure_bwt_matrix(data)
     figure_transfer_table(data)
-    figure_compute_cost()
     return 0
 
 

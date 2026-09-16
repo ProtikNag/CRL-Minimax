@@ -10,199 +10,75 @@ two orders' retention matrices as the evidence. Its root cause and any mitigatio
 are out of scope here, so the canonical order is **not** rebuilt in this folder;
 `reports/order_sensitivity/` keeps that material.
 
+## Status, 2026-09-16
+
+The reversed-order rerun is **in progress**, and this folder shows it mid-flight.
+
+| Method | Tasks finished | Source |
+|---|---:|---|
+| Min-Max (ours) | 3 / 5 | `data_live.json`, post-threshold-fix |
+| CLEAR | 5 / 5 | `../../order_sensitivity/data.json`, **pre**-threshold-fix |
+| CKA-RL | 3 / 5 | `data_live.json`, post-threshold-fix |
+| CompoNet | 2 / 5 | `data_live.json`, post-threshold-fix |
+
+Three caveats that have to travel with any of these figures.
+
+**Only CLEAR has finished, and it is the odd one out.** Its run predates the
+threshold fix, so it trained every task to a lower bar than the other three.
+It is not directly comparable to them and should be rerun before the paper.
+
+**The threshold fix landed hard.** Ours' SpaceInvaders went 588.5 → 1318.1 on
+task 1, which is 146% of the joint ceiling. That is the single largest change
+in this tier and it is why the old and new runs are never averaged together.
+
+**Ours' Breakout shows the value-vs-score gap.** The local phase peaked at 396,
+the value-constraint shortfall reached ≈0, and the greedy diagonal still fell to
+77.6 during consolidation. The constraint is satisfied on `V` while the score
+collapses. Worth stating in the paper rather than leaving for a reviewer.
+
 ## Figures
 
 | Stem | What it shows |
-|------|---------------|
-| `forgetting_matrices` | Full forgetting matrices, Min-Max against CLEAR, every cell as a fraction of the Joint ceiling |
-| `final_scores` | Per-game final greedy-100 score, Local specialist and both methods as bars against the Joint ceiling drawn as a rule |
-| `backward_transfer_matrix` | Backward transfer at **every** training phase, both methods |
-| `transfer_table` | Per-task backward transfer plus the aggregates, both methods |
-| `compute_cost` | Wall-clock cost of one full five-game run, Min-Max against CLEAR and Joint |
+|---|---|
+| `forgetting_matrices` | Retention matrices, 2×2, all four methods |
+| `final_scores` | Per-game score after the final task, five series |
+| `transfer_table` | Backward transfer and aggregates, four columns |
 
-All in `png/` (300 dpi) and `svg/` (vector).
+`backward_transfer_matrix` and `compute_cost` were dropped. Compute was measured
+across different GPUs per method, so the comparison was never fair.
 
-## Transfer metrics
+## How unfinished runs are shown
 
-Scores go onto a common scale as `(raw - random) / (Joint ceiling - random)`
-before any averaging. Raw backward transfer cannot be averaged across games whose
-scores differ by roughly 700x. `random` is `RANDOM_SCORES` from
-`crl/envs/atari.py`, read by the script so the one definition stays authoritative.
+Two different rules, on purpose.
 
-Backward transfer follows `analysis/continual_metrics.py`: for each task learned
-before the last, `final - just_learned`. Negative is forgetting. The last task
-has nothing trained after it, so it has no backward transfer and is excluded from
-every mean.
+**The matrix and the bars pad.** A task a run has not reached is stood in for at
+ours' value, as asked. Every such cell or bar is drawn in the series colour at
+26% alpha with a full-strength outline, marked `‡`, and named in the legend.
+Nothing padded is ever a solid fill.
 
-| | Min-Max | CLEAR |
-|---|---:|---:|
-| Mean backward transfer | **−0.20** | −0.57 |
-| Forgetting | **0.24** | 0.57 |
-| Average performance, all 5 tasks | 0.85 | 1.11 |
-| Average performance, prior 4 tasks | **0.82** | 0.47 |
+**The table does not pad.** Its numbers are *derived*, and padding derived
+numbers manufactures results: pairing ours' live diagonal with a padded final
+row produced a backward transfer of −0.69 on SpaceInvaders for a run whose live
+data shows SpaceInvaders **recovering** 498.5 → 793.2. So every number in the
+table is computed over the tasks that run has actually finished, with the count
+printed under each heading. The columns are therefore not comparable to each
+other, which the footnote says.
 
-Both average-performance rows are shown because the all-5 row inverts: CLEAR's
-1.11 is its last-learned Q\*bert at 3.6x the ceiling carrying four forgotten
-games. The prior-4 row is the one that measures retention.
+## Forward transfer is unresolved
 
-Min-Max's Space Invaders backward transfer is **positive** (+0.16). It is the
-first task in the sequence and it ends the run above where it was when it was
-learned, so consolidation improved it rather than merely preserving it.
+Every forward-transfer figure in this project carries `*`. Two separate reasons:
 
-### The backward-transfer matrix, and what it shows that the table does not
+- On Atari it is **not measurable** from these runs. Each task has its own head,
+  untrained until that task arrives, and no task is evaluated before training.
+- The from-scratch baseline that the AUC form needs is being recomputed, so the
+  GridWorld numbers that *are* measurable are provisional too.
 
-`transfer_table` reduces backward transfer to its final row. The full lower
-triangle is available, since every task is evaluated after every later phase, and
-it answers a question the final row cannot: **when** was a task lost, and did it
-come back. Cell `(i, j)` is task `j` after consolidating task `i`, minus task `j`
-when it was just learned.
-
-Reading each column downward, from the phase after that task was learned:
-
-| Task | Min-Max | CLEAR |
-|---|---|---|
-| Space Invaders | −0.00 → +0.01 → +0.15 → **+0.16** | −0.07 → −0.14 → −0.08 → −0.11 |
-| Boxing | **−1.12** → −0.34 → −0.61 | −0.18 → −0.45 → **−0.94** |
-| Breakout | −0.48 → −0.33 | −0.88 → **−0.99** |
-| Pong | +0.00 | −0.24 |
-
-**Min-Max's forgetting is non-monotone; CLEAR's is not.** Boxing collapses to
-−1.12 under the Breakout consolidation and then **recovers to −0.34**, and
-Breakout climbs back from −0.48 to −0.33. Space Invaders ends *above* where it
-was learned. Three of Min-Max's ten cells are positive.
-
-CLEAR has **no positive cell anywhere**, and its two worst columns decline
-monotonically with no recovery at all: Boxing −0.18 → −0.45 → −0.94, Breakout
-−0.88 → −0.99.
-
-The reading this supports is that consolidation actively repairs a past task,
-whereas replay slows the bleed without reversing it. It is also the honest place
-to note that Min-Max's single worst cell (−1.12) is worse than anything CLEAR
-does; the difference is that Min-Max does not stay there.
-
-Single seed, so this is a pattern in one run, not an estimated effect.
-
-### Forward transfer is absent from these runs, but it is not unmeasurable
-
-Reported as `—` in `transfer_table` because **these runs did not log what it
-needs**, not because the quantity is undefined. An earlier version of this file
-said forward transfer was "not measurable in this study". That was overstated,
-and the distinction matters for the rerun.
-
-**Which definition.** CKA-RL and Continual World use
-`FT_i = (AUC_i − AUC_i^b) / (1 − AUC_i^b)`, where `AUC_i` is the area under task
-`i`'s learning curve **during its own training phase**, against a from-scratch
-baseline's curve on the same task. That is a statement about *learning speed*.
-
-The zero-shot Lopez-Paz form `R[i−1, i]` — performance on task `i` before
-training on it — genuinely is meaningless here, for two reasons:
-`configs/atari5.yaml` sets `eval_all_tasks: false`, so the upper triangle was
-never populated ([ppo_continual.py:130](../../../crl/ppo_continual.py#L130)); and
-`ImpalaMultiHeadActorCriticPolicy` allocates every task's head at construction
-([impala.py:104](../../../crl/policies/impala.py#L104)), leaving it at random
-init until its task arrives, so a zero-shot score would measure an untrained head
-rather than transfer through the trunk.
-
-**But the AUC form is unaffected by both.** It needs no upper triangle, and
-per-task heads are irrelevant to it: the continual learner and the baseline both
-start task `i`'s head from scratch, and what differs is the trunk they sit on —
-exactly what forward transfer is supposed to measure.
-
-What it does need, and what these runs lack:
-
-1. **Periodic within-phase evaluation of the current task.** `atari5.yaml` sets
-   `eval_every: 0`, so there is no `p_i(t)` to integrate. This cannot be
-   recovered from a finished run.
-2. **A paired from-scratch baseline per task.** `experiments/train_expert.py`
-   already trains single-task experts from a shared init — those *are* the
-   baseline. Whether their learning curves were logged is an open question worth
-   checking before training new ones.
-
-Both are addressed in the rerun; see the sprint section of `HANDOFF.md` and
-`docs/LOGGING_CONTRACT.md`.
-
-## Reading the retention colour
-
-The scale is **clamped at the ceiling and pivoted at 65%**:
-
-- below 65% of the ceiling renders as a tint of red, deepening toward 0%,
-- 65% is the neutral point,
-- above 65% warms toward blue, and **everything at or above 100% is the same
-  blue**.
-
-The clamp matters. The exploratory version ran the scale to 250% to fit CLEAR's
-360% Q\*bert cell, which dragged genuinely retained cells such as 82% down into
-pink. Colour is clamped; the **printed number is always the true value**,
-however far above 100% it runs.
-
-## Why the Joint ceiling is the denominator
-
-**Joint** is one budget-matched model trained on all five games at once. It is
-order-independent, so it is the same reference in both orders and keeps any
-cross-order statement honest.
-
-**Local** (the single-task specialist) is order-dependent: a task-1 game has no
-local phase, and later locals start from the evolving global. SpaceInvaders is
-1132.2 canonical against 588.5 reversed for the same game. Retention against
-Local therefore mixes forgetting with reference drift, so Local appears here only
-as a raw-score reference in `final_scores`, never as a denominator.
-
-## What the two figures say
-
-Min-Max holds the four prior tasks at 79 / 82 / 70 / 101% of the ceiling. CLEAR
-holds the same four at 56 / 55 / 8 / 54% and loses Breakout outright, walking it
-106% → 19% → 8% down the rows.
-
-CLEAR's Q\*bert is the caveat: learned last, with nothing trained after it, it
-reaches 15351 against a ceiling of 4262, which is 3.6×. That single cell lifts
-CLEAR's five-game mean above Min-Max's while it is forgetting everything else,
-which is why the **prior-task mean over the four earlier tasks (83% against 43%)
-is the statistic to quote**, not the all-five mean (86% against 107%).
-
-## Compute cost
-
-Wall-clock hours for one complete five-game run, single GPU, seed 0. Values are
-cached in `compute.json`, read off `report/figures/compute_cost_wall.svg`, since
-the run directories are gitignored and live only on the cluster.
-
-| | Hours | vs Min-Max |
-|---|---:|---:|
-| Joint | 13.2 | 0.73× |
-| **Min-Max (ours)** | **18.1** | 1.00× |
-| CLEAR | 36.9 | 2.04× |
-
-CLEAR spans 36.4 to 37.3 across its replay-buffer configurations, drawn as a
-capped span at the end of its stem; the configuration choice moves it by under
-an hour.
-
-Drawn as a lollipop with a dashed reference rule at Min-Max. With three values
-the encoding is identical to a bar chart at a tenth of the ink, which leaves the
-panel quiet enough to carry the rule, and the rule is what turns three numbers
-into the comparison the reader came for. Zero is kept on the axis: unlike a
-threshold comparison, hours have a meaningful zero and stem length is a real
-magnitude.
-
-Two things to carry into any caption.
-
-**The two series are measured differently and the comparison is indicative, not
-exact.** Ours sums per-phase `wall_s` from `resource_usage.json`, counting only
-time inside the training phases. CLEAR and Joint take `t_wall` from the last row
-of `logs.jsonl`, which is total elapsed and so also includes evaluation,
-checkpointing and setup. Ours is the understated series, so its true elapsed
-time is higher than shown and **the gap here is an upper bound on our advantage,
-not a lower one.** At this magnitude, 18.1 h against 36.4 to 37.3 h, the
-advantage survives the caveat comfortably, but do not quote the gap as exact.
-
-**`report/manifest.json` used to caption its own version of this figure as "V5 is
-substantially slower than CLEAR"**, which contradicted its own numbers. Fixed on
-2026-09-16; the dashboard and this folder now say the same thing.
-
-## Data and rebuild
-
-Numbers come from `reports/order_sensitivity/data.json`, the single transcription
-of the cluster `eval_matrix.json` files. They are not duplicated here. Re-transcribe
-that file if a run is rerun.
+## Rebuild
 
 ```bash
 python reports/final/atari_reversed/make_figures.py
 ```
+
+Reads `data_live.json` for the three live methods and the cached transcription
+for CLEAR. Re-transcribe `data_live.json` as the run advances; the figures and
+every count in their captions follow the data.
