@@ -441,19 +441,16 @@ def figure_final_scores(data: dict) -> None:
         for key, values, real_flags in series:
             value = float(values[index])
             real = bool(real_flags[index])
-            # A stand-in bar keeps the series colour and stays a solid fill:
-            # the palette is the palette. It is set apart by alpha plus a dashed
-            # outline in the same hue, which is the encoding the style file
-            # already uses for a de-emphasised mark, not by a texture.
-            marker = dict(color=COLOR[key], line=dict(width=0))
-            if not real:
-                marker = dict(color=hex_to_rgba(COLOR[key], 0.26),
-                              line=dict(color=COLOR[key], width=1.3))
+            # Every bar is one solid fill in its series colour, with no
+            # outline. Mixing outlined and un-outlined bars in the same panel
+            # reads as two kinds of thing before it reads as measured vs not.
+            # The stand-in marker is carried by the value label instead.
             label = format_score(value) + ("" if real else PLACEHOLDER)
             fig.add_trace(go.Bar(
                 x=[NAME[key]], y=[value],
                 name=NAME[key], legendgroup=key, showlegend=(column == 1),
-                marker=marker, width=0.62,
+                marker=dict(color=COLOR[key], line=dict(width=0)),
+                width=0.62,
                 text=[label], textposition="outside", cliponaxis=False,
                 textfont=dict(family=FONT_MONO, size=9.5,
                               color=AC["text_primary"] if real else AC["text_muted"]),
@@ -479,7 +476,8 @@ def figure_final_scores(data: dict) -> None:
     clear_final = merged["CLEAR"][0][-1]
     fig.add_annotation(
         x=0.02, y=0.72, xref=f"x{last} domain", yref=f"y{last} domain",
-        text=f"<b>{clear_final[-1] / joint[-1]:.1f}×</b> ceiling", showarrow=False,
+        text=f"<b>{clear_final[-1] / joint[-1]:.1f}×</b><br>ceiling",
+        showarrow=False,
         xanchor="left", yanchor="middle",
         font=dict(family=FONT_UI, size=10, color=COLOR["CLEAR"]),
     )
@@ -520,32 +518,23 @@ def figure_final_scores(data: dict) -> None:
         line=dict(color=COLOR["Joint"], width=1.3, dash="dash"),
         showlegend=True, hoverinfo="skip",
     ), row=1, col=1)
-    fig.add_trace(go.Bar(
-        x=[None], y=[None], name=f"not measured ({PLACEHOLDER}), run still going",
-        marker=dict(color=hex_to_rgba(AC["text_muted"], 0.26),
-                    line=dict(color=AC["text_muted"], width=1.3)),
-        showlegend=True, hoverinfo="skip",
-    ), row=1, col=1)
-
     counts = measured_rows(data, live)
     fig.add_annotation(
         x=0, y=0, xref="paper", yref="paper", xshift=-54, yshift=-30,
-        text=("Scores after the final task. <b>Faded, outlined bars are NOT "
-              "MEASURED</b>: that run has not<br>"
-              "reached the end of the sequence, so the bar stands in at ours' "
-              "value.<br>"
-              "Tasks completed: "
+        text=(f"Scores after the final task. <b>A value marked {PLACEHOLDER} is "
+              "NOT MEASURED</b>: that run has not reached the end of the "
+              "sequence,<br>"
+              "so the bar stands in at ours' value. Tasks completed: "
               + ", ".join(f"{NAME[k]} {counts[k]}/5" for k, _s, _n in PANELS)
               + ".<br>"
-              "<b>Only CLEAR has finished</b>, and it predates the threshold "
-              "fix. Ours has not finished either,<br>"
-              "so ours, CKA-RL and CompoNet all stand in at the same values and "
-              "are not distinguishable here."),
+              "<b>Only CLEAR has finished, and it predates the threshold fix.</b> "
+              "Ours has not finished either, so ours, CKA-RL and CompoNet<br>"
+              "stand in at the same values and are not distinguishable here."),
         showarrow=False, xanchor="left", yanchor="top", align="left",
         font=dict(family=FONT_UI, size=9, color=AC["text_muted"]))
-    fig.update_layout(margin=dict(l=58, r=14, t=98, b=96))
+    fig.update_layout(margin=dict(l=58, r=14, t=98, b=84))
 
-    export_pair(fig, "final_scores", W_FULL, height_for(W_FULL, 1.52) + 74)
+    export_pair(fig, "final_scores", W_FULL, height_for(W_FULL, 1.52) + 62)
 
 
 # ── Figure: backward-transfer matrix ────────────────────────────────────────

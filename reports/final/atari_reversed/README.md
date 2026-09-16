@@ -52,9 +52,12 @@ across different GPUs per method, so the comparison was never fair.
 Two different rules, on purpose.
 
 **The matrix and the bars pad.** A task a run has not reached is stood in for at
-ours' value, as asked. Every such cell or bar is drawn in the series colour at
-26% alpha with a full-strength outline, marked `‡`, and named in the legend.
-Nothing padded is ever a solid fill.
+ours' value, as asked. In `final_scores` every bar is a solid fill in its series
+colour, with no outline on any of them, and the stand-in is marked `‡` on the
+value label. Mixing outlined and un-outlined bars in one panel read as two kinds
+of thing before it read as measured against not. In `forgetting_matrices`, where
+a cell has no label of its own to carry the mark, the stand-in is a faded fill
+with a dotted border plus the `‡`.
 
 **The table does not pad.** Its numbers are *derived*, and padding derived
 numbers manufactures results: pairing ours' live diagonal with a padded final
