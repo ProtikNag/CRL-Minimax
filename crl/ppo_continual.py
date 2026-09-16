@@ -313,8 +313,15 @@ class PPOAlternationTrainer:
             self.global_policy.to(self.device)
         if self.clog is not None:
             self.clog.phase_start(k - 1, task.spec.name, self.method)
-        n_iters = (self.ppo.task1_iters if k == 1
-                   else self.ppo.local_iters + self.ppo.global_iters)
+        # Use the SAME per-game budget as ours' local phase (local_iters_per_task[game])
+        # so the grow-method baselines (CompoNet/CKA-RL) train each task for the same
+        # iters as ours -- else SI-as-task-1 got task1_iters (1500) vs ours' 3000,
+        # undertraining the baselines and unfairly flattering ours. Falls back to the
+        # generic budget for envs with no per-game entry (e.g. gridworld).
+        game = getattr(task, "game", task.spec.name)
+        n_iters = self.ppo.local_iters_per_task.get(
+            game, self.ppo.task1_iters if k == 1
+            else self.ppo.local_iters + self.ppo.global_iters)
         summ = self.local_trainer.train(
             self.global_policy, task, num_iters=n_iters,
             seed=self.seed + 1000 * k, current_task=k, phase_type=self.method,
