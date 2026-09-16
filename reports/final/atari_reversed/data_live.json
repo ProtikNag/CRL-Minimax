@@ -1,0 +1,51 @@
+{
+  "_comment": "Partial snapshot of the in-progress reversed-order Atari run (seed 0). Transcribed from the gitignored results/atari5_rev_*_seed0/eval_matrix.json + status.json on the cluster so viz can be built from a tracked source. eval_matrix[i] = greedy-100 scores on tasks 0..i AFTER finishing (local+consolidation) task i. Rows are lower-triangular and grow as tasks complete. Re-transcribe when the run advances.",
+  "snapshot_utc": "2026-09-16T21:29Z",
+  "order": ["SpaceInvaders", "Boxing", "Breakout", "Pong", "Qbert"],
+  "thresholds": {"SpaceInvaders": 900, "Boxing": 67, "Breakout": 285, "Pong": 20, "Qbert": 4260},
+  "random_scores": {"SpaceInvaders": 148.0, "Boxing": 0.1, "Breakout": 1.7, "Pong": -20.7, "Qbert": 163.9},
+  "notes": {
+    "breakout_local_peak": 396.0,
+    "breakout_ours_consolidated_diag": 77.57,
+    "value_vs_score": "Ours Breakout value-constraint shortfall reached ~0 yet the greedy diagonal fell 396->77.6 during consolidation: the documented value-vs-score mismatch. Retention of PAST tasks is strong (SI recovered 498.5->793.2, +BWT; Boxing held ~60).",
+    "cka_rl_boxing_collapse": "CKA-RL forgot Boxing catastrophically after Breakout (90.5 -> -8.31, below random) and SI 641.5 -> 204.6."
+  },
+  "methods": {
+    "ours": {
+      "label": "Min-Max (ours)",
+      "policy": "impala_ac_multihead",
+      "tasks_done": 3,
+      "current": {"task_idx": 3, "task": "Pong", "phase": "local", "iter": 9900},
+      "eval_matrix": [
+        [1318.10],
+        [498.50, 68.67],
+        [793.20, 59.76, 77.57]
+      ],
+      "wall_s": 41392.5,
+      "frames_total": 81100800
+    },
+    "cka_rl": {
+      "label": "CLEAR / CKA-RL",
+      "tasks_done": 3,
+      "current": {"task_idx": 3, "task": "Pong", "phase": "cka_rl", "iter": 9400},
+      "eval_matrix": [
+        [641.50],
+        [317.60, 90.51],
+        [204.60, -8.31, 65.26]
+      ],
+      "wall_s": 23424.0,
+      "frames_total": 77004800
+    },
+    "componet": {
+      "label": "CompoNet",
+      "tasks_done": 2,
+      "current": {"task_idx": 2, "task": "Breakout", "phase": "componet", "iter": 6600},
+      "eval_matrix": [
+        [726.00],
+        [726.00, 80.40]
+      ],
+      "wall_s": 23474.7,
+      "frames_total": 54067200
+    }
+  }
+}
