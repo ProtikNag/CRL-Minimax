@@ -24,6 +24,13 @@ reviewer can reasonably ask which failure our constraint addresses. It addresses
 forgetting; we make no plasticity claim, and neither CReLU nor continual
 backprop conflicts with the min-max objective, so both compose with it.
 
+**Our 50-task GridWorld runs bear this out.** Both take the top forward-transfer
+scores of any method we ran (CReLUs 0.251, CbpNet 0.175, against ours at 0.077)
+and neither improves retention at all: backward transfer −0.371 and −0.394,
+indistinguishable from plain fine-tuning's −0.390. They buy speed on each new
+task and give back the same ground on the old ones, which is what their papers
+claim they do. Numbers and figures in `reports/final/gridworld/`.
+
 ## External references worth comparing against (not in this folder)
 
 - **WMAR** (Yang, Kuhlmann, Kowadlo, 2024; arXiv 2401.16650) — online model-based

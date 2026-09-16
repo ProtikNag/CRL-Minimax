@@ -11,7 +11,7 @@ benchmark, where tasks are modes of one game and each gets its own head.
 | Subfolder | Line | Status |
 |-----------|------|--------|
 | `atari_reversed/` | Five-game Atari sequence, reversed order, ours vs CLEAR vs the Joint ceiling | done |
-| `gridworld/` | 50-task shared-head GridWorld: ours vs CKA-RL vs fine-tuning vs from-scratch | 4 methods x 3 seeds complete; CbpNet and CReLUs still running |
+| `gridworld/` | 50-task shared-head GridWorld: ours vs CKA-RL vs CbpNet vs CReLUs vs fine-tuning vs from-scratch | all 6 methods complete; CbpNet and CReLUs at 1 seed, more in flight |
 | `cka_rl/` | CKA-RL (NeurIPS 25) benchmark: Meta-World CW20, SpaceInvaders, Freeway | Table 1 + per-mode success done; Meta-World still running |
 
 ## Conventions shared by every set
@@ -26,10 +26,11 @@ benchmark, where tasks are modes of one game and each gets its own head.
   since Plotly rasterises heatmap traces).
 - Academic template from `report/acviz.py`: white ground, Tufte spine,
   horizontal grid only, the fixed palette, Inter / JetBrains Mono.
-- **Error bars are drawn only where seeds were measured.** GridWorld has three
-  complete seeds per method, so every interval there is real; the Atari and
-  CKA-RL sets are single-seed and carry none. No interval is invented, and a
-  method with one seed carries no band.
+- **Error bars are drawn only where seeds were measured.** In GridWorld four
+  methods have three complete seeds and their intervals are real; CbpNet and
+  CReLUs have one each and carry a borrowed s.d. marked `†`, which the figures
+  drop on their own once their seeds land. The Atari and CKA-RL sets are
+  single-seed and carry none. No band is drawn over a single run.
 - **Captions are derived, not typed.** Seed counts, tallies and quoted ranges
   are computed at render time, so a rebuild after new runs land updates the
   figures and their captions together.

@@ -15,7 +15,7 @@ shared task-conditioned head**. Capacity is fixed and interference is forced.
 
 | Stem | What it shows |
 |---|---|
-| `learned_vs_retained` | Every task's score when learned against its score at the end. **The separator.** |
+| `learned_vs_retained` | Every task's score when learned against its score at the end, 3×2. **The separator.** |
 | `retention_curve` | Mean score of everything learned so far, as the sequence grows |
 | `headline_metrics` | PERF, forgetting, backward and forward transfer, as a table |
 | `raw_vs_normalised` | Final per-task score on both scales, and why the choice matters |
@@ -28,17 +28,25 @@ Normalisation is `(score − random) / (1 − random)`, so **0 is a random polic
 
 ## Status
 
-Complete 50-task runs: **Min-Max 3, CKA-RL 3, fine-tuning 3, from-scratch 3**.
-All four methods at three seeds, every interval measured.
+Six methods, all with at least one complete 50-task run.
 
-**CbpNet and CReLUs are still running** (seed 0 only, at 32/50 and 44/50 tasks as
-of the last pull). They are declared in the figure script and join every figure
-and caption on the next rebuild, with no edit needed. Both come from the
-plasticity line, `docs/papers/2023_Abbas_*` and `docs/papers/2024_Dohare_*`, and
-CbpNet is one of CKA-RL's own baselines.
+| Method | Complete seeds | In flight |
+|---|---:|---|
+| Min-Max (ours) | 3 | — |
+| CKA-RL | 3 | — |
+| CbpNet | 1 | seeds 1 and 2, at 24/50 and 28/50 |
+| CReLUs | 1 | seed 1, at 4/50 |
+| Fine-tuning | 3 | — |
+| From-scratch | 3 | — |
+
+CbpNet and CReLUs carry a **borrowed standard deviation** (ours', marked `†`)
+until their own seeds land. A lent interval is not a measurement, and the table
+says so; the marker and its footnote disappear on their own once the seeds
+arrive. Their per-task panels also hold 50 points rather than 150, so read their
+quadrant counts as rates.
 
 Partial runs are **excluded from every aggregate** rather than averaged in —
-mixing a 50-task run with a 32-task one produces a number belonging to neither.
+mixing a 50-task run with a 24-task one produces a number belonging to neither.
 Which runs count is read from `metrics.json`, and every caption's seed counts,
 tallies and quoted ranges are derived from the data rather than typed.
 
@@ -47,17 +55,36 @@ tallies and quoted ranges are derived from the data rather than typed.
 | | PERF | Forgetting | BWT | FWT |
 |---|---:|---:|---:|---:|
 | **Min-Max (ours)** | **0.596** ±0.007 | **0.112** ±0.008 | **+0.358** ±0.028 | 0.077 ±0.063 |
-| CKA-RL | 0.470 ±0.040 | 0.237 ±0.028 | −0.187 ±0.039 | **0.162** ±0.037 |
+| CKA-RL | 0.470 ±0.040 | 0.237 ±0.028 | −0.187 ±0.039 | 0.162 ±0.037 |
+| CReLUs | 0.329 † | 0.407 † | −0.371 † | **0.251** † |
+| CbpNet | 0.284 † | 0.431 † | −0.394 † | 0.175 † |
 | Fine-tuning | 0.261 ±0.051 | 0.430 ±0.048 | −0.390 ±0.053 | 0.142 ±0.020 |
 | From-scratch | 0.158 ±0.062 | 0.559 ±0.066 | −0.506 ±0.070 | 0 (reference) |
 
-Ours leads average performance by **0.126**, and the two intervals are nowhere
-near touching. It roughly halves CKA-RL's forgetting and is the only method with
-positive backward transfer.
+Ours leads average performance by **0.126** over the nearest method, and no
+interval comes close to touching.
 
-The third seed moved every baseline **down** (CKA-RL 0.490 → 0.470, from-scratch
-0.193 → 0.158) and left ours where it was, so the margin widened rather than
-narrowed as the sample grew.
+### The plasticity baselines do exactly what the plasticity literature predicts
+
+This is the useful result from adding them, and it is worth stating explicitly
+because it is a clean division of labour rather than a horse race.
+
+**They take the top two forward-transfer scores** (CReLUs 0.251, CbpNet 0.175),
+beating CKA-RL and every other method including ours. **They fix nothing about
+retention**: backward transfer is −0.371 and −0.394, statistically
+indistinguishable from plain fine-tuning's −0.390, and forgetting sits at 0.41
+and 0.43 against fine-tuning's 0.43.
+
+That is the expected shape. Both methods target *loss of plasticity*, the
+network's decaying ability to learn anything new after long training. Neither
+targets interference between tasks. So they buy speed on each new task and give
+back the same ground on the old ones. The papers are in `docs/papers/`
+(`2023_Abbas_*` for CReLUs, `2024_Dohare_*` for continual backprop), and CbpNet
+is one of CKA-RL's own baselines.
+
+The reading for the paper: **our constraint and their activation or reset trick
+address different failures and compose rather than compete.** Ours makes no
+plasticity claim, and the forward-transfer column is where that shows.
 
 ### Why `learned_vs_retained` is the figure to lead with
 
@@ -69,6 +96,8 @@ than when it was learned* — and the methods separate completely:
 |---|---:|
 | **Min-Max (ours)** | **91%** |
 | CKA-RL | 13% |
+| CbpNet | 8% |
+| CReLUs | 8% |
 | Fine-tuning | 8% |
 | From-scratch | 6% |
 
@@ -87,16 +116,22 @@ the way to solved.
 
 Each panel shades only the quadrant that characterises its method.
 
-| | points | rescued | lost |
-|---|---:|---:|---:|
-| **Min-Max (ours)** | 150 | **32** | **0** |
-| CKA-RL | 150 | 0 | 12 |
-| Fine-tuning | 150 | 0 | 45 |
-| From-scratch | 150 | 0 | 57 |
+| | points | rescued | lost | lost as a rate |
+|---|---:|---:|---:|---:|
+| **Min-Max (ours)** | 150 | **32** | **0** | **0%** |
+| CKA-RL | 150 | 0 | 12 | 8% |
+| CbpNet | 50 | 0 | 13 | 26% |
+| CReLUs | 50 | 0 | 17 | 34% |
+| Fine-tuning | 150 | 0 | 45 | 30% |
+| From-scratch | 150 | 0 | 57 | 38% |
 
-No baseline rescues a single task. Ours loses none. CKA-RL's low count in the
-red quadrant is not retention — its final scores mostly sit above 0.25, so it
-lands between the two boxes rather than in either; its weakness shows up in the
+**Compare the rate, not the count** — CbpNet and CReLUs contribute one seed each,
+so 50 points against 150. By rate they lose tasks about as often as plain
+fine-tuning, and more often than CKA-RL.
+
+No baseline rescues a single task. Ours loses none. CKA-RL's low rate in the red
+quadrant is not retention — its final scores mostly sit above 0.25, so it lands
+between the two boxes rather than in either; its weakness shows up in the
 aggregate metrics instead.
 
 **It is not a headroom artefact.** A task left at 0.2 has more room to improve
@@ -107,7 +142,9 @@ the gain as a share of the headroom still available (`1 − learned`) rules it o
 |---|---:|---:|---:|
 | **Min-Max (ours)** | **+42%** | **+57%** | **+19%** |
 | CKA-RL | −6% | −24% | −86% |
+| CbpNet | −7% | −30% | −184% |
 | Fine-tuning | −7% | −38% | −182% |
+| CReLUs | −11% | −39% | −201% |
 | From-scratch | −8% | −56% | −233% |
 
 Ours captures a large share of the room it has left, in every bin. Every baseline
@@ -127,6 +164,8 @@ The per-task detail behind the aggregate is not flattering in every direction:
 |---|---:|---:|
 | **Min-Max (ours)** | 0.25 | **0.60** |
 | CKA-RL | 0.65 | 0.47 |
+| CReLUs | 0.69 | 0.33 |
+| CbpNet | 0.67 | 0.28 |
 | Fine-tuning | 0.64 | 0.26 |
 | From-scratch | 0.65 | 0.16 |
 
@@ -137,9 +176,13 @@ a task left at 0.25 than one left at 0.65. Better to say so than to let a
 reviewer find it. The claims that survive are the **final state** after 50 tasks
 and the **shape** — flat for ours, falling for everyone else.
 
-The likely mechanism: the local phase here is short (150–250 iterations) and the
-global consolidation, which maximises return over *all* seen tasks, does most of
-the learning. With 50 related layouts there is a lot of positive transfer
+Note CReLUs has the **highest** immediate score of any method (0.69) and still
+ends at 0.33. Learning each task well is not the binding constraint here;
+holding it is.
+
+The likely mechanism for ours: the local phase is short (150–250 iterations) and
+the global consolidation, which maximises return over *all* seen tasks, does most
+of the learning. With 50 related layouts there is a lot of positive transfer
 available, and consolidation is what harvests it.
 
 ### `retention_curve`
@@ -151,10 +194,11 @@ the newest task well post a flattering curve.
 This is the readable form of the forgetting matrix. At 50 tasks the triangle is
 far too dense to see anything in, but its row means are not, and they answer the
 question the matrix was there for — *does the method still work at 50 tasks*.
-Ours ends flat at ≈0.61 while the others sit at 0.46, 0.25 and 0.15.
+Ours ends flat at ≈0.61; the rest sit at 0.46 (CKA-RL), 0.32 (CReLUs), 0.28
+(CbpNet), 0.25 (fine-tuning) and 0.15 (from-scratch).
 
-All four bands are the min-max over three complete seeds, and **ours' band never
-touches CKA-RL's** at any point in the sequence.
+Ours' band never touches CKA-RL's at any point in the sequence. CbpNet and
+CReLUs carry no band, having one complete seed each.
 
 ### Raw against normalised
 
@@ -167,22 +211,30 @@ achievement on different tasks. Median final score:
 |---|---:|---:|
 | **Min-Max (ours)** | 0.92 | **0.67** |
 | CKA-RL | 0.87 | 0.49 |
+| CbpNet | 0.81 | 0.26 |
+| CReLUs | 0.80 | 0.23 |
 | Fine-tuning | 0.80 | 0.20 |
 | From-scratch | 0.77 | 0.10 |
 
 Showing both is the point: the separation normalisation exposes is real, not an
-artefact of the normaliser.
+artefact of the normaliser. Note that CbpNet, CReLUs and fine-tuning are
+indistinguishable on the raw scale (0.80–0.81) and still ordered on the
+normalised one.
 
 ### Forward transfer, and the budget asymmetry behind it
 
-Ours is last on FWT (0.077 against CKA-RL's 0.162), and the table above is why:
-forward transfer measures how fast a task is learned in its own phase, and ours
-deliberately spends less there.
+Ours is **last of six** on FWT (0.077, against CReLUs' 0.251), and the trade
+table above is why: forward transfer measures how fast a task is learned in its
+own phase, and ours deliberately spends less there.
 
 **The per-task budgets are not matched.** Ours' local phase runs 150–250
 iterations; the others run 150–500. Ours uses *more* total optimisation but less
 of it inside any single task's own learning phase. From-scratch is the FWT
 reference, so its value is 0 by construction and it is omitted from that column.
+
+Expect a reviewer to press on this. The answer is the division of labour above:
+the plasticity methods win this column and lose every retention column, which is
+what their own papers claim they do.
 
 ### Compute
 
@@ -190,6 +242,8 @@ reference, so its value is 0 by construction and it is omitted from that column.
 |---|---:|---:|
 | **Min-Max (ours)** | 244 min | — |
 | CKA-RL | 161 min | 0.66× |
+| CbpNet | 170 min | 0.70× |
+| CReLUs | 168 min | 0.69× |
 | Fine-tuning | 136 min | 0.56× |
 | From-scratch | 171 min | 0.70× |
 
@@ -203,15 +257,14 @@ agree to within 7 minutes, so its interval hides behind its marker.
 - **Ours re-simulates past environments during consolidation.** The others train
   only on the current task. This is live past-task environment access — a
   stronger assumption than a replay buffer, not a weaker one.
-- **CKA-RL here is our own reimplementation**, adapted to the shared-head setting
-  the original does not target. Say so in the paper.
+- **CKA-RL, CbpNet and CReLUs here are our own reimplementations**, adapted to
+  the shared-head setting. CKA-RL's original does not target it. Say so.
 - **CompoNet is excluded** because it grows the network; every method here has a
   fixed footprint (ours a fixed shared head, CKA-RL a fixed trunk plus a bounded
-  pool of 5 and a small per-task α). CbpNet and CReLUs are both fixed-capacity
-  and so are in, once their runs finish.
-- **Seeds:** three complete per method, all four intervals measured. The
-  borrowed-standard-deviation placeholder is unused, and its `†` note disappears
-  from the table automatically when it is not needed.
+  pool of 5 and a small per-task α, CbpNet fixed with unit resets, CReLUs fixed
+  with a CReLU activation).
+- **Seeds:** three complete for ours, CKA-RL, fine-tuning and from-scratch; one
+  each for CbpNet and CReLUs, whose intervals are borrowed and marked `†`.
 
 ## Rebuild
 
@@ -221,5 +274,5 @@ python reports/final/gridworld/make_figures.py
 
 Reads `reports/gridworld_sharedhead/*/` per `docs/LOGGING_CONTRACT.md`. Nothing
 is transcribed or duplicated into this folder. Method count is read from the
-data, so CbpNet and CReLUs appear as rows and panels the first time their runs
-report complete, with no edit here.
+data, and the script checks its own output for clipped captions and rasterised
+SVG, exiting non-zero on either.
