@@ -17,15 +17,17 @@ The reversed-order rerun is **in progress**, and this folder shows it mid-flight
 | Method | Tasks finished | Source |
 |---|---:|---|
 | Min-Max (ours) | 3 / 5 | `data_live.json`, post-threshold-fix |
-| CLEAR | 5 / 5 | `../../order_sensitivity/data.json`, **pre**-threshold-fix |
+| CLEAR | 5 / 5 | `../../order_sensitivity/data.json` |
 | CKA-RL | 3 / 5 | `data_live.json`, post-threshold-fix |
 | CompoNet | 2 / 5 | `data_live.json`, post-threshold-fix |
 
 Three caveats that have to travel with any of these figures.
 
-**Only CLEAR has finished, and it is the odd one out.** Its run predates the
-threshold fix, so it trained every task to a lower bar than the other three.
-It is not directly comparable to them and should be rerun before the paper.
+**Only CLEAR has finished.** Its run predates the threshold change, but that
+does not affect it: CLEAR never reached its thresholds on the first four games,
+so it trained to its full budget on them regardless. Only Q\*bert cleared its
+threshold, and Q\*bert is the last task, so nothing earlier is affected. CLEAR
+does not need rerunning.
 
 **The threshold fix landed hard.** Ours' SpaceInvaders went 588.5 → 1318.1 on
 task 1, which is 146% of the joint ceiling. That is the single largest change

@@ -429,7 +429,7 @@ def figure_final_scores(data: dict) -> None:
     # Beside the rule it either collided with a bar label (Pong: ceiling 20.7
     # against bars at 21.0) or was struck through by the rule itself.
     titles = [
-        f"{labels[game]}<br><span style=\"font-size:9px;color:{COLOR['Joint']}\">"
+        f"{labels[game]}<br><span style=\"font-size:11px;color:{COLOR['Joint']}\">"
         f"ceiling {format_score(joint[i])}</span>"
         for i, game in enumerate(order)
     ]
@@ -450,9 +450,9 @@ def figure_final_scores(data: dict) -> None:
                 x=[NAME[key]], y=[value],
                 name=NAME[key], legendgroup=key, showlegend=(column == 1),
                 marker=dict(color=COLOR[key], line=dict(width=0)),
-                width=0.62,
+                width=0.74,
                 text=[label], textposition="outside", cliponaxis=False,
-                textfont=dict(family=FONT_MONO, size=9.5,
+                textfont=dict(family=FONT_MONO, size=12,
                               color=AC["text_primary"] if real else AC["text_muted"]),
                 hovertemplate="%{x}: %{y:,.1f}<extra></extra>",
             ), row=1, col=column)
@@ -467,7 +467,7 @@ def figure_final_scores(data: dict) -> None:
         # its label beside it and needs far less. Giving the rule the same 1.26
         # headroom as a bar left a third of every panel empty.
         bar_top = max(float(v[index]) for _k, v, _r in series)
-        top = max(bar_top * 1.20, ceiling * 1.04)
+        top = max(bar_top * 1.16, ceiling * 1.03)
         fig.update_yaxes(range=[0, top], row=1, col=column)
 
     # Q*bert is the one panel where a bar runs away from the ceiling; say by how
@@ -479,12 +479,12 @@ def figure_final_scores(data: dict) -> None:
         text=f"<b>{clear_final[-1] / joint[-1]:.1f}×</b><br>ceiling",
         showarrow=False,
         xanchor="left", yanchor="middle",
-        font=dict(family=FONT_UI, size=10, color=COLOR["CLEAR"]),
+        font=dict(family=FONT_UI, size=12, color=COLOR["CLEAR"]),
     )
 
     for annotation in fig.layout.annotations[:len(order)]:
-        annotation.font = dict(family=FONT_UI, size=11.5, color=AC["text_primary"])
-        annotation.y = 1.04
+        annotation.font = dict(family=FONT_UI, size=13.5, color=AC["text_primary"])
+        annotation.y = 1.045
 
     # Method names live in the legend once, which is what lets the per-panel
     # x-axis drop its tick labels; four rotated labels per panel were the single
@@ -494,19 +494,19 @@ def figure_final_scores(data: dict) -> None:
     fig.update_yaxes(showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
                      nticks=4, zeroline=False, showline=False, ticklen=0,
                      tickangle=0,
-                     tickfont=dict(family=FONT_MONO, size=9,
+                     tickfont=dict(family=FONT_MONO, size=11,
                                    color=AC["text_muted"]))
     fig.update_yaxes(
         title=dict(text="greedy-100 score",
-                   font=dict(family=FONT_UI, size=11, color=AC["text_muted"])),
+                   font=dict(family=FONT_UI, size=13, color=AC["text_muted"])),
         row=1, col=1,
     )
     fig.update_layout(
-        title=None, barmode="group", bargap=0.30,
+        title=None, barmode="group", bargap=0.22,
         margin=dict(l=58, r=14, t=98, b=22),
         legend=dict(
-            orientation="h", x=0.0, xanchor="left", y=1.26, yanchor="bottom",
-            font=dict(family=FONT_UI, size=10.5, color=AC["text_primary"]),
+            orientation="h", x=0.0, xanchor="left", y=1.17, yanchor="bottom",
+            font=dict(family=FONT_UI, size=12, color=AC["text_primary"]),
             bgcolor="rgba(0,0,0,0)", borderwidth=0,
             itemsizing="constant", tracegroupgap=0,
         ),
@@ -527,14 +527,16 @@ def figure_final_scores(data: dict) -> None:
               "so the bar stands in at ours' value. Tasks completed: "
               + ", ".join(f"{NAME[k]} {counts[k]}/5" for k, _s, _n in PANELS)
               + ".<br>"
-              "<b>Only CLEAR has finished, and it predates the threshold fix.</b> "
-              "Ours has not finished either, so ours, CKA-RL and CompoNet<br>"
-              "stand in at the same values and are not distinguishable here."),
+              "<b>Only CLEAR has finished.</b> Ours has not finished either, so "
+              "ours, CKA-RL and CompoNet stand in at the same<br>"
+              "values and are not distinguishable from each other here."),
         showarrow=False, xanchor="left", yanchor="top", align="left",
-        font=dict(family=FONT_UI, size=9, color=AC["text_muted"]))
-    fig.update_layout(margin=dict(l=58, r=14, t=98, b=84))
+        font=dict(family=FONT_UI, size=10.5, color=AC["text_muted"]))
+    # Tighter top and a taller frame: the bars were a third of the figure and
+    # their labels were unreadable at print size.
+    fig.update_layout(margin=dict(l=66, r=16, t=76, b=100))
 
-    export_pair(fig, "final_scores", W_FULL, height_for(W_FULL, 1.52) + 62)
+    export_pair(fig, "final_scores", W_FULL, 534)
 
 
 # ── Figure: backward-transfer matrix ────────────────────────────────────────
@@ -781,9 +783,12 @@ def figure_transfer_table(data: dict) -> None:
         kind = "muted" if all(c in ("—", "·") for c in cells_i) else "tint"
         rows.append((kind, f"{i + 1}.  {labels[game]}", *cells_i))
     rows.append(("rule", "", *[""] * len(keys)))
-    rows.append(("total", "Mean", *cells(lambda m: f"{m['bwt_mean']:+.2f}")))
+    # The backward-transfer mean sits with the other aggregates rather than in a
+    # block of its own; it is one summary number among four, not a category.
     rows.append(("section", "Aggregate, over the tasks each run has finished",
                  *[""] * len(keys)))
+    rows.append(("plain", "Backward transfer, mean",
+                 *cells(lambda m: f"{m['bwt_mean']:+.2f}")))
     rows.append(("plain", "Forgetting", *cells(lambda m: f"{m['forgetting']:.2f}")))
     rows.append(("plain", "Average performance, all finished tasks",
                  *cells(lambda m: f"{m['ap_all']:.2f}")))
@@ -906,8 +911,7 @@ def figure_transfer_table(data: dict) -> None:
         "over 3 tasks is not a mean over 5.<br>"
         "· not reached yet.&nbsp;&nbsp;— last task of that run, no backward "
         "transfer by construction.<br>"
-        "<b>Only CLEAR is complete, and it predates the threshold fix</b>, so "
-        "it trained each task to a lower bar.<br>"
+        "<b>Only CLEAR is complete.</b><br>"
         f"{PENDING_BASE} Forward transfer unresolved. Not measurable from these "
         "runs (per-task heads, untrained until<br>"
         "&nbsp;&nbsp;&nbsp;that task arrives), and the from-scratch baseline the "
