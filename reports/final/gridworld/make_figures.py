@@ -56,6 +56,8 @@ LOST_FILL = "#FBDCDC"      # learned strong, ended poorly
 METHODS = [
     ("ours",     "Min-Max (ours)", AC["blue"],       "biggrid50_sh_ours_"),
     ("cka_rl",   "CKA-RL",         AC["amber"],      "biggrid50_cka_rl_"),
+    ("cbp",      "CbpNet",         AC["violet"],     "biggrid50_cbp_"),
+    ("crelu",    "CReLUs",         AC["teal"],       "biggrid50_crelu_"),
     ("finetune", "Fine-tuning",    AC["red"],        "biggrid50_sh_finetune_"),
     ("baseline", "From-scratch",   AC["text_faint"], "biggrid50_sh_baseline_"),
 ]
@@ -103,30 +105,72 @@ def learned_and_final(run: str, column: str = "normalized") -> tuple[np.ndarray,
     return learned[keep], final[keep]
 
 
+def active_methods() -> list[tuple[str, str, str, str]]:
+    """The methods with at least one complete 50-task run.
+
+    A method whose runs are still in flight is absent from every figure rather
+    than drawn as an empty row, and rejoins on the next rebuild once a seed
+    lands. Method count is therefore data, not a constant, which is why the
+    layouts below are all derived from ``len(active_methods())``.
+    """
+    return [m for m in METHODS if complete_runs(m[3])]
+
+
+def pending_methods() -> list[str]:
+    """Methods declared but with no complete run yet, for the captions.
+
+    A figure that silently omits a baseline reads as a choice. Naming what is
+    still running makes it a status instead.
+    """
+    return [label for _key, label, _color, prefix in METHODS
+            if not complete_runs(prefix)]
+
+
+def pending_note() -> str:
+    """" CbpNet and CReLUs are still running." — empty when nothing is."""
+    names = pending_methods()
+    if not names:
+        return ""
+    listed = (names[0] if len(names) == 1
+              else " and ".join([", ".join(names[:-1]), names[-1]]))
+    single = len(names) == 1
+    # Always its own line. Appending it to whatever sentence ends the caption is
+    # what pushed the last line off the right edge of the table.
+    return (f"<br><b>{listed} {'is' if single else 'are'} still running</b> and "
+            f"{'joins' if single else 'join'} these figures on the next rebuild.")
+
+
 def seed_summary() -> str:
-    """"ours 3, CKA-RL 2, ..." — the complete-seed count per method.
+    """"Min-Max 3, CKA-RL 2, ..." — the complete-seed count per method.
 
     Captions state seed counts, and seed counts change every time a run lands.
     Deriving the sentence rather than typing it is what stops a figure from
     describing a state of the world that stopped being true two commits ago.
     """
     return ", ".join(f"{label.split(' (')[0]} {len(complete_runs(prefix))}"
-                     for _key, label, _color, prefix in METHODS)
+                     for _key, label, _color, prefix in active_methods())
 
 
 def add_footnote(fig: go.Figure, text: str, left_margin: int,
-                 clear_axis_title: bool = True) -> None:
+                 clear_axis_title: bool = True) -> int:
     """Place a footnote below the plot, measured in pixels rather than fractions.
 
     Anchoring at a paper fraction fails on short figures: -0.2 of a shallow plot
     area is only a few pixels, so the note lands on the x-axis title. Pixels are
     what actually need clearing, so pixels are what this uses.
+
+    Returns the bottom margin the note needs. Captions here are assembled from
+    the data and change length as runs land, and a hand-set margin that was
+    right for six lines clips the seventh. Asking the note how much room it
+    wants is what keeps that from happening again.
     """
+    offset = 64 if clear_axis_title else 34
     fig.add_annotation(
         x=0, y=0, xref="paper", yref="paper",
-        xshift=-left_margin + 4, yshift=-(64 if clear_axis_title else 34),
+        xshift=-left_margin + 4, yshift=-offset,
         text=text, showarrow=False, xanchor="left", yanchor="top", align="left",
         font=dict(family=FONT_UI, size=FS_NOTE, color=AC["text_muted"]))
+    return offset + round(13.5 * (text.count("<br>") + 1)) + 14
 
 
 # ── Figure 1: learned vs retained ───────────────────────────────────────────
@@ -142,11 +186,20 @@ def figure_learned_vs_retained() -> None:
     brought back above it, the baselines the tasks they learned above average
     and then lost.
     """
-    fig = make_subplots(rows=2, cols=2, horizontal_spacing=0.13,
-                        vertical_spacing=0.20)
+    methods = active_methods()
+    n_rows = (len(methods) + 1) // 2
+
+    # Panel height and the gap above each panel's two-line header are fixed in
+    # pixels, and the figure grows to fit however many methods have landed.
+    # Deriving the spacing *fraction* from those pixels is what keeps a 6-method
+    # render from squeezing the headers into the panel above it.
+    panel_h, gap_h, top_m, bottom_m = 200, 100, 112, 152
+    plot_h = n_rows * panel_h + (n_rows - 1) * gap_h
+    fig = make_subplots(rows=n_rows, cols=2, horizontal_spacing=0.13,
+                        vertical_spacing=gap_h / plot_h)
     tally: dict[str, tuple[int, int, int]] = {}
 
-    for index, (key, label, color, prefix) in enumerate(METHODS):
+    for index, (key, label, color, prefix) in enumerate(methods):
         row, col = index // 2 + 1, index % 2 + 1
         runs = complete_runs(prefix)
         pairs = [learned_and_final(r) for r in runs]
@@ -225,22 +278,31 @@ def figure_learned_vs_retained() -> None:
                                               color=AC["text_muted"]))
     title = dict(font=dict(family=FONT_UI, size=FS_AXIS,
                            color=AC["text_primary"]))
-    for row in (1, 2):
+    for row in range(1, n_rows + 1):
         fig.update_yaxes(title=dict(text="score after all 50 tasks", **title),
                          row=row, col=1)
+    # An odd method count leaves the last cell empty, so each column carries its
+    # x-axis title on the lowest panel that column actually uses, and the unused
+    # cell is blanked rather than left as an empty styled frame.
     for col in (1, 2):
+        used = [i for i in range(len(methods)) if i % 2 + 1 == col]
+        if not used:
+            continue
         fig.update_xaxes(title=dict(text="score when the task was just learned",
-                                    **title), row=2, col=col)
+                                    **title), row=used[-1] // 2 + 1, col=col)
+    for index in range(len(methods), n_rows * 2):
+        fig.update_xaxes(visible=False, row=index // 2 + 1, col=index % 2 + 1)
+        fig.update_yaxes(visible=False, row=index // 2 + 1, col=index % 2 + 1)
 
     def phrase(which: int) -> str:
         parts = [f"{label.split(' (')[0]} "
                  f"{tally[key][which] or 'none'}"
                  + (f" of {tally[key][2]}" if tally[key][which] else "")
-                 for key, label, _c, _p in METHODS]
+                 for key, label, _c, _p in methods]
         return "; ".join(parts)
 
     rescued_line, lost_line = phrase(0), phrase(1)
-    add_footnote(fig, (
+    bottom_m = add_footnote(fig, (
         "One point per task, in units of (score − random) / (1 − random), so 0 "
         "is a random policy and 1 a solved task; the diagonal is no change.<br>"
         "Each panel shades one quadrant and draws only its two bounds.<br>"
@@ -248,18 +310,19 @@ def figure_learned_vs_retained() -> None:
         "most of the way to solved.<br>"
         f"<b>Rescued: {rescued_line}.</b><br>"
         f"<b>Lost: {lost_line}.</b><br>"
-        f"Complete seeds per method: {seed_summary()}; each contributes 50 "
-        "points."), 78)
+        "Each complete seed contributes 50 points.<br>"
+        f"Complete seeds: {seed_summary()}.{pending_note()}"), 78)
     fig.update_layout(
         title=None, plot_bgcolor=AC["bg"],
-        margin=dict(l=78, r=26, t=112, b=152),
-        legend=dict(orientation="h", x=0.0, xanchor="left", y=1.135,
+        margin=dict(l=78, r=26, t=top_m, b=bottom_m),
+        legend=dict(orientation="h", x=0.0, xanchor="left",
+                    y=1 + 68 / plot_h,   # a fixed 68 px above the plot area
                     yanchor="bottom", bgcolor="rgba(0,0,0,0)", borderwidth=0,
                     itemsizing="constant",
                     font=dict(family=FONT_UI, size=FS_TICK,
                               color=AC["text_primary"])),
         showlegend=True)
-    export_pair(fig, "learned_vs_retained", W_FULL, 764)
+    export_pair(fig, "learned_vs_retained", W_FULL, plot_h + top_m + bottom_m)
 
 
 # ── Figure 2: retention across the sequence ─────────────────────────────────
@@ -273,8 +336,9 @@ def figure_retention_curve() -> None:
     """
     fig = go.Figure()
     ends: list[tuple[str, float, float, str]] = []
+    extent = [np.inf, -np.inf]   # lowest and highest point any band reaches
 
-    for key, label, color, prefix in METHODS:
+    for key, label, color, prefix in active_methods():
         runs = complete_runs(prefix)
         per_seed = np.full((len(runs), N_TASKS), np.nan)
         for index, run in enumerate(runs):
@@ -286,6 +350,8 @@ def figure_retention_curve() -> None:
         with np.errstate(invalid="ignore"):
             mean = np.nanmean(per_seed, axis=0)
             low, high = np.nanmin(per_seed, axis=0), np.nanmax(per_seed, axis=0)
+        extent = [min(extent[0], float(np.nanmin(per_seed))),
+                  max(extent[1], float(np.nanmax(per_seed)))]
 
         # Band only where more than one seed reports. Drawing one over a single
         # run would invent an interval that does not exist.
@@ -329,23 +395,27 @@ def figure_retention_curve() -> None:
         title=dict(text="mean score of the tasks already learned",
                    font=dict(family=FONT_UI, size=FS_AXIS,
                              color=AC["text_primary"])),
-        range=[-0.02, 0.80], showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
+        # Range follows the bands rather than a fixed pair of numbers, so a
+        # method whose seeds spread below zero is not silently clipped.
+        range=[min(-0.02, extent[0] - 0.03), max(0.80, extent[1] + 0.03)],
+        showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
         zeroline=True, zerolinecolor=AC["border"], zerolinewidth=1.0,
         showline=True, linecolor=AC["axis"], linewidth=1.2, ticklen=4,
         tickfont=dict(family=FONT_MONO, size=FS_TICK, color=AC["text_muted"]))
 
-    add_footnote(fig, (
+    bottom = add_footnote(fig, (
         "After finishing task k, the mean score over the k−1 tasks learned "
         "before it, in units of (score − random) / (1 − random).<br>"
         "The just-learned task is excluded, because including it lets a method "
         "that merely learns the newest task well post a flattering curve.<br>"
-        f"<b>Shaded bands are the min-max across each method's complete "
-        f"seeds</b> — {seed_summary()}.<br>"
+        "<b>Shaded bands are the min-max across each method's complete "
+        "seeds.</b><br>"
         "A method with one seed carries no band: an interval over a single run "
-        "is invented rather than measured."), 74)
+        "is invented rather than measured.<br>"
+        f"Complete seeds: {seed_summary()}.{pending_note()}"), 74)
     fig.update_layout(title=None, showlegend=False,
-                      margin=dict(l=74, r=150, t=24, b=138))
-    export_pair(fig, "retention_curve", W_FULL, 462)
+                      margin=dict(l=74, r=150, t=24, b=bottom))
+    export_pair(fig, "retention_curve", W_FULL, 300 + 24 + bottom)
 
 
 # ── Figure 3: raw against normalised ────────────────────────────────────────
@@ -363,8 +433,9 @@ def figure_raw_vs_normalised() -> None:
                         subplot_titles=["Raw discounted return",
                                         "Normalised against each task's random floor"])
 
+    methods = active_methods()
     for col, column in enumerate(["raw", "normalized"], start=1):
-        for index, (key, label, color, prefix) in enumerate(METHODS):
+        for index, (key, label, color, prefix) in enumerate(methods):
             values = np.concatenate([learned_and_final(r, column)[1]
                                      for r in complete_runs(prefix)])
             jitter = (np.random.default_rng(index).random(len(values)) - 0.5) * 0.28
@@ -388,9 +459,9 @@ def figure_raw_vs_normalised() -> None:
                 bgcolor="rgba(255,255,255,0.90)", borderpad=2,
                 row=1, col=col)
 
-    fig.update_yaxes(tickmode="array", tickvals=list(range(len(METHODS))),
-                     ticktext=[m[1] for m in METHODS],
-                     range=[len(METHODS) - 0.35, -0.90], showgrid=False,
+    fig.update_yaxes(tickmode="array", tickvals=list(range(len(methods))),
+                     ticktext=[m[1] for m in methods],
+                     range=[len(methods) - 0.35, -0.90], showgrid=False,
                      zeroline=False, showline=False, ticklen=0,
                      tickfont=dict(family=FONT_UI, size=FS_AXIS,
                                    color=AC["text_primary"]))
@@ -412,35 +483,50 @@ def figure_raw_vs_normalised() -> None:
                                color=AC["text_primary"])
         annotation.y = 1.09
 
-    add_footnote(fig, (
+    # The two ranges the caption quotes are properties of the runs, so they are
+    # measured here rather than typed. Typed, they drift the moment a seed lands.
+    all_raw = np.concatenate([learned_and_final(r, "raw")[1]
+                              for _k, _l, _c, p in methods
+                              for r in complete_runs(p)])
+    ours_runs = complete_runs("biggrid50_sh_ours_")
+    raw_one = learned_and_final(ours_runs[0], "raw")[1]
+    norm_one = learned_and_final(ours_runs[0], "normalized")[1]
+    floor = (raw_one - norm_one) / (1 - norm_one)   # invert the normaliser
+
+    bottom = add_footnote(fig, (
         "One point per task after all 50 are learned; the heavy rule is the "
         "median. <b>Both panels are the same runs.</b><br>"
         "A random policy already collects most of the raw return here, so raw "
-        "scores crowd into [0.59, 0.99] and the methods look closer than they "
-        "are.<br>"
-        "The random floor also varies per task, from 0.55 to 0.87, so the same "
-        "raw number is a different achievement on different tasks.<br>"
+        f"scores crowd into [{all_raw.min():.2f}, {all_raw.max():.2f}] and the "
+        "methods look closer than they are.<br>"
+        f"The random floor also varies per task, from {floor.min():.2f} to "
+        f"{floor.max():.2f}, so the same raw number is a different achievement "
+        "on different tasks.<br>"
         "Normalising against each task's own floor is what makes them "
         "comparable.<br>"
-        f"Complete seeds per method: {seed_summary()}."), 118)
+        f"Complete seeds: {seed_summary()}.{pending_note()}"), 118)
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=118, r=26, t=56, b=152))
-    export_pair(fig, "raw_vs_normalised", W_FULL, 456)
+                      margin=dict(l=118, r=26, t=56, b=bottom))
+    # 62 px per method row keeps the point clouds from overlapping as rows are
+    # added, so the figure grows rather than compressing.
+    export_pair(fig, "raw_vs_normalised", W_FULL,
+                62 * len(methods) + 56 + bottom)
 
 
 # ── Figure 4: compute cost ──────────────────────────────────────────────────
 def figure_compute_cost() -> None:
     """Wall-clock for one complete 50-task run."""
     fig = go.Figure()
+    methods = active_methods()
     totals = {key: np.array([
         sum(float(r["wall_s_phase"]) for r in load_phases(run)) / 60.0
         for run in complete_runs(prefix)])
-        for key, _label, _color, prefix in METHODS}
+        for key, _label, _color, prefix in methods}
 
     reference = float(np.mean(totals["ours"]))
     top = max(float(v.max()) for v in totals.values())
 
-    for index, (key, label, color, _prefix) in enumerate(METHODS):
+    for index, (key, label, color, _prefix) in enumerate(methods):
         values = totals[key]
         mean = float(np.mean(values))
         fig.add_trace(go.Scatter(
@@ -482,44 +568,52 @@ def figure_compute_cost() -> None:
         gridwidth=0.6, zeroline=False, showline=True, linecolor=AC["border"],
         ticklen=0, tickfont=dict(family=FONT_MONO, size=FS_TICK,
                                  color=AC["text_muted"]))
-    fig.update_yaxes(tickmode="array", tickvals=list(range(len(METHODS))),
-                     ticktext=[m[1] for m in METHODS],
-                     range=[len(METHODS) - 0.5, -0.5], showgrid=False,
+    fig.update_yaxes(tickmode="array", tickvals=list(range(len(methods))),
+                     ticktext=[m[1] for m in methods],
+                     range=[len(methods) - 0.5, -0.5], showgrid=False,
                      zeroline=False, showline=False, ticklen=0,
                      tickfont=dict(family=FONT_UI, size=FS_AXIS,
                                    color=AC["text_primary"]))
 
-    add_footnote(fig, (
-        "× is relative to ours. Complete runs only; the capped segment on ours "
-        "is its min-max across complete seeds.<br>"
-        f"Complete seeds per method: {seed_summary()}.<br>"
+    bottom = add_footnote(fig, (
+        "× is relative to ours. Complete runs only; a capped segment is that "
+        "method's min-max across its complete seeds.<br>"
+        f"Complete seeds: {seed_summary()}.<br>"
         "<b>Ours is the most expensive because consolidation re-simulates past "
         "environments</b>, spending time on tasks it has already learned.<br>"
-        "Measured on a shared, contended cluster, so read it as indicative."), 122)
+        "Measured on a shared, contended cluster, so read it as "
+        f"indicative.{pending_note()}"), 122)
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
-                      margin=dict(l=122, r=126, t=20, b=132))
-    export_pair(fig, "compute_cost", W_FULL, 318)
+                      margin=dict(l=122, r=126, t=20, b=bottom))
+    export_pair(fig, "compute_cost", W_FULL, 41 * len(methods) + 20 + bottom)
 
 
 # ── Figure 5: headline metrics, as a table ──────────────────────────────────
 def figure_headline_table() -> None:
     """The four continual-learning metrics as a booktabs table.
 
-    A table rather than four lollipop panels: there are sixteen numbers and the
-    reader wants to compare them exactly, which is what a table is for.
+    A table rather than lollipop panels: the reader wants to compare the numbers
+    exactly, which is what a table is for.
+
+    Methods run down the rows and metrics across the columns, because the method
+    count grows as baselines land while the metric count does not. Putting the
+    growing axis vertical is what lets a sixth method join without squeezing
+    every column past the width of its own header.
     """
     data = metrics()
-    rows = [("perf", "Average performance", "higher is better", +1),
-            ("forgetting", "Forgetting", "lower is better", -1),
-            ("bwt", "Backward transfer", "higher is better", +1),
-            ("fwt", "Forward transfer", "higher is better", +1)]
+    methods = active_methods()
+    # (metric, header line 1, header line 2, which way is better)
+    cols = [("perf", "Average", "performance", "higher is better", +1),
+            ("forgetting", "Forgetting", "", "lower is better", -1),
+            ("bwt", "Backward", "transfer", "higher is better", +1),
+            ("fwt", "Forward", "transfer", "higher is better", +1)]
 
     def values_for(prefix: str, metric: str) -> list[float]:
         return [data[r][metric] for r in complete_runs(prefix)
                 if data[r].get(metric) is not None]
 
     label_x = 0.0
-    col_x = [40.0, 58.0, 76.0, 94.0]
+    col_x = [46.0, 62.0, 78.0, 94.0]
     right_edge = col_x[-1] + 2
 
     fig = go.Figure()
@@ -530,45 +624,58 @@ def figure_headline_table() -> None:
         fig.add_shape(type="line", x0=label_x - 1, x1=right_edge, y0=y, y1=y,
                       line=dict(color=color, width=width), layer="above")
 
-    header_y = 0.60
-    rule(header_y + 0.62, 1.4, AC["axis"])
-    rule(header_y - 0.52, 1.1, AC["axis"])
-    fig.add_annotation(
-        x=label_x, y=header_y, text="<b>normalised units</b>", showarrow=False,
-        xanchor="left", yanchor="middle",
-        font=dict(family=FONT_UI, size=FS_TICK, color=AC["text_muted"]))
-    for x, (_key, label, color, _prefix) in zip(col_x, METHODS):
-        fig.add_annotation(
-            x=x, y=header_y, text=f"<b>{label}</b>", showarrow=False,
-            xanchor="right", yanchor="middle",
-            font=dict(family=FONT_UI, size=FS_AXIS, color=color))
+    # Column statistics first: the best value in a column is only knowable once
+    # every method in it has been read.
+    present = {metric: {key: values_for(prefix, metric)
+                        for key, _l, _c, prefix in methods}
+               for metric, _h1, _h2, _sense, _better in cols}
+    ours_sd = {metric: (float(np.std(v["ours"], ddof=1))
+                        if len(v["ours"]) > 1 else 0.0)
+               for metric, v in present.items()}
+    best = {}
+    for metric, _h1, _h2, _sense, better in cols:
+        means = [float(np.mean(v)) for v in present[metric].values() if v]
+        best[metric] = (max(means) if better > 0 else min(means)) if means else None
 
-    lent_used = False
-    for index, (metric, label, sense, better) in enumerate(rows):
-        y = -index - 0.55
+    header_y = 0.0
+    rule(header_y + 1.05, 1.4, AC["axis"])
+    rule(header_y - 0.62, 1.1, AC["axis"])
+    fig.add_annotation(
+        x=label_x, y=header_y + 0.12, text="<b>normalised units</b>",
+        showarrow=False, xanchor="left", yanchor="middle",
+        font=dict(family=FONT_UI, size=FS_TICK, color=AC["text_muted"]))
+    for x, (_metric, head1, head2, sense, _better) in zip(col_x, cols):
         fig.add_annotation(
-            x=label_x, y=y, text=label, showarrow=False, yshift=6,
-            xanchor="left", yanchor="middle",
+            x=x, y=header_y + (0.46 if head2 else 0.28), text=f"<b>{head1}</b>",
+            showarrow=False, xanchor="right", yanchor="middle",
             font=dict(family=FONT_UI, size=FS_AXIS, color=AC["text_primary"]))
+        if head2:
+            fig.add_annotation(
+                x=x, y=header_y + 0.12, text=f"<b>{head2}</b>", showarrow=False,
+                xanchor="right", yanchor="middle",
+                font=dict(family=FONT_UI, size=FS_AXIS,
+                          color=AC["text_primary"]))
         fig.add_annotation(
-            x=label_x, y=y, text=sense, showarrow=False, yshift=-9,
-            xanchor="left", yanchor="middle",
+            x=x, y=header_y - 0.28, text=sense, showarrow=False,
+            xanchor="right", yanchor="middle",
             font=dict(family=FONT_UI, size=FS_NOTE, color=AC["text_faint"]))
 
-        present = {key: values_for(prefix, metric)
-                   for key, _l, _c, prefix in METHODS}
-        # From-scratch is forward transfer's own reference, so it scores 0 by
-        # construction there and cannot compete for the best value.
-        contenders = {k: float(np.mean(v)) for k, v in present.items() if v}
-        best = ((max(contenders.values()) if better > 0
-                 else min(contenders.values())) if contenders else None)
+    lent_used = False
+    for index, (key, label, color, _prefix) in enumerate(methods):
+        y = -index - 0.95
+        if key == "ours":
+            fig.add_shape(type="rect", layer="below",
+                          x0=label_x - 1, x1=right_edge,
+                          y0=y - 0.45, y1=y + 0.45,
+                          fillcolor=hex_to_rgba(AC["blue"], 0.07),
+                          line=dict(width=0))
+        fig.add_annotation(
+            x=label_x, y=y, text=f"<b>{label}</b>", showarrow=False,
+            xanchor="left", yanchor="middle",
+            font=dict(family=FONT_UI, size=FS_AXIS, color=color))
 
-        ours_values = present["ours"]
-        lent_sd = (float(np.std(ours_values, ddof=1))
-                   if len(ours_values) > 1 else 0.0)
-
-        for x, (key, _label, _color, _prefix) in zip(col_x, METHODS):
-            values = present[key]
+        for x, (metric, _h1, _h2, _sense, _better) in zip(col_x, cols):
+            values = present[metric][key]
             if not values:
                 fig.add_annotation(
                     x=x, y=y, text="0, by construction", showarrow=False,
@@ -578,10 +685,10 @@ def figure_headline_table() -> None:
                 continue
             mean = float(np.mean(values))
             measured = len(values) > 1
-            sd = float(np.std(values, ddof=1)) if measured else lent_sd
+            sd = float(np.std(values, ddof=1)) if measured else ours_sd[metric]
             lent_used = lent_used or (not measured and sd > 1e-9)
             body = f"{mean:+.2f}" if metric == "bwt" else f"{mean:.2f}"
-            if best is not None and abs(mean - best) < 1e-9:
+            if best[metric] is not None and abs(mean - best[metric]) < 1e-9:
                 body = f"<b>{body}</b>"
             if sd > 1e-9:
                 dagger = "" if measured else "†"
@@ -593,28 +700,40 @@ def figure_headline_table() -> None:
                 font=dict(family=FONT_MONO, size=FS_VALUE,
                           color=AC["text_primary"]))
 
-    bottom = -len(rows) - 0.1
+    bottom = -len(methods) - 0.5
     rule(bottom, 1.4, AC["axis"])
+    note_lines = [
+        "Complete 50-task runs only; partial seeds are excluded rather than "
+        "averaged in. <b>Bold</b> is the best value in each column.",
+        "Values are the mean over each method's complete seeds with ±1 s.d. "
+        "across them.",
+        f"Complete seeds: {seed_summary()}.",
+        *(["<b>† marks a placeholder:</b> that method has a single complete "
+           "seed, so it carries ours' s.d. until its own land. A lent interval "
+           "is not a measurement."] if lent_used else []),
+        "Forward transfer is measured against the from-scratch run, which is "
+        "therefore 0 by construction.",
+        # removeprefix, not lstrip: lstrip("<br>") strips those four characters
+        # in any order and would eat the opening <b> of the sentence too.
+        *([pending_note().removeprefix("<br>")] if pending_note() else []),
+    ]
     fig.add_annotation(
-        x=label_x - 1, y=bottom - 0.35,
-        text=("Complete 50-task runs only; partial seeds are excluded rather "
-              "than averaged in. <b>Bold</b> is the best value in each row.<br>"
-              f"Values are the mean over each method's complete seeds with ±1 "
-              f"s.d. across them ({seed_summary()}).<br>"
-              + ("<b>† marks a placeholder:</b> that method has a single "
-                 "complete seed, so it carries ours' s.d. until its own land. "
-                 "A lent interval is not a measurement.<br>" if lent_used else "")
-              +
-              "Forward transfer is measured against the from-scratch run, which "
-              "is therefore 0 by construction."),
+        x=label_x - 1, y=bottom - 0.30, text="<br>".join(note_lines),
         showarrow=False, xanchor="left", yanchor="top", align="left",
         font=dict(family=FONT_UI, size=FS_NOTE, color=AC["text_muted"]))
 
+    top_y = header_y + 1.5
+    # The caption block is sized by its own line count, so the table neither
+    # clips it nor leaves a band of empty paper under a short one.
+    bottom_y = bottom - 0.55 - 0.40 * len(note_lines)
     fig.update_xaxes(visible=False, range=[label_x - 2, right_edge + 1])
-    fig.update_yaxes(visible=False, range=[bottom - 2.6, header_y + 1.2])
+    fig.update_yaxes(visible=False, range=[bottom_y, top_y])
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
                       margin=dict(l=20, r=20, t=14, b=12))
-    export_pair(fig, "headline_metrics", W_FULL, 356)
+    # 39 px per unit row keeps the type scale identical however many rows there
+    # are, instead of stretching the same table to a fixed height.
+    export_pair(fig, "headline_metrics", W_FULL,
+                round(39 * (top_y - bottom_y)) + 26)
 
 
 # ── Export ──────────────────────────────────────────────────────────────────
@@ -626,6 +745,38 @@ def export_pair(fig: go.Figure, stem: str, width: int, height: int) -> None:
     print(f"  png/{stem}.png  svg/{stem}.svg")
 
 
+def verify() -> list[str]:
+    """Check every export for the two faults this figure set keeps hitting.
+
+    Clipped captions and rasterised SVGs both survive a glance at the PNG, and
+    both have shipped here before. Captions are assembled from the data and grow
+    as runs land, so the check belongs in the run rather than in someone's
+    memory.
+    """
+    from PIL import Image
+
+    faults = []
+    for png in sorted(PNG_DIR.glob("*.png")):
+        pixels = np.asarray(Image.open(png).convert("L"))
+        ink = pixels < 245
+        rows, cols = np.where(ink.any(axis=1))[0], np.where(ink.any(axis=0))[0]
+        if not rows.size:
+            faults.append(f"{png.name}: blank")
+            continue
+        edges = (rows[0], pixels.shape[0] - 1 - rows[-1],
+                 cols[0], pixels.shape[1] - 1 - cols[-1])
+        if min(edges) <= 8:
+            faults.append(f"{png.name}: content within {min(edges)}px of an edge "
+                          "(top, bottom, left, right = "
+                          f"{', '.join(str(e) for e in edges)})")
+    for svg in sorted(SVG_DIR.glob("*.svg")):
+        embedded = svg.read_text(encoding="utf-8").count("<image")
+        if embedded:
+            faults.append(f"{svg.name}: {embedded} embedded raster image(s), "
+                          "so the figure is not fully vector")
+    return faults
+
+
 def main() -> int:
     install_template()
     print("reports/final/gridworld")
@@ -634,7 +785,15 @@ def main() -> int:
     figure_raw_vs_normalised()
     figure_compute_cost()
     figure_headline_table()
-    return 0
+
+    faults = verify()
+    for fault in faults:
+        print(f"  FAULT  {fault}")
+    if not faults:
+        pending = pending_methods()
+        print(f"  checked: {seed_summary()}"
+              + (f"; pending {', '.join(pending)}" if pending else ""))
+    return 1 if faults else 0
 
 
 if __name__ == "__main__":
