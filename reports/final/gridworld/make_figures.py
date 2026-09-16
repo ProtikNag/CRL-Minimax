@@ -426,9 +426,14 @@ def figure_retention_curve() -> None:
         "that merely learns the newest task well post a flattering curve.<br>"
         "<b>Shaded bands are the min-max across each method's complete "
         "seeds.</b><br>"
-        "A method with one seed carries no band: an interval over a single run "
-        "is invented rather than measured.<br>"
-        f"Complete seeds: {seed_summary()}.{pending_note()}"), 74)
+        # Only worth saying while some method actually has a single seed. A
+        # caption that explains a condition the data no longer meets is the
+        # same defect as a stale number.
+        + ("A method with one seed carries no band: an interval over a single "
+           "run is invented rather than measured.<br>"
+           if any(len(complete_runs(p)) == 1 for _k, _l, _c, p in active_methods())
+           else "")
+        + f"Complete seeds: {seed_summary()}.{pending_note()}"), 74)
     fig.update_layout(title=None, showlegend=False,
                       margin=dict(l=74, r=150, t=24, b=bottom))
     export_pair(fig, "retention_curve", W_FULL, 300 + 24 + bottom)
