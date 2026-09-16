@@ -299,11 +299,7 @@ the residue that is not part of it.
    (not possible on this cluster — see gotchas). The dashboard was
    static-verified only. Low priority: `reports/final/` is the paper deliverable
    and does not depend on the dashboard.
-2. **Fix the stale caption in `report/manifest.json`.** Its `compute_cost_wall`
-   entry reads *"V5 is substantially slower than CLEAR"*, which contradicts its
-   own numbers (15.1 h and 18.1 h against 36.4-37.3 h). Correct or drop it before
-   the dashboard is shown to anyone.
-3. (Deferred, post-deadline) multi-seed Atari beyond the opportunistic seed 1;
+2. (Deferred, post-deadline) multi-seed Atari beyond the opportunistic seed 1;
    a retention metric that credits competent-but-sub-specialist play.
 
 ### Done, do not redo

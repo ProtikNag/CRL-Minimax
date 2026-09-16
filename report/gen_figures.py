@@ -1257,7 +1257,12 @@ def fig_compute_cost() -> None:
         group="compute_cost",
         group_title="Compute Cost",
         title="Wall-clock time per method: Ours (V5) vs CLEAR vs Joint",
-        caption="V5 is substantially slower than CLEAR (global phase re-collects all past envs each iter = O(k)). Single GPU, single seed.",
+        caption=(
+            "V5 costs 15.1 h against CLEAR's 36.9 h, roughly 0.4x, and sits just above "
+            "the Joint ceiling's 13.2 h. Global consolidation re-collects all past envs "
+            "each iteration (O(k)), which is why it costs more than Joint. Ours counts "
+            "training phases only while CLEAR and Joint count total elapsed, so read the "
+            "gap as indicative. Single GPU, single seed."),
         details=(
             "Wall-clock time in hours, single GPU, seed 0. "
             "V5 canonical: sum of task1 + local + global wall_s from resource_usage.json. "
@@ -1265,7 +1270,12 @@ def fig_compute_cost() -> None:
             "CLEAR: t_wall from last row of logs.jsonl (total elapsed). "
             "Joint 6M: t_wall from joint_final row. "
             "V5 global consolidation re-collects all past environments each iteration (O(k) cost), "
-            "explaining the much higher wall-time vs CLEAR replay."
+            "which is why V5 costs more than the Joint ceiling despite training on one task "
+            "at a time. It remains far cheaper than CLEAR. "
+            "NOTE the two series are measured differently: V5 counts only time inside training "
+            "phases while CLEAR and Joint count total elapsed including evaluation, checkpointing "
+            "and setup. V5 is the understated series, so the gap shown is an upper bound on V5's "
+            "advantage, not a lower one."
         ),
         variants=[v],
         seed=0, dataset="Atari-5", model="impala_ac_multihead",

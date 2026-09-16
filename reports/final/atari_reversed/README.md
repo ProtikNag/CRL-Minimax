@@ -188,13 +188,14 @@ Two things to carry into any caption.
 exact.** Ours sums per-phase `wall_s` from `resource_usage.json`, counting only
 time inside the training phases. CLEAR and Joint take `t_wall` from the last row
 of `logs.jsonl`, which is total elapsed and so also includes evaluation,
-checkpointing and setup. Ours is the series understated by this, so the gap
-shown is a lower bound on our advantage rather than an inflated one.
+checkpointing and setup. Ours is the understated series, so its true elapsed
+time is higher than shown and **the gap here is an upper bound on our advantage,
+not a lower one.** At this magnitude, 18.1 h against 36.4 to 37.3 h, the
+advantage survives the caveat comfortably, but do not quote the gap as exact.
 
-**`report/manifest.json` currently captions its own version of this figure as "V5
-is substantially slower than CLEAR".** That contradicts the figure's own numbers
-(15.1 h and 18.1 h against 36.4 to 37.3 h). The caption is stale and should be
-corrected or dropped before the dashboard is shown to anyone.
+**`report/manifest.json` used to caption its own version of this figure as "V5 is
+substantially slower than CLEAR"**, which contradicted its own numbers. Fixed on
+2026-09-16; the dashboard and this folder now say the same thing.
 
 ## Data and rebuild
 
