@@ -15,7 +15,7 @@ shared task-conditioned head**. Capacity is fixed and interference is forced.
 
 | Stem | What it shows |
 |---|---|
-| `learned_vs_retained` | Every task's score when learned against its score at the end, 3×2. **The separator.** |
+| `learned_vs_retained` | Every task's score when learned against its score at the end, 2×3. **The separator.** |
 | `retention_curve` | Mean score of everything learned so far, as the sequence grows |
 | `headline_metrics` | PERF, forgetting, backward and forward transfer, as a table |
 | `raw_vs_normalised` | Final per-task score on both scales, and why the choice matters |

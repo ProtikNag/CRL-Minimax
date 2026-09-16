@@ -187,20 +187,30 @@ def figure_learned_vs_retained() -> None:
     and then lost.
     """
     methods = active_methods()
-    n_rows = (len(methods) + 1) // 2
+    n_cols = 3
+    n_rows = -(-len(methods) // n_cols)
 
-    # Panel height and the gap above each panel's two-line header are fixed in
-    # pixels, and the figure grows to fit however many methods have landed.
-    # Deriving the spacing *fraction* from those pixels is what keeps a 6-method
-    # render from squeezing the headers into the panel above it.
-    panel_h, gap_h, top_m, bottom_m = 200, 100, 112, 152
-    plot_h = n_rows * panel_h + (n_rows - 1) * gap_h
-    fig = make_subplots(rows=n_rows, cols=2, horizontal_spacing=0.13,
-                        vertical_spacing=gap_h / plot_h)
+    # Panels are square. Both axes carry the same quantity in the same units and
+    # the whole reading is which side of the diagonal a point falls on, so a
+    # non-square panel tilts the diagonal off 45° and misleads the eye.
+    #
+    # Width is fixed by the paper column, so the panel size follows from it and
+    # the figure height follows from the panel size. Gaps are in pixels because
+    # what they have to clear is in pixels: a column gap clears the next panel's
+    # y tick labels, a row gap clears the panel header stacked above it.
+    left_m, right_m, top_m, bottom_m = 78, 26, 118, 152
+    gap_w, gap_v = 46, 104
+    plot_w = W_FULL - left_m - right_m
+    panel = (plot_w - (n_cols - 1) * gap_w) / n_cols
+    plot_h = n_rows * panel + (n_rows - 1) * gap_v
+
+    fig = make_subplots(rows=n_rows, cols=n_cols,
+                        horizontal_spacing=gap_w / plot_w,
+                        vertical_spacing=gap_v / plot_h)
     tally: dict[str, tuple[int, int, int]] = {}
 
     for index, (key, label, color, prefix) in enumerate(methods):
-        row, col = index // 2 + 1, index % 2 + 1
+        row, col = index // n_cols + 1, index % n_cols + 1
         runs = complete_runs(prefix)
         pairs = [learned_and_final(r) for r in runs]
         learned = np.concatenate([p[0] for p in pairs])
@@ -241,19 +251,20 @@ def figure_learned_vs_retained() -> None:
 
         inside = (((learned < POOR) & (final > STRONG)) if rescue
                   else ((learned > STRONG) & (final < POOR)))
+        # Three stacked lines rather than one running line. At three columns a
+        # panel is about 150 px wide and the old single-line header ran to some
+        # 250 px, so it overhung the panel beside it.
         axis = f"{index + 1 if index else ''}"
-        fig.add_annotation(
-            x=0, y=1.19, xref=f"x{axis} domain", yref=f"y{axis} domain",
-            text=f"<b>{label}</b>", showarrow=False,
-            xanchor="left", yanchor="bottom",
-            font=dict(family=FONT_UI, size=FS_PANEL, color=AC["text_primary"]))
-        fig.add_annotation(
-            x=0, y=1.035, xref=f"x{axis} domain", yref=f"y{axis} domain",
-            text=(f"<b>{improved:.0%}</b> ended better &nbsp;·&nbsp; "
-                  f"<b>{int(inside.sum())}</b> of {len(learned)} in the "
-                  "shaded quadrant"),
-            showarrow=False, xanchor="left", yanchor="bottom",
-            font=dict(family=FONT_UI, size=FS_TICK, color=color))
+        for offset, text, size, ink in (
+                (2, f"<b>{label}</b>", FS_PANEL, AC["text_primary"]),
+                (1, f"<b>{improved:.0%}</b> ended better", FS_TICK, color),
+                (0, f"<b>{int(inside.sum())}</b> of {len(learned)} in the "
+                    "quadrant", FS_TICK, color)):
+            fig.add_annotation(
+                x=0, y=1.0, xref=f"x{axis} domain", yref=f"y{axis} domain",
+                yshift=8 + offset * 17, text=text, showarrow=False,
+                xanchor="left", yanchor="bottom",
+                font=dict(family=FONT_UI, size=size, color=ink))
 
     # Real legend entries rather than text inside the panels.
     for name, fill in ((f"learned poorly (&lt; {POOR:.2f}), ended strong "
@@ -276,23 +287,27 @@ def figure_learned_vs_retained() -> None:
                      showline=True, linecolor=AC["axis"], linewidth=1.2,
                      ticklen=4, tickfont=dict(family=FONT_MONO, size=FS_TICK,
                                               color=AC["text_muted"]))
+    # One axis title for the whole grid, not one per column. Per-column titles
+    # are set on their own subplot and at three columns they abut and read as
+    # one run-on string.
     title = dict(font=dict(family=FONT_UI, size=FS_AXIS,
                            color=AC["text_primary"]))
-    for row in range(1, n_rows + 1):
-        fig.update_yaxes(title=dict(text="score after all 50 tasks", **title),
-                         row=row, col=1)
-    # An odd method count leaves the last cell empty, so each column carries its
-    # x-axis title on the lowest panel that column actually uses, and the unused
-    # cell is blanked rather than left as an empty styled frame.
-    for col in (1, 2):
-        used = [i for i in range(len(methods)) if i % 2 + 1 == col]
-        if not used:
-            continue
-        fig.update_xaxes(title=dict(text="score when the task was just learned",
-                                    **title), row=used[-1] // 2 + 1, col=col)
-    for index in range(len(methods), n_rows * 2):
-        fig.update_xaxes(visible=False, row=index // 2 + 1, col=index % 2 + 1)
-        fig.update_yaxes(visible=False, row=index // 2 + 1, col=index % 2 + 1)
+    fig.add_annotation(
+        x=0.5, y=0, xref="paper", yref="paper", yshift=-40,
+        text="score when the task was just learned", showarrow=False,
+        xanchor="center", yanchor="top", **title)
+    fig.add_annotation(
+        x=0, y=0.5, xref="paper", yref="paper", xshift=-(left_m - 12),
+        text="score after all 50 tasks", showarrow=False, textangle=-90,
+        xanchor="center", yanchor="middle", **title)
+
+    # A method count that does not fill the grid leaves trailing cells empty, so
+    # those cells are blanked rather than left as empty styled frames.
+    for index in range(len(methods), n_rows * n_cols):
+        fig.update_xaxes(visible=False,
+                         row=index // n_cols + 1, col=index % n_cols + 1)
+        fig.update_yaxes(visible=False,
+                         row=index // n_cols + 1, col=index % n_cols + 1)
 
     def phrase(which: int) -> str:
         parts = [f"{label.split(' (')[0]} "
@@ -314,15 +329,16 @@ def figure_learned_vs_retained() -> None:
         f"Complete seeds: {seed_summary()}.{pending_note()}"), 78)
     fig.update_layout(
         title=None, plot_bgcolor=AC["bg"],
-        margin=dict(l=78, r=26, t=top_m, b=bottom_m),
+        margin=dict(l=left_m, r=right_m, t=top_m, b=bottom_m),
         legend=dict(orientation="h", x=0.0, xanchor="left",
-                    y=1 + 68 / plot_h,   # a fixed 68 px above the plot area
+                    y=1 + 74 / plot_h,   # a fixed 74 px above the plot area
                     yanchor="bottom", bgcolor="rgba(0,0,0,0)", borderwidth=0,
                     itemsizing="constant",
                     font=dict(family=FONT_UI, size=FS_TICK,
                               color=AC["text_primary"])),
         showlegend=True)
-    export_pair(fig, "learned_vs_retained", W_FULL, plot_h + top_m + bottom_m)
+    export_pair(fig, "learned_vs_retained", W_FULL,
+                round(plot_h) + top_m + bottom_m)
 
 
 # ── Figure 2: retention across the sequence ─────────────────────────────────
