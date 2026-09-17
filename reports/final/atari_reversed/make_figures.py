@@ -208,9 +208,11 @@ def random_scores() -> dict[str, float]:
 def transfer_metrics(data: dict, key, order: list[str] | None = None) -> dict:
     """Backward transfer and the aggregates it travels with, in normalised units.
 
-    Scores are put on a common scale as ``(raw - random) / (ceiling - random)``
-    before any averaging: raw backward transfer cannot be averaged across games
-    whose scores differ by ~700x (Pong around 20, Q*bert around 4000).
+    Scores are put on a common scale as ``raw / ceiling`` before any averaging,
+    because raw backward transfer cannot be averaged across games whose scores
+    differ by ~700x (Pong around 20, Q*bert around 4000). This is the same scale
+    ``retention_matrix`` uses, so the table and the matrices agree cell for cell.
+    Note the random floor is not 0 on it: Pong's random policy scores -100%.
 
     Backward transfer follows ``analysis/continual_metrics.py``: for each task
     learned before the last one, ``final - just_learned``. Negative is
@@ -219,11 +221,9 @@ def transfer_metrics(data: dict, key, order: list[str] | None = None) -> dict:
     """
     order = order if order is not None else data["orders"][ORDER_KEY]
     joint = reference_in_order(data, "joint", order)
-    random_by_game = random_scores()
-    floor = np.array([random_by_game[game] for game in order], dtype=float)
 
     scores = key if isinstance(key, np.ndarray) else matrix(data, key)
-    normalised = (scores - floor[None, :]) / (joint - floor)[None, :]
+    normalised = scores / joint[None, :]
 
     count = len(order)
     just_learned = np.array([normalised[i, i] for i in range(count)])
@@ -913,8 +913,10 @@ def figure_transfer_table(data: dict) -> None:
     status += ".</b><br>"
 
     footnote = (
-        "Normalised as (score − random) / (Joint ceiling − random). Backward "
-        "transfer is final − just-learned.<br>"
+        "Normalised as score / Joint ceiling, the same scale the retention "
+        "matrices use.<br>"
+        "Backward transfer is final − just-learned. The random floor is not 0 "
+        "on this scale; on Pong it is −100%.<br>"
         "<b>Every number is computed over the tasks that run has finished</b>, "
         "counted under each column. Nothing is<br>"
         "extrapolated, so the columns are not comparable. A mean over fewer "
@@ -942,7 +944,7 @@ def figure_transfer_table(data: dict) -> None:
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
                       margin=dict(l=16, r=16, t=14, b=10))
 
-    export_pair(fig, "transfer_table", W_FULL, 236)
+    export_pair(fig, "transfer_table", W_FULL, 248)
 
 
 # ── Figure 4: compute cost ──────────────────────────────────────────────────

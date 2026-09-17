@@ -41,7 +41,7 @@ in this tier and it is why the old and new runs are never averaged together.
 the value-constraint shortfall reached ≈0, and the greedy diagonal still fell to
 77.6 during consolidation. The constraint is satisfied on `V` while the score
 collapses. It then recovered to 144.5 after the Pong phase, which is the only
-positive backward transfer any method posts in this tier (+0.24). Worth stating
+positive backward transfer any method posts in this tier (+0.23). Worth stating
 in the paper rather than leaving for a reviewer.
 
 ### What the two finished baselines did
@@ -51,18 +51,29 @@ plasticity trade the method is for.
 
 **CKA-RL forgot almost everything.** Its final row is Space Invaders 212.6,
 Boxing −15.5, Breakout 6.7, Pong −21.0, Q\*bert 4420.5. Boxing and Pong finish
-**below a random policy**. Only the last-learned game survives, and its average
-performance over prior tasks is −0.03, which is the random floor. Backward
-transfer −0.80.
+**below a random policy**. Only the last-learned game survives, which leaves
+average performance at 0.01 against a ceiling of 1.00 and backward transfer at
+−0.99, the worst of the four.
 
 **CompoNet forgot nothing and stopped learning.** Its lower triangle is
 constant by construction, since components freeze, so backward transfer is
 exactly 0.00 on every task. The cost shows up on the diagonal: Breakout reached
 only 99.2 against a threshold of 285, and Q\*bert scored **0.0**, never learned
-at all. Average performance 0.82 over prior tasks against 0.65 over all of them,
-and the whole of that gap is the task it failed to learn.
+at all. Average performance lands at 0.66, and the whole of the shortfall is the
+one task it never learned.
 
 Ours sits between the two, retaining without freezing.
+
+## Normalisation
+
+Everything in this folder is on **one scale, `score / Joint ceiling`**. The
+retention matrices always used it and `transfer_table` now does too, so a cell
+in a matrix and the aggregate under it are the same quantity.
+
+The random floor is **not** 0 on this scale. It is 16% on Space Invaders, 4% on
+Q\*bert, near 0% on Boxing and Breakout, and **−100% on Pong**, whose random
+policy scores −20.7 against a ceiling of 20.7. So CKA-RL's Pong cell at −101%
+means *at random*, not far below it, and a reader has to be told that once.
 
 ## Figures
 
