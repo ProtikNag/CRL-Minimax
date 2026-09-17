@@ -1,0 +1,147 @@
+% Related work.
+%
+% Organisation follows Hu et al. (CKA-RL, NeurIPS 2025), which groups continual
+% RL into the four families of the Pan et al. survey and gives each a run-in
+% bold paragraph. Two families are added that the taxonomy does not cover but
+% that this paper has to engage with: plasticity-oriented methods, whose
+% failure mode is distinct from forgetting, and constrained RL, which supplies
+% the machinery. A final paragraph places this work.
+%
+% Every paragraph ends on what its family leaves unaddressed, so the gap
+% argument accumulates rather than arriving all at once at the end.
+
+\section{Related Work}
+\label{sec:related}
+
+Continual reinforcement learning asks an agent to learn a sequence of tasks
+while retaining competence on those it has already seen. Existing methods are
+commonly grouped into four families \citep{pan2025survey}, namely
+regularisation-based, rehearsal-based, architecture-based and meta-learning
+based approaches. We review each in turn, then two lines of work that the
+taxonomy does not cover but that bear directly on our contribution.
+
+\paragraph{Regularisation-based methods.}
+These add a penalty to the learning objective that discourages movement in
+parameters deemed important to earlier tasks. Elastic weight consolidation
+\citep{kirkpatrick2017ewc} weights that penalty by a Fisher-information
+estimate of per-parameter importance, and Progress \& Compress
+\citep{schwarz2018progress} alternates an active column with distillation into
+a knowledge base under an online variant of the same penalty. More recent work
+adapts the penalty during training rather than fixing it, with ITER
+\citep{igl2021iter} periodically distilling into a freshly initialised network
+and TRAC \citep{muppidi2024trac} tuning regularisation strength online to limit
+weight drift. \citet{anand2023permanent} instead decompose the value function
+into permanent and transient components to address the stability-plasticity
+trade-off directly.
+\textbf{What is left unaddressed.} The trade-off is expressed as a penalty
+weight, and that weight has to be chosen before it is known which tasks will
+come under pressure or how much. A single scalar is asked to price retention
+uniformly across tasks that are not equally at risk, and the resulting
+behaviour is a soft trade rather than a requirement the optimiser must meet.
+Degradation on earlier tasks accordingly remains substantial as sequences
+lengthen \citep{hu2025ckarl}.
+
+\paragraph{Rehearsal-based methods.}
+These retain past experience and replay it while learning new tasks. CLEAR
+\citep{rolnick2019clear} combines off-policy replay with behavioural and value
+cloning towards the replayed behaviour and remains the reference point for
+sequential Atari evaluation \citep{powers2022cora}. RECALL
+\citep{kessler2022recall} pairs multi-head training with adaptive normalisation
+and policy distillation, IQ \citep{kessler2023iq} partitions contexts by online
+clustering to reduce interference between state distributions, and DRAGO
+\citep{zheng2024drago} substitutes synthetic replay and exploration-based
+memory recovery so that raw past-task data need not be stored.
+\textbf{What is left unaddressed.} The buffer is a proxy for the objective
+rather than the objective itself. Replaying a fixed sample encourages the
+policy to reproduce past behaviour, which is not the same as requiring that it
+still achieve past return, and the two come apart as the stored distribution
+drifts from what the current policy would visit. Storage also grows with the
+task sequence unless the buffer is subsampled, at which point the proxy weakens
+further.
+
+\paragraph{Architecture-based methods.}
+These allocate, partition or compose parameters so that tasks interfere less by
+construction. Progressive networks \citep{rusu2016progressive} add a column per
+task with lateral connections to frozen predecessors, PackNet
+\citep{mallya2018packnet} prunes and freezes a subnetwork per task, and MaskNet
+\citep{benavides2022masknet} learns per-task modulation masks over a fixed
+network that can be linearly recombined for new tasks. CompoNet
+\citep{malagon2024componet} makes each new policy a module that attends over
+frozen previous ones, and CKA-RL \citep{hu2025ckarl} maintains a pool of
+task-specific knowledge vectors, adapting a weighted combination of them to
+each new task and merging similar vectors to bound growth.
+\textbf{What is left unaddressed.} Protection is bought with parameters. Frozen
+capacity cannot be overwritten, but neither can it be improved, so positive
+backward transfer is unavailable by construction, and scalability becomes the
+binding concern as the task count grows \citep{hu2025ckarl}. A related point is
+evaluative rather than algorithmic. Methods in this family are normally
+evaluated with a separate output head per task, which removes the most direct
+channel through which a later task can overwrite an earlier one.
+
+\paragraph{Meta-learning based methods.}
+These treat the sequence as a distribution over tasks and optimise for rapid
+adaptation to the next draw. MAML \citep{finn2017maml} trains parameters from
+which a few gradient steps suffice on a new task, MB-MPO
+\citep{clavera2018mbmpo} meta-learns policies robust to an ensemble of learned
+dynamics models, and ESCP \citep{luo2022escp} strengthens context encoding so
+that abrupt environment changes are absorbed quickly.
+\textbf{What is left unaddressed.} The objective is adaptation speed, and
+retention of specific earlier tasks is at best incidental to it. These methods
+are complementary to ours rather than competing with it.
+
+\paragraph{Plasticity-oriented methods.}
+A separate failure mode is the loss of the ability to learn anything new after
+prolonged training. \citet{abbas2023plasticity} show that value-based agents
+cycling through Atari games progressively lose this ability as activations
+sparsify and gradients shrink, and mitigate it by replacing the activation with
+a concatenated ReLU. \citet{dohare2024plasticity} demonstrate the same
+degradation across architectures and optimisers and propose continual
+backpropagation, which continually reinitialises a small fraction of
+low-utility units.
+\textbf{What is left unaddressed.} These methods restore the capacity to
+acquire, not the capacity to hold, and the two failures are separable. We
+report this distinction empirically in Section~\ref{sec:results}, where both
+interventions improve forward transfer and leave backward transfer
+indistinguishable from naive fine-tuning. We make no plasticity claim, and
+neither intervention conflicts with the objective proposed here.
+
+\paragraph{Constrained RL and primal-dual optimisation.}
+Constrained Markov decision processes \citep{altman1999cmdp} pose policy
+optimisation subject to explicit constraints, and are most often solved either
+by trust-region updates that guarantee feasibility \citep{achiam2017cpo} or by
+Lagrangian relaxation with dual ascent on the multiplier
+\citep{tessler2019rcpo}. The dominant application is safety, where the
+constraint bounds an auxiliary cost.
+\textbf{What is left unaddressed.} In that literature the constraint is an
+exogenous budget, fixed in advance and independent of learning. We take the
+same machinery and point it at a comparator that is learned and that moves,
+namely a specialist policy trained on each task as it arrives. To our
+knowledge, retention in continual RL has not previously been posed as a
+constraint of this form.
+
+\paragraph{Evaluation protocols.}
+Continual RL benchmarks differ in ways that strongly affect how much
+interference is possible at all. CORA \citep{powers2022cora} standardises
+sequential Atari with continual evaluation, isolated forgetting and zero-shot
+transfer metrics; Continual World \citep{wolczyk2021continualworld} does the
+same for robotic manipulation; and the benchmark of \citet{hu2025ckarl} draws
+tasks as modes of a single game and assigns each its own output head.
+\textbf{What is left unaddressed.} Both a per-task head and tasks drawn from a
+single game reduce the pressure on shared parameters, the first by removing the
+output layer from contention and the second by making transfer plentiful. A
+method that constrains retention has little room to demonstrate itself under
+either. We return to this in Section~\ref{sec:setup}, where we evaluate under
+settings that relax each property in turn.
+
+\paragraph{Where this work sits.}
+Across the four families, retention is approximated rather than required. It is
+priced by a penalty weight, approximated by a stored sample, or purchased with
+frozen parameters. This paper states it directly. We require that the deployed
+policy remain within a tolerance of a task-specific specialist on every task it
+has seen, and enforce that requirement by primal-dual alternation, so the
+multiplier on each task is set by the optimisation rather than chosen in
+advance. The constraint is one-sided, which distinguishes it from both
+distillation and parameter freezing, since the deployed policy is prevented
+from falling behind a specialist but left free to exceed it. Nothing is stored
+and nothing is frozen, so retention does not compete with capacity as the
+sequence lengthens.
