@@ -10,24 +10,28 @@ two orders' retention matrices as the evidence. Its root cause and any mitigatio
 are out of scope here, so the canonical order is **not** rebuilt in this folder;
 `reports/order_sensitivity/` keeps that material.
 
-## Status, 2026-09-16
+## Status, 2026-09-17
 
-The reversed-order rerun is **in progress**, and this folder shows it mid-flight.
+Three of the four runs are complete. **Ours is the only one still going.**
 
 | Method | Tasks finished | Source |
 |---|---:|---|
-| Min-Max (ours) | 3 / 5 | `data_live.json`, post-threshold-fix |
+| Min-Max (ours) | 4 / 5 | `data_live.json`, post-threshold-fix |
 | CLEAR | 5 / 5 | `../../order_sensitivity/data.json` |
-| CKA-RL | 3 / 5 | `data_live.json`, post-threshold-fix |
-| CompoNet | 2 / 5 | `data_live.json`, post-threshold-fix |
+| CKA-RL | 5 / 5 | `data_live.json`, post-threshold-fix |
+| CompoNet | 5 / 5 | `data_live.json`, post-threshold-fix |
 
-Three caveats that have to travel with any of these figures.
+Caveats that have to travel with any of these figures.
 
-**Only CLEAR has finished.** Its run predates the threshold change, but that
-does not affect it: CLEAR never reached its thresholds on the first four games,
-so it trained to its full budget on them regardless. Only Q\*bert cleared its
-threshold, and Q\*bert is the last task, so nothing earlier is affected. CLEAR
-does not need rerunning.
+**Ours is measured after four tasks, the others after five.** Ours has not yet
+taken the final Q\*bert consolidation, so its numbers are not strictly
+comparable to the three finished runs and the difference runs in ours' favour.
+Every figure says so, and nothing is extrapolated to close the gap.
+
+**CLEAR's run predates the threshold change**, which does not affect it. CLEAR
+never reached its thresholds on the first four games, so it trained to its full
+budget on them regardless. Only Q\*bert cleared its threshold, and Q\*bert is
+the last task, so nothing earlier is affected. CLEAR does not need rerunning.
 
 **The threshold fix landed hard.** Ours' SpaceInvaders went 588.5 → 1318.1 on
 task 1, which is 146% of the joint ceiling. That is the single largest change
@@ -36,7 +40,29 @@ in this tier and it is why the old and new runs are never averaged together.
 **Ours' Breakout shows the value-vs-score gap.** The local phase peaked at 396,
 the value-constraint shortfall reached ≈0, and the greedy diagonal still fell to
 77.6 during consolidation. The constraint is satisfied on `V` while the score
-collapses. Worth stating in the paper rather than leaving for a reviewer.
+collapses. It then recovered to 144.5 after the Pong phase, which is the only
+positive backward transfer any method posts in this tier (+0.24). Worth stating
+in the paper rather than leaving for a reviewer.
+
+### What the two finished baselines did
+
+The two failures are opposite, and between them they frame the stability and
+plasticity trade the method is for.
+
+**CKA-RL forgot almost everything.** Its final row is Space Invaders 212.6,
+Boxing −15.5, Breakout 6.7, Pong −21.0, Q\*bert 4420.5. Boxing and Pong finish
+**below a random policy**. Only the last-learned game survives, and its average
+performance over prior tasks is −0.03, which is the random floor. Backward
+transfer −0.80.
+
+**CompoNet forgot nothing and stopped learning.** Its lower triangle is
+constant by construction, since components freeze, so backward transfer is
+exactly 0.00 on every task. The cost shows up on the diagonal: Breakout reached
+only 99.2 against a threshold of 285, and Q\*bert scored **0.0**, never learned
+at all. Average performance 0.82 over prior tasks against 0.65 over all of them,
+and the whole of that gap is the task it failed to learn.
+
+Ours sits between the two, retaining without freezing.
 
 ## Figures
 
@@ -49,25 +75,28 @@ collapses. Worth stating in the paper rather than leaving for a reviewer.
 `backward_transfer_matrix` and `compute_cost` were dropped. Compute was measured
 across different GPUs per method, so the comparison was never fair.
 
-## How unfinished runs are shown
+## How the unfinished run is shown
 
-Two different rules, on purpose.
+**One rule now, everywhere. Nothing is stood in for.**
 
-**The matrix and the bars pad.** A task a run has not reached is stood in for at
-ours' value, as asked. In `final_scores` every bar is a solid fill in its series
-colour, with no outline on any of them, and the stand-in is marked `‡` on the
-value label. Mixing outlined and un-outlined bars in one panel read as two kinds
-of thing before it read as measured against not. In `forgetting_matrices`, where
-a cell has no label of its own to carry the mark, the stand-in is a faded fill
-with a dotted border plus the `‡`.
+Earlier versions padded a run's unreached tasks at ours' value, which was the
+right call while ours was the most advanced run and the baselines were the ones
+still going. That situation has reversed. Ours is now the only run in flight, so
+the same rule would have put a **different run's** numbers under ours' own name
+in the headline figure: ours' only complete five-task run is the
+pre-threshold-fix one, whose task 1 scored 588.5 against the live run's 1318.1.
 
-**The table does not pad.** Its numbers are *derived*, and padding derived
-numbers manufactures results: pairing ours' live diagonal with a padded final
-row produced a backward transfer of −0.69 on SpaceInvaders for a run whose live
-data shows SpaceInvaders **recovering** 498.5 → 793.2. So every number in the
-table is computed over the tasks that run has actually finished, with the count
-printed under each heading. The columns are therefore not comparable to each
-other, which the footnote says.
+So an unreached task is simply absent. In `forgetting_matrices` ours' last row
+is blank. In `final_scores` ours' Q\*bert slot is empty, with the slot itself
+kept so the bars stay aligned across panels. In `transfer_table` the cell reads
+`·`, and every aggregate is computed over the tasks that run has finished, with
+the count printed under each heading. The columns are therefore not comparable
+to each other, which the footnote says.
+
+**The score axis runs below zero where the data does.** CKA-RL finishes Boxing
+at −15.5 and Pong at −21.0, both under the random floor. A zero-pinned axis drew
+those two bars with no height at all, which read as *not reached* against a
+caption saying exactly that. The floor now follows the data.
 
 ## Forward transfer is unresolved
 

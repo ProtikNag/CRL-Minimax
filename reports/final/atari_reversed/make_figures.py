@@ -145,32 +145,22 @@ def source_matrix(data: dict, live: dict, source: str, name: str) -> np.ndarray:
 
 
 def filled(data: dict, live: dict) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    """Every method as (matrix, measured_mask), missing rows standing in.
+    """Every method as (matrix, measured_mask). Nothing is stood in for.
 
-    The stand-in rule is the one that was asked for: a task a method has not
-    reached is assumed to go as well as it went for ours. Ours' own unreached
-    rows fall back to its completed pre-threshold-fix run, the only five-task
-    run of ours that exists.
+    An earlier version padded a run's unreached rows at ours' value. That rule
+    was right while ours was the most advanced run and the baselines were the
+    ones still going. The situation has since reversed: CLEAR, CKA-RL and
+    CompoNet are all complete and ours is the only run still in flight, so the
+    same rule would put a DIFFERENT run's numbers under ours' own name in the
+    headline figure. Ours' only complete five-task run is the pre-threshold-fix
+    one, whose task 1 scored 588.5 against the live run's 1318.1.
 
-    NOTHING here is measured data for the filled cells, and the mask is what
-    every figure uses to mark them. A figure that cannot mark them must not use
-    this function.
+    Unreached cells are therefore left as NaN and every figure drops them.
     """
-    live_ours = source_matrix(data, live, "live", "ours")
-    old_ours = padded(data["matrices"][f"v5_{ORDER_KEY}"])
-    # Row i of the stand-in: ours' live row if it reached that task, else ours'
-    # completed older run.
-    stand_in = np.where(np.isfinite(live_ours).any(axis=1)[:, None],
-                        live_ours, old_ours)
-
     out = {}
     for key, source, name in PANELS:
         grid = source_matrix(data, live, source, name)
-        measured = np.isfinite(grid).any(axis=1)          # per row
-        complete = np.where(measured[:, None], grid, stand_in)
-        # Mask is per CELL and only true where the run actually produced it.
-        cell_mask = np.isfinite(grid) & measured[:, None]
-        out[key] = (complete, cell_mask)
+        out[key] = (grid, np.isfinite(grid))
     return out
 
 
@@ -284,10 +274,9 @@ def scale_color(fraction: float) -> str:
 def figure_matrices(data: dict) -> None:
     """Retention matrices for all four methods, 2x2, clamped colour.
 
-    Cells a run has not reached yet are stood in for, and every such cell is
-    drawn washed out with a dashed border and a double dagger. The distinction
-    has to survive a reader who only looks at the picture, so it is carried by
-    three redundant channels, not by the caption alone.
+    Cells a run has not reached yet are left blank rather than stood in for, so
+    an empty cell means exactly one thing, that the run has not got there. Ours
+    is the only run still in flight and its last row is the one that is missing.
     """
     live = load_live()
     order = data["orders"][ORDER_KEY]
@@ -312,6 +301,8 @@ def figure_matrices(data: dict) -> None:
         for row_index in range(size):
             for column_index in range(row_index + 1):
                 value = values[row_index, column_index]
+                if not np.isfinite(value):
+                    continue          # that run has not reached this task
                 real = bool(mask[row_index, column_index])
                 # Colour is clamped at the ceiling; the printed number is always
                 # the true value, however far above 100% it runs.
@@ -418,12 +409,14 @@ def figure_final_scores(data: dict) -> None:
     # bar: it is a threshold to clear, and drawing it as another bar made the
     # panel read as a race with no reference at all.
     #
-    # The final row of a method that has not finished is entirely stand-in, so
-    # its bars are hatched. `real` is per game and comes from the mask.
+    # Each method contributes the last row it actually produced. The finished
+    # runs' row is after all five tasks; ours' is after four, and its remaining
+    # column is simply absent rather than filled in from another run.
     series = [("Local", local, np.ones(len(order), dtype=bool))]
     for key, _src, _name in PANELS:
         grid, mask = merged[key]
-        series.append((key, grid[-1], mask[-1]))
+        last_measured = int(np.isfinite(grid).any(axis=1).sum()) - 1
+        series.append((key, grid[last_measured], mask[last_measured]))
 
     # The ceiling value rides in the panel subtitle rather than beside its rule.
     # Beside the rule it either collided with a bar label (Pong: ceiling 20.7
@@ -440,6 +433,18 @@ def figure_final_scores(data: dict) -> None:
         index = column - 1
         for key, values, real_flags in series:
             value = float(values[index])
+            if not np.isfinite(value):
+                # This run has not reached this task. Keep the category so the
+                # bar slots stay in the same place in every panel, and draw
+                # nothing in it. Dropping the trace instead re-flows the group
+                # and pushes the remaining bars off the right edge.
+                fig.add_trace(go.Bar(
+                    x=[NAME[key]], y=[None],
+                    name=NAME[key], legendgroup=key, showlegend=(column == 1),
+                    marker=dict(color=COLOR[key], line=dict(width=0)),
+                    width=0.74, hoverinfo="skip",
+                ), row=1, col=column)
+                continue
             real = bool(real_flags[index])
             # Every bar is one solid fill in its series colour, with no
             # outline. Mixing outlined and un-outlined bars in the same panel
@@ -466,9 +471,16 @@ def figure_final_scores(data: dict) -> None:
         # Bars need headroom for their outside labels; the ceiling rule carries
         # its label beside it and needs far less. Giving the rule the same 1.26
         # headroom as a bar left a third of every panel empty.
-        bar_top = max(float(v[index]) for _k, v, _r in series)
-        top = max(bar_top * 1.16, ceiling * 1.03)
-        fig.update_yaxes(range=[0, top], row=1, col=column)
+        finite = [float(v[index]) for _k, v, _r in series
+                  if np.isfinite(v[index])]
+        top = max(max(finite) * 1.16, ceiling * 1.03)
+        # A score can fall below zero: CKA-RL forgets Boxing to -15.5 and Pong
+        # to -21.0, both under the random floor. Pinning the axis at 0 drew
+        # those bars with no height at all, so they read as "not reached"
+        # against a caption that says a missing bar means exactly that. The
+        # floor follows the data, with room for the label under the bar.
+        bottom = min(0.0, min(finite) * 1.35)
+        fig.update_yaxes(range=[bottom, top], row=1, col=column)
 
     # Q*bert is the one panel where a bar runs away from the ceiling; say by how
     # much rather than leaving the reader to divide two four-digit numbers.
@@ -521,15 +533,15 @@ def figure_final_scores(data: dict) -> None:
     counts = measured_rows(data, live)
     fig.add_annotation(
         x=0, y=0, xref="paper", yref="paper", xshift=-54, yshift=-30,
-        text=(f"Scores after the final task. <b>A value marked {PLACEHOLDER} is "
-              "NOT MEASURED</b>: that run has not reached the end of the "
-              "sequence,<br>"
-              "so the bar stands in at ours' value. Tasks completed: "
+        text=("Each bar is that run's most recent complete evaluation. A "
+              "missing bar is a task it has not reached.<br>"
+              "Nothing is stood in for. Tasks finished, "
               + ", ".join(f"{NAME[k]} {counts[k]}/5" for k, _s, _n in PANELS)
               + ".<br>"
-              "<b>Only CLEAR has finished.</b> Ours has not finished either, so "
-              "ours, CKA-RL and CompoNet stand in at the same<br>"
-              "values and are not distinguishable from each other here."),
+              "<b>Ours is the only run still going</b>, so its bars come after "
+              "four tasks rather than five and have not yet<br>"
+              "taken the final consolidation. They are not strictly comparable "
+              "to the finished runs, and the gap favours ours."),
         showarrow=False, xanchor="left", yanchor="top", align="left",
         font=dict(family=FONT_UI, size=10.5, color=AC["text_muted"]))
     # Tighter top and a taller frame: the bars were a third of the figure and
@@ -902,17 +914,27 @@ def figure_transfer_table(data: dict) -> None:
     # Table footnotes. Without them the "—" cells look like work left undone
     # rather than a measurement this study's design cannot support. Wrapped by
     # hand: Plotly annotations do not reflow.
+    # Typed once as "Only CLEAR is complete", which went stale the moment
+    # CKA-RL and CompoNet finished. Derived from the counts now.
+    done_names = [NAME[k] for k in keys if counts[k] == len(order)]
+    part_names = [f"{NAME[k]} at {counts[k]} of {len(order)}"
+                  for k in keys if counts[k] < len(order)]
+    status = "<b>" + ", ".join(done_names) + " complete"
+    if part_names:
+        status += "; " + ", ".join(part_names)
+    status += ".</b><br>"
+
     footnote = (
         "Normalised as (score − random) / (Joint ceiling − random).<br>"
         "Backward transfer is final − just-learned.<br>"
         "<b>Every number is computed over the tasks that run has finished</b>, "
         "counted under each heading.<br>"
         "Nothing is extrapolated, so the columns are not comparable: a mean "
-        "over 3 tasks is not a mean over 5.<br>"
+        "over fewer tasks is not a mean over five.<br>"
         "· not reached yet.&nbsp;&nbsp;— last task of that run, no backward "
         "transfer by construction.<br>"
-        "<b>Only CLEAR is complete.</b><br>"
-        f"{PENDING_BASE} Forward transfer unresolved. Not measurable from these "
+        + status
+        + f"{PENDING_BASE} Forward transfer unresolved. Not measurable from these "
         "runs (per-task heads, untrained until<br>"
         "&nbsp;&nbsp;&nbsp;that task arrives), and the from-scratch baseline the "
         "AUC form needs is being recomputed.<br>"
