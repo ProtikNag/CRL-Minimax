@@ -24,16 +24,24 @@ storyline and the standing rebuttals live in
   dropped into `main.tex` without touching section content.
 - `\citep` / `\citet` via natbib.
 - Related work is grouped thematically rather than chronologically, following
-  Hu et al. (CKA-RL, NeurIPS 2025), and every family paragraph closes on what
-  that family leaves unaddressed.
+  Hu et al. (CKA-RL, NeurIPS 2025), and every family closes on what it leaves
+  unaddressed.
+
+## Page budget
+
+Nine pages, and the results section is the heavy one. Related work is held to
+roughly half a page, naming only the canonical representative of each family
+and letting the survey carry the rest. Evaluation protocols (CORA, Continual
+World) belong in `sections/setup.tex`, where the benchmark-structure argument
+is made anyway, rather than being covered twice.
 
 ## Before submitting
 
-`references.bib` ends with a block marked **VERIFY BEFORE SUBMISSION**. Those
-entries are cited by CKA-RL, and what `related_work.tex` says about them comes
-from CKA-RL's own description of them, which is reliable. Their bibliographic
-details are not. Check each against the CKA-RL reference list or drop the
-citation.
+`references.bib` ends with a block marked **CURRENTLY UNCITED. VERIFY BEFORE
+USING.** Those entries survive from a longer draft of the related work and
+nothing cites them now, so none reaches the rendered bibliography. Their
+bibliographic details are guesses. Check each against the CKA-RL reference list
+before restoring any citation to them.
 
 ## Build
 
