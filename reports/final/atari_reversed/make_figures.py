@@ -403,6 +403,18 @@ def figure_final_scores(data: dict) -> None:
     joint = reference_in_order(data, "joint", order)
     local = reference_in_order(data, f"local_{ORDER_KEY}", order)
     live = load_live()
+
+    # The cached local-specialist vector belongs to the pre-threshold-fix run.
+    # Task 1 has no prior global to consolidate against, so the specialist's
+    # score and that run's own task-1 diagonal are one measurement, not two: in
+    # the cached run both are 588.5 to the decimal. The identity holds for no
+    # other task (Boxing 98.9 against 96.85, Breakout 363.9 against 293.58,
+    # Q*bert 4341.0 against 4270.25), so only task 1 is refreshed here, from the
+    # live diagonal rather than a typed number. Tasks 2..5 keep their cached
+    # pre-fix values and can only be corrected by re-running the specialists.
+    local = local.copy()
+    local[0] = float(source_matrix(data, live, "live", "ours")[0, 0])
+
     merged = filled(data, live)
 
     # Bars are the four methods plus the specialist. The ceiling is a rule, not a

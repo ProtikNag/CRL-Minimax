@@ -93,6 +93,16 @@ per-task rows at all, and every aggregate in it is computed over the tasks that
 run has finished, with the count printed under each column. The columns are therefore not comparable
 to each other, which the footnote says.
 
+**The local-specialist reference is only partly refreshed.** The cached vector
+belongs to the pre-threshold-fix run. Task 1 has no prior global to consolidate
+against, so the specialist's score and that run's own task-1 diagonal are one
+measurement rather than two, and in the cached run both read 588.5 to the
+decimal. `final_scores` therefore takes task 1 from the live diagonal, 1318.1,
+computed at render time rather than typed. The identity holds for no other task
+(Boxing 98.9 against 96.85, Breakout 363.9 against 293.58, Q\*bert 4341.0
+against 4270.25), so **Boxing, Breakout, Pong and Q\*bert still carry pre-fix
+specialist values** and can only be corrected by re-running the specialists.
+
 **The score axis runs below zero where the data does.** CKA-RL finishes Boxing
 at −15.5 and Pong at −21.0, both under the random floor. A zero-pinned axis drew
 those two bars with no height at all, which read as *not reached* against a
