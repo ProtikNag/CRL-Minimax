@@ -135,12 +135,30 @@ compute.
 
 ## 6. Results
 
-### 6.1 The standard benchmark
-**goal** Establish parity, and that parity is all this tier can establish.
-**flow** Table 1 with our row → third of eleven, winning no column, within 0.026
-of the best → the band is 0.089 wide and fine-tuning sits 0.001 behind us → read
-as a check that the method is not broken on the established setting, then move
-to the settings that can separate methods.
+**Order settled 2026-09-17.** Established benchmark first, then GridWorld, then
+Atari, over a suggestion to lead with GridWorld. Table 1 first sets up a
+question, that the benchmark cannot separate this method from naive fine-tuning,
+and 6.2 is the payoff that answers it. It also establishes standing on the
+field's own benchmark before we ask the reader to accept two settings of our own.
+
+Emphasis on GridWorld is carried by four other levers rather than by order.
+- **The abstract quotes GridWorld's numbers**, 91% against 13% and the only
+  positive backward transfer in the comparison. Table 1 gets one clause.
+- **The learned-vs-retained scatter is Figure 1**, placed in the introduction.
+  Reviewers read figures before sections, which makes this the strongest lever.
+- **6.1 runs a third of a page** against 6.2's full page. Length signals
+  importance more reliably than position does.
+- **The section title and first sentence pre-frame it** as a compatibility
+  check, and it closes with an explicit pointer forward to 6.2.
+
+### 6.1 Compatibility with the established benchmark
+**goal** Establish standing, and pose the question 6.2 answers.
+**flow** We first confirm the method is sound where the field measures → Table 1
+with our row, third of eleven, within 0.026 of the best, winning no column → the
+top six span 0.089 and naive fine-tuning sits 0.0011 behind us → so this
+benchmark cannot separate a method built to prevent forgetting from one that
+does nothing about it → point forward to 6.2, which runs the same two methods
+with the heads shared.
 
 ### 6.2 Shared head, fifty tasks
 **goal** The main result.
