@@ -10,9 +10,10 @@ headline contribution is.
 This document gives you everything you need to form an independent view. It
 describes the algorithm, the three experiment sets and how they differ from each
 other, the results, the objections I expect from reviewers and my prepared
-answers, and my current plan for the paper's structure. At the end there is a
-section marked clearly as **my own opinion**, which you should feel free to
-disagree with, and a list of specific questions.
+answers, and my current plan for the paper's structure. Section 8 carries the
+opinion of **Claude**, the assistant that helped prepare this brief, kept
+separate so you can disagree with it without unpicking the facts. Section 9 says
+what I would like you to produce.
 
 I am collecting opinions from several models before committing. Please be
 direct. If you think the framing is wrong, say so and say why.
@@ -96,7 +97,7 @@ interference is even possible.
   one? With a per-task head, the head cannot be overwritten by later tasks, so
   forgetting can only happen through the shared trunk. Interference is
   structurally suppressed.
-- **Task relatedness.** Are the tasks *modes of the same game*, or genuinely
+- **Task relatedness.** Are the tasks *modes of the same game*, or wholly
   different environments? Modes of one game share states and dynamics, so
   transfer is high and interference is low.
 
@@ -194,26 +195,21 @@ below it. That is a difference in kind rather than in degree.
 the established benchmark. Remove the per-task heads and the same two methods
 differ by 0.335.
 
-**A trade we report rather than hide.** Ours learns each new task to a mean of
-0.25 immediately, where the baselines reach 0.65, and then climbs past all of
-them within two or three phases. So the positive backward transfer is partly
-earned and partly structural, since a task left at 0.25 has more room to improve.
-We address this with a headroom-normalised table, gain as a share of `1 − learned`
-within bins of initial score. Ours is positive in every bin. Every baseline is
-negative in every bin, so they do not merely fail to improve, they give ground
-back regardless of where the task started. Ours is also last of six on forward
-transfer, which is the flip side of the same trade.
-
 ### Setting C, five different Atari games
 
 Scores are normalised by a jointly-trained model's score on each game.
 
-| | Backward transfer | Forgetting | Average performance |
-|---|---:|---:|---:|
-| **SPARC (ours)** | **−0.21** | **0.29** | 0.77 |
-| CLEAR (replay) | −0.62 | 0.62 | 1.07 |
-| CKA-RL | −0.99 | 0.99 | 0.01 |
-| CompoNet | +0.00 | 0.00 | 0.66 |
+| | Backward transfer | Forgetting | Average, all tasks | Average, before the last task |
+|---|---:|---:|---:|---:|
+| **SPARC (ours)** | **−0.21** | **0.29** | 0.77 | 0.70 |
+| CLEAR (replay) | −0.62 | 0.62 | 1.07 | 0.43 |
+| CKA-RL | −0.99 | 0.99 | 0.01 | −0.25 |
+| CompoNet | +0.00 | 0.00 | 0.66 | **0.83** |
+
+The last column excludes the final task in the sequence, which has had nothing
+trained after it and therefore measures capacity rather than retention.
+Including it lets a method that simply overfits the last game post a flattering
+average, which is exactly what happens to CLEAR.
 
 The aggregate table undersells what is interesting here. **The two strongest
 baselines fail in opposite directions, and between them they draw the
@@ -229,8 +225,13 @@ stability-plasticity dilemma about as starkly as a benchmark can.**
   285, and **Q\*bert scored 0.0, never learned at all.** This is a pure
   plasticity failure.
 - **CLEAR's 1.07 average is an artefact** of overfitting the final task. Its
-  Q\*bert score is 3.6× the joint reference while everything before it decayed.
-  Its average over prior tasks only is 0.43.
+  Q\*bert score is 3.6× the joint reference while everything before it decayed,
+  which is why it falls to 0.43 once the last task is excluded.
+
+Note that CompoNet posts the **best** score in the table on tasks before the
+last one, 0.83, precisely because its frozen components cannot be overwritten.
+Its 0.66 overall is what that costs, and the whole of the difference is the game
+it never learned.
 
 Ours is the only method in the comparison that both retains old tasks and keeps
 learning new ones.
@@ -240,21 +241,12 @@ learning new ones.
 ## 5. Limitations we will state
 
 **Task order sensitivity, and it is out of scope for this paper.** Running the
-same five Atari games in the reverse order changes which method looks better.
-Retention over the four tasks learned before the last one, against an
-order-independent joint reference:
-
-| Order | SPARC (ours) | CLEAR |
-|---|---:|---:|
-| Canonical | 43% | **88%** |
-| Reversed | **83%** | 43% |
-
-The lines cross. **We are not more order-robust than CLEAR**, we swing 40 points
-and CLEAR swings 45. We plan to state this plainly in the limitations section,
-show that CKA-RL and CompoNet are susceptible too, include ourselves in that
-figure rather than quietly omitting ourselves, and declare the problem
-field-wide and out of scope here. Diagnosing or fixing order sensitivity is
-future work, not this paper.
+same tasks in a different order changes which method comes out ahead. **Ours is
+order dependent, and so is every baseline we tested**, by comparable margins. We
+have run both orders and have the numbers to show it, and we will present them
+with ourselves included rather than quietly omitting ourselves from the figure.
+The paper will state the problem as field-wide and declare it out of scope.
+Diagnosing or fixing order sensitivity is future work, not this paper.
 
 **Other limitations we will state.**
 
@@ -273,11 +265,11 @@ future work, not this paper.
 
 ### Objection 1. Live past-task environment access is an unfair advantage
 
-This is the big one. We re-enter past environments during consolidation. That is
-a **stronger** assumption than a replay buffer, not a weaker one, and we will say
-so in the abstract rather than bury it.
+We re-enter past environments during consolidation. That is a **stronger**
+assumption than a replay buffer, not a weaker one, and we will say so in the
+abstract rather than bury it.
 
-Three answers, in order of strength.
+Three answers.
 
 1. **The environments are retained for evaluation regardless.** No continual RL
    paper can fill in a forgetting matrix without re-instantiating past tasks
@@ -311,9 +303,11 @@ a result in either direction.
 
 ### Objection 4. The positive backward transfer is a headroom artefact
 
-Answered with the headroom-normalised table described in Section 4, which is
-positive for us in every bin of initial score and negative for every baseline in
-every bin.
+A task left at a low score has more room to improve, so "improved" could in
+principle be mechanical. We measure the gain as a share of the headroom still
+available, within bins of initial score. Ours is positive in every bin. Every
+baseline is negative in every bin, so they do not merely fail to improve, they
+give ground back regardless of where the task started.
 
 ---
 
@@ -360,10 +354,11 @@ the limitations.
 
 ---
 
-## 8. My own opinion, offered separately
+## 8. Claude's opinion, offered separately
 
-*Everything in this section is my view rather than settled fact. It is the part I
-would most like you to push back on.*
+*This section is the opinion of Claude, the assistant that helped prepare this
+brief. It is not mine and it is not settled fact. First person below refers to
+Claude. It is the part I would most like you to push back on.*
 
 **On the framing risk.** There are two coherent ways to tell this story and they
 are in tension.
@@ -378,13 +373,14 @@ are in tension.
   framing the third-place finish stops being a liability and becomes the opening
   evidence.
 
-I lean method-first because the algorithm is genuinely novel and
-diagnosis-first papers often get read as position papers. But I think the
-decision is close, and the single strongest fact in the whole project belongs to
-the diagnosis framing. **On the established benchmark our method and naive
-fine-tuning differ by 0.001. Remove the per-task heads and the gap is 0.335.**
-That sentence justifies the entire experimental program in one line, and under
-method-first it gets buried in a setup section.
+Method-first is the decision and this is not an attempt to reopen it. It is
+recorded so you know what the choice costs, because the single strongest fact in
+the project belongs to the other framing. **On the established benchmark this
+method and naive sequential fine-tuning differ by 0.001. Remove the per-task
+heads and the gap is 0.335.** That one sentence justifies the entire
+experimental program, and under method-first it lands in a setup section rather
+than in the opening. Whoever writes Section 5.1 should treat it as the sentence
+that section exists to carry.
 
 **On what is strongest.** The factorial framing of the two extra settings is, I
 think, the most defensible methodological asset. "We made it harder" invites a
@@ -415,16 +411,29 @@ something a reviewer would otherwise find and weight more heavily than we would.
 
 ## 9. What I would like from you
 
-1. **Method-first or diagnosis-first?** Which framing gives this paper the best
-   chance at ICLR, and why?
-2. **Is the contribution list right**, and in the right order?
-3. **Is the proposed title good?** If not, propose alternatives. I would like
-   the title to foreground the algorithm while hinting at the state of the
-   field.
-4. **Does the three-setting design hold up?** Is the factorial argument as
-   strong as I think, or is there a hole in it?
-5. **How exposed are we on the environment-access assumption?** Is our three-part
-   answer sufficient, and if not what would make it sufficient?
-6. **What is the single biggest weakness** you see in this plan that I have not
-   already named?
-7. **Anything in the results we are underselling or overselling?**
+**Do not grade what is above. Build on it.** One decision is settled and I am not
+looking to reopen it. **The paper is method-first.** The algorithm is the
+headline contribution, and the evaluation settings exist so that it can be seen
+working. Please work inside that.
+
+Write your own version of the following four, from scratch rather than as edits
+to mine.
+
+1. **A contribution list.** Ordered, most important first, phrased the way you
+   would put it in an introduction.
+2. **A storyline.** The argument the paper makes from start to finish, in a
+   paragraph or two. What should a reader believe by the end, and what sequence
+   of claims gets them there?
+3. **A section flow.** Sections and subsections, each with a line on what it is
+   for and how it hands off to the next.
+4. **Title candidates.** Several of them. Foreground the algorithm and hint at
+   the state of the field. Propose your own rather than commenting on mine.
+
+Then, more loosely:
+
+5. **Brainstorm what we have missed.** Framings, analyses, figures, further cuts
+   of the results we already have, or experiments we have not considered.
+   Speculative ideas are welcome, this is the part where I want range rather
+   than caution.
+6. **Where is this plan most exposed** to a sceptical reviewer?
+7. **Anything in the results being undersold or oversold?**
