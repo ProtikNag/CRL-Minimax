@@ -8,17 +8,25 @@ deliberately decline to make.
 
 ## 1. The spine
 
-> Standard continual-RL evaluation suppresses the interference it claims to
-> measure. Remove either of the two mechanisms doing the suppressing and the
-> field's ranking inverts.
+**Revised 2026-09-17. The algorithm is the contribution.** An earlier draft of
+this file made the benchmark diagnosis the spine and the method a consequence.
+That is now inverted at Protik's direction.
 
-The paper is **not** "our method is SOTA". Under that framing, being third on
-the CKA-RL benchmark is a liability. Under the spine above, it is the first
-piece of evidence.
+> Continual RL still loses old tasks whenever capacity is shared. We state
+> retention as an explicit constraint, that the deployed policy stay within
+> epsilon of a specialist on every task it has seen, and solve the resulting
+> min-max problem by primal-dual alternation.
 
-**The single strongest number.** On the CKA-RL benchmark ours and naive
-fine-tuning differ by **0.0011** (0.8670 vs FT-N 0.8659). Remove the per-task
-heads and the gap is **0.335** (0.596 vs 0.261).
+The evaluation contribution is **subordinate and instrumental**. The standard
+benchmark cannot show what the constraint does, so we build two settings that
+can. It motivates the experimental design in Section 5 and returns as a finding
+in Section 7; it is not the opening claim.
+
+**The number that justifies the extra settings.** On the CKA-RL benchmark ours
+and naive fine-tuning differ by **0.0011** (0.8670 vs FT-N 0.8659). Remove the
+per-task heads and the gap is **0.335** (0.596 vs 0.261). Used to explain why a
+third-place finish on a saturated benchmark is uninformative either way, not to
+argue that benchmarks are the paper's subject.
 
 ## 2. The two crutches, as a factorial
 
