@@ -754,9 +754,7 @@ def figure_transfer_table(data: dict) -> None:
     live = load_live()
     counts = measured_rows(data, live)
     keys = [key for key, _s, _n in PANELS]
-    labels = data["labels"]
     order = data["orders"][ORDER_KEY]
-    last = len(order) - 1
 
     # Every number here is computed over the tasks a method has ACTUALLY
     # finished, not over a grid padded with ours' values.
@@ -776,39 +774,17 @@ def figure_transfer_table(data: dict) -> None:
     def cells(fn) -> list[str]:
         return [fn(metrics[key]) for key in keys]
 
-    def row_cells(index: int) -> list[str]:
-        out = []
-        for key in keys:
-            n = counts[key]
-            if index >= n:
-                out.append("·")          # not reached yet
-            elif index == n - 1:
-                out.append("—")          # last task of this run: no BWT by design
-            else:
-                out.append(f"{metrics[key]['bwt'][index]:+.2f}")
-        return out
-
-    # (kind, label, cells...). "tint" cells carry a background.
-    rows: list[tuple] = [("section", "Backward transfer", *[""] * len(keys))]
-    for i, game in enumerate(order):
-        cells_i = row_cells(i)
-        kind = "muted" if all(c in ("—", "·") for c in cells_i) else "tint"
-        rows.append((kind, f"{i + 1}.  {labels[game]}", *cells_i))
-    rows.append(("rule", "", *[""] * len(keys)))
-    # The backward-transfer mean sits with the other aggregates rather than in a
-    # block of its own; it is one summary number among four, not a category.
-    rows.append(("section", "Aggregate, over the tasks each run has finished",
-                 *[""] * len(keys)))
-    rows.append(("plain", "Backward transfer, mean",
-                 *cells(lambda m: f"{m['bwt_mean']:+.2f}")))
-    rows.append(("plain", "Forgetting", *cells(lambda m: f"{m['forgetting']:.2f}")))
-    rows.append(("plain", "Average performance, all finished tasks",
-                 *cells(lambda m: f"{m['ap_all']:.2f}")))
-    rows.append(("plain", "Average performance, prior tasks only",
-                 *cells(lambda m: f"{m['ap_prior']:.2f}")))
-    rows.append(("section", "Forward transfer", *[""] * len(keys)))
-    rows.append(("muted", f"Zero-shot, before training on the task{PENDING_BASE}",
-                 *["—"] * len(keys)))
+    # Four aggregate rows and nothing else. The per-task backward-transfer
+    # block is gone, and with it both section headings: with four rows left
+    # there is no block for a heading to separate. The per-task detail it
+    # carried is already in forgetting_matrices, cell for cell.
+    rows: list[tuple] = [
+        ("plain", "Backward transfer, mean",
+         *cells(lambda m: f"{m['bwt_mean']:+.2f}")),
+        ("plain", "Forgetting", *cells(lambda m: f"{m['forgetting']:.2f}")),
+        ("plain", "Average performance", *cells(lambda m: f"{m['ap_all']:.2f}")),
+        ("muted", f"Forward transfer{PENDING_BASE}", *["—"] * len(keys)),
+    ]
 
     # Geometry in arbitrary units; the axes are hidden and only host the layout.
     # Rows advance a cursor downward by their own height, so a separator costs a
@@ -925,14 +901,12 @@ def figure_transfer_table(data: dict) -> None:
     status += ".</b><br>"
 
     footnote = (
-        "Normalised as (score − random) / (Joint ceiling − random).<br>"
-        "Backward transfer is final − just-learned.<br>"
+        "Normalised as (score − random) / (Joint ceiling − random). Backward "
+        "transfer is final − just-learned.<br>"
         "<b>Every number is computed over the tasks that run has finished</b>, "
-        "counted under each heading.<br>"
-        "Nothing is extrapolated, so the columns are not comparable: a mean "
-        "over fewer tasks is not a mean over five.<br>"
-        "· not reached yet.&nbsp;&nbsp;— last task of that run, no backward "
-        "transfer by construction.<br>"
+        "counted under each column. Nothing is<br>"
+        "extrapolated, so the columns are not comparable. A mean over fewer "
+        "tasks is not a mean over five.<br>"
         + status
         + f"{PENDING_BASE} Forward transfer unresolved. Not measurable from these "
         "runs (per-task heads, untrained until<br>"
@@ -956,7 +930,7 @@ def figure_transfer_table(data: dict) -> None:
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
                       margin=dict(l=16, r=16, t=14, b=10))
 
-    export_pair(fig, "transfer_table", W_FULL, 500)
+    export_pair(fig, "transfer_table", W_FULL, 236)
 
 
 # ── Figure 4: compute cost ──────────────────────────────────────────────────

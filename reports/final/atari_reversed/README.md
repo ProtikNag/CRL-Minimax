@@ -70,7 +70,7 @@ Ours sits between the two, retaining without freezing.
 |---|---|
 | `forgetting_matrices` | Retention matrices, 2×2, all four methods |
 | `final_scores` | Per-game score after the final task, five series |
-| `transfer_table` | Backward transfer and aggregates, four columns |
+| `transfer_table` | Four aggregate metrics per method, no per-task rows |
 
 `backward_transfer_matrix` and `compute_cost` were dropped. Compute was measured
 across different GPUs per method, so the comparison was never fair.
@@ -88,9 +88,9 @@ pre-threshold-fix one, whose task 1 scored 588.5 against the live run's 1318.1.
 
 So an unreached task is simply absent. In `forgetting_matrices` ours' last row
 is blank. In `final_scores` ours' Q\*bert slot is empty, with the slot itself
-kept so the bars stay aligned across panels. In `transfer_table` the cell reads
-`·`, and every aggregate is computed over the tasks that run has finished, with
-the count printed under each heading. The columns are therefore not comparable
+kept so the bars stay aligned across panels. `transfer_table` carries no
+per-task rows at all, and every aggregate in it is computed over the tasks that
+run has finished, with the count printed under each column. The columns are therefore not comparable
 to each other, which the footnote says.
 
 **The score axis runs below zero where the data does.** CKA-RL finishes Boxing
