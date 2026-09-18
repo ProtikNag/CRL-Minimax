@@ -804,7 +804,13 @@ def figure_transfer_table(data: dict) -> None:
         ("plain", "Backward transfer, mean",
          *cells(lambda m: f"{m['bwt_mean']:+.2f}")),
         ("plain", "Forgetting", *cells(lambda m: f"{m['forgetting']:.2f}")),
-        ("plain", "Average performance", *cells(lambda m: f"{m['ap_all']:.2f}")),
+        ("plain", "Average performance, all tasks",
+         *cells(lambda m: f"{m['ap_all']:.2f}")),
+        # The last task has had nothing trained after it, so including it
+        # measures capacity rather than retention and rewards a run that simply
+        # overfits the final game. CLEAR is exactly that case, 1.07 against 0.43.
+        ("plain", "Average performance, before the last task",
+         *cells(lambda m: f"{m['ap_prior']:.2f}")),
         ("muted", f"Forward transfer{PENDING_BASE}", *["—"] * len(keys)),
     ]
 
@@ -931,13 +937,14 @@ def figure_transfer_table(data: dict) -> None:
         "counted under each column. Nothing is<br>"
         "extrapolated, so the columns are not comparable. A mean over fewer "
         "tasks is not a mean over five.<br>"
+        "The last task has nothing trained after it, so the row above it "
+        "excludes it and measures retention alone.<br>"
         + status
-        + f"{PENDING_BASE} Forward transfer unresolved. Not measurable from these "
-        "runs (per-task heads, untrained until<br>"
-        "&nbsp;&nbsp;&nbsp;that task arrives), and the from-scratch baseline the "
-        "AUC form needs is being recomputed.<br>"
-        "&nbsp;&nbsp;&nbsp;Treat every forward-transfer number in this project "
-        "as provisional."
+        + f"{PENDING_BASE} Forward transfer needs two artefacts these runs do "
+        "not have, the within-phase evaluation<br>"
+        "&nbsp;&nbsp;&nbsp;curve for each task and a paired from-scratch run "
+        "over the same sequence. It is reported as<br>"
+        "&nbsp;&nbsp;&nbsp;unmeasured rather than estimated."
     )
     fig.add_annotation(
         x=label_x - 1, y=-body_bottom - 0.5, text=footnote,
@@ -954,7 +961,7 @@ def figure_transfer_table(data: dict) -> None:
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
                       margin=dict(l=16, r=16, t=14, b=10))
 
-    export_pair(fig, "transfer_table", W_FULL, 248)
+    export_pair(fig, "transfer_table", W_FULL, 283)
 
 
 # ── Figure 4: compute cost ──────────────────────────────────────────────────
