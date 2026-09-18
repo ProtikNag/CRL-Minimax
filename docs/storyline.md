@@ -22,10 +22,20 @@ prior context on the project.
 |---|---|
 | Framing | **Method-first.** The algorithm is the headline contribution; the evaluation settings exist so it can be seen working |
 | Method name | **DUEL**, Dual-Policy Expert-Anchored Learning |
-| Title | *DUEL: Primal-Dual Retention Constraints for Continual Reinforcement Learning* |
+| Title | *DUEL: Retention Constraints for Continual Reinforcement Learning Without Parameter Isolation* |
 | Results order | Established benchmark, then GridWorld, then Atari |
 | Order sensitivity | Limitations section, framed as field-wide and out of scope |
 | Scope and cost | Stated in the abstract, not buried in limitations |
+
+**On the title.** "Without parameter isolation" names the *method family*
+(PackNet, ProgNet, CompoNet), not the architecture. The distinction is
+load-bearing. The Atari setting gives each game its own output head, so a tail
+like "without per-task parameters" would be false there, whereas the isolation
+family is genuinely absent from the comparison we claim to win, and the
+abstract's Atari sentence is already scoped to methods that do not expand. Two
+earlier tails were rejected: "under real interference" passes an unearned
+judgment on other people's benchmarks, and abbreviating Reinforcement Learning
+invites an avoidable objection.
 
 **On the results order.** An outside reviewer argued for leading with GridWorld,
 so the reader's first empirical impression would be the strongest evidence rather
