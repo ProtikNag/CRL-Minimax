@@ -1,0 +1,40 @@
+% Abstract.
+%
+% Method-first, per docs/PAPER_OUTLINE.md. Four moves in order:
+%   1. the gap, stated as what the three existing families each substitute for
+%      retention rather than as a list of prior work;
+%   2. the method, with the one-sided constraint and the primal-dual solution;
+%   3. the assumptions, stated here rather than left for a limitations section,
+%      because a reviewer who finds the simulator assumption in an appendix
+%      reads it as concealment;
+%   4. the results, with GridWorld carrying the numbers and the established
+%      benchmark reduced to one clause. That clause does double duty, since
+%      naming what the benchmark suppresses is what motivates the other two
+%      settings without spending a sentence on benchmark critique.
+%
+% Claim discipline, per docs/storyline.md §7: "can substantially mask" rather
+% than any claim that benchmarks fail to measure forgetting, and "among the
+% methods evaluated" rather than field-wide superiority.
+
+\begin{abstract}
+Continual reinforcement learning is meant to preserve earlier tasks, yet
+existing methods only approximate that requirement. Regularisation prices
+retention with a penalty weight fixed before it is known which tasks will come
+under pressure, replay approximates it with a stored sample, and modular methods
+buy it with frozen parameters. We state it directly. DUEL requires the deployed
+policy to stay within a tolerance of a task-specific specialist on every task
+seen so far, and enforces that requirement by primal-dual alternation, so each
+task's multiplier is set by the optimisation rather than chosen in advance. The
+constraint is one-sided, which leaves the policy free to exceed a specialist
+while preventing it from falling behind. DUEL assumes past-task simulators
+remain available, stores no trajectories, and costs roughly 1.4 to 1.8 times the
+cheapest baseline. It is competitive with the state of the art on the
+established benchmark, where per-task output heads and tasks drawn from a single
+game can substantially mask interference. Under one shared head across fifty
+tasks and three seeds it leads the nearest baseline by 0.126 in average
+performance and is the only method evaluated with positive backward transfer,
+$+0.358$ against $-0.187$, with 91\% of tasks ending above the level at which
+they were first learned against 13\% for the nearest competitor. Across five
+unrelated Atari games it is the only method evaluated that both retains the
+earlier games and learns the last.
+\end{abstract}
