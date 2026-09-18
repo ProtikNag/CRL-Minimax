@@ -22,20 +22,36 @@ prior context on the project.
 |---|---|
 | Framing | **Method-first.** The algorithm is the headline contribution; the evaluation settings exist so it can be seen working |
 | Method name | **DUEL**, Dual-Policy Expert-Anchored Learning |
-| Title | *DUEL: Retention Constraints for Continual Reinforcement Learning Without Parameter Isolation* |
+| Title | *Forgetting Returns Without Parameter Isolation: DUEL for Continual Reinforcement Learning* |
 | Results order | Established benchmark, then GridWorld, then Atari |
 | Order sensitivity | Limitations section, framed as field-wide and out of scope |
 | Scope and cost | Stated in the abstract, not buried in limitations |
 
-**On the title.** "Without parameter isolation" names the *method family*
-(PackNet, ProgNet, CompoNet), not the architecture. The distinction is
-load-bearing. The Atari setting gives each game its own output head, so a tail
-like "without per-task parameters" would be false there, whereas the isolation
-family is genuinely absent from the comparison we claim to win, and the
-abstract's Atari sentence is already scoped to methods that do not expand. Two
-earlier tails were rejected: "under real interference" passes an unearned
-judgment on other people's benchmarks, and abbreviating Reinforcement Learning
-invites an avoidable objection.
+**On the title.** Two halves, each doing one job. "Forgetting Returns"
+is the finding, and it is backed rather than rhetorical: on the established
+benchmark the top six methods span 0.089 and naive fine-tuning sits 0.0011
+behind third place, while removing the crutches costs baselines between 0.19 and
+0.51 in backward transfer. "Without Parameter Isolation" names the *method
+family* (PackNet, ProgNet, CompoNet), not the architecture, which is
+load-bearing: the Atari setting gives each game its own output head, so an
+architectural tail such as "without per-task parameters" would be false there,
+whereas the isolation family really is absent from the comparison we claim to
+win.
+
+**Two risks the title carries.** It can be skim-read as *parameter isolation is
+the answer*, which argues for CompoNet rather than for us, and CompoNet does
+post zero forgetting on Atari. The colon structure and the abstract's opening
+handle it, but the paper should never leave that reading standing. The counter
+is already in the results: isolation buys retention by refusing to learn, and
+CompoNet never learns the final game, scoring 0.0 for an all-task average of
+0.66 against our 0.78. Second, "parameter isolation" is a term of art, so the
+abstract names the same family in its own words and the two must not drift
+apart.
+
+**Tails rejected along the way.** "Under real interference" passes an unearned
+judgment on other people's benchmarks. "Without per-task parameters" and
+"without room to grow" are false or misleading for the Atari setting.
+Abbreviating Reinforcement Learning invites an avoidable objection.
 
 **On the results order.** An outside reviewer argued for leading with GridWorld,
 so the reader's first empirical impression would be the strongest evidence rather

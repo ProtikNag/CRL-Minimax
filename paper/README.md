@@ -1,7 +1,7 @@
 # Paper source
 
-ICLR 2026. Working title *DUEL: Retention Constraints for Continual
-Reinforcement Learning Without Parameter Isolation*.
+ICLR 2026. Working title *Forgetting Returns Without Parameter Isolation:
+DUEL for Continual Reinforcement Learning*.
 
 ```
 paper/
@@ -46,11 +46,14 @@ before restoring any citation to them.
 ## Build
 
 ```bash
-cd paper && rm -f main.aux main.bbl main.blg && \
-  pdflatex main && bibtex main && pdflatex main && pdflatex main
+cd paper
+rm -f main.aux main.bbl main.blg
+pdflatex main; bibtex main; pdflatex main; pdflatex main
 ```
 
-Clear the auxiliaries first. Running over a stale `main.aux` makes BibTeX skip
+Separate the steps with `;` rather than `&&`. `pdflatex` exits non-zero on
+warnings alone, so an `&&` chain silently skips the later passes and leaves
+no PDF. Clear the auxiliaries first. Running over a stale `main.aux` makes BibTeX skip
 the bibliography and leaves every citation undefined, which looks like a
 citation bug rather than a build one. Check `main.blg` for BibTeX errors; the
 LaTeX log will not show them.

@@ -25,6 +25,14 @@
 % Freezing guarantees no CHANGE, which is not a required LEVEL, so the surviving
 % claim covers architectural methods too.
 %
+% TITLE ALIGNMENT. The title is "Forgetting Returns Without Parameter
+% Isolation: DUEL for Continual Reinforcement Learning". "Parameter isolation"
+% is a term of art, so the third family above is worded as "isolating parameters
+% by expanding the architecture" to bridge it. If either is reworded, reword
+% both. The title can also be skim-read as endorsing parameter isolation, so
+% the abstract must never leave that reading standing; the Atari sentence's
+% qualifier is what closes it.
+%
 % THE ATARI SENTENCE IS SCOPED, AND THE SCOPE IS LOAD-BEARING. CompoNet retains
 % the earlier games BETTER than we do, 0.83 against 0.67 of ceiling. It does so
 % by expanding the architecture, and it never learns the final game, scoring 0.
@@ -43,7 +51,7 @@ sequence, and learning a new one can reshape the behavior the agent had acquired
 for earlier ones. Although Continual Reinforcement Learning addresses this,
 retention is pursued indirectly in the current literature. Existing methods do
 so by penalizing weight movement, imitating behavior from stored data, or
-expanding the architecture. None of these makes performance on an old task a
+isolating parameters by expanding the architecture. None of these makes performance on an old task a
 constraint the agent is required to meet. We propose \textbf{Dual-Policy
 Expert-Anchored Learning (DUEL)}, which trains a temporary expert on each new
 task and requires the policy it deploys to keep scoring on that task as well as
