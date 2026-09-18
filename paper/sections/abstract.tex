@@ -17,10 +17,20 @@
 %   "Expert-Anchored"       -> the name is defined in place by the clause after
 %                              it, keep scoring as well as the expert did
 %
-% The gap paragraph leads with the shared flaw rather than the three families,
-% so "We make that check the objective" has something specific to answer. The
-% earlier version listed penalty/sample/frozen parameters without saying what
-% went wrong, leaving "To address this" pointing at nothing.
+% THE GAP SENTENCE IS THE ONE TO GET RIGHT. Two false claims have already been
+% cut from it.
+%   "never check whether an old task is still done well" -- flatly untrue.
+%       Every continual-RL paper evaluates old tasks and reports backward
+%       transfer, average performance and forward transfer. The real
+%       distinction is between MEASURING retention after training and REQUIRING
+%       a performance level during it, which is what the paper actually claims.
+%   "decide in advance how much to protect old tasks" -- overclaims. Adaptive
+%       schemes exist, and Fisher weighting is data-driven, so a blanket
+%       "in advance" invites a counterexample.
+% What survives is mechanical and checkable: the three families pursue
+% retention indirectly, and none of them sets a performance level the agent
+% must meet. Freezing guarantees no CHANGE, which is not the same as requiring
+% a LEVEL, so the claim holds for architectural methods too.
 %
 % LENGTH. Theirs is 171 words and this is 253. The difference is mostly
 % honesty: their gap sentence is "existing methods often suffer from
@@ -37,10 +47,10 @@
 Reinforcement learning enables agents to acquire effective behaviour through
 interaction with an environment. However, real-world agents meet tasks in
 sequence, and learning a new one destroys what earlier ones established.
-Although Continual Reinforcement Learning addresses this, its usual remedies
-never check whether an old task is still done well. They decide in advance how
-much to protect old tasks, copy former behaviour from stored data, or freeze
-parameters so a task can never change. We make that check the objective. We
+Although Continual Reinforcement Learning addresses this, retention is pursued
+indirectly, by penalising weight movement, imitating behaviour from stored data,
+or freezing parameters per task. None of these makes performance on an old task
+a level the agent is required to meet. We
 propose Dual-Policy Expert-Anchored Learning (DUEL), which trains a temporary
 expert on each new task, then requires the policy it deploys to keep scoring as
 well on that task as the expert did. Specifically, the deployed policy is
