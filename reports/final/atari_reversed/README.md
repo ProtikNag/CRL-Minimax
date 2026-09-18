@@ -160,14 +160,65 @@ at −15.5 and Pong at −21.0, both under the random floor. A zero-pinned axis 
 those two bars with no height at all, which read as *not reached* against a
 caption saying exactly that. The floor now follows the data.
 
-## Forward transfer is unresolved
+## Forward transfer, provisional
 
-Every forward-transfer figure in this project carries `*`. Two separate reasons:
+`fwt.json` carries the AUC form, `FWT_i = (AUC_i − AUC_i^b) / (1 − AUC_i^b)`,
+computed from each task's local learning curve against a from-scratch
+single-task expert. **These numbers are temporary. A new baseline run is under
+way and will replace them.**
 
-- On Atari it is **not measurable** from these runs. Each task has its own head,
-  untrained until that task arrives, and no task is evaluated before training.
-- The from-scratch baseline that the AUC form needs is being recomputed, so the
-  GridWorld numbers that *are* measurable are provisional too.
+Per game, normalised by the from-scratch expert peak, which is the reference the
+definition calls for rather than the Joint ceiling the rest of this folder uses.
+
+| | SpaceInv | Boxing | Breakout | Pong | Q\*bert | defined on |
+|---|---:|---:|---:|---:|---:|---:|
+| **Min-Max (ours)** | — | — | **+0.26** | — | −0.07 | 2 games |
+| CKA-RL | −0.68 | **+0.31** | −2.43 | — | −0.97 | 4 games |
+| CompoNet | −0.76 | −0.34 | −2.26 | — | −3.79 | 4 games |
+| CLEAR | — | — | — | — | — | no curves logged |
+
+Three separate reasons for the blanks, and they matter.
+
+- **Ours has no curve for Space Invaders or Boxing.** Its run resumed from task
+  3, so those two local phases were never logged. This is a logging gap, not a
+  result.
+- **Pong is ill-conditioned for every method.** The from-scratch expert reaches
+  the normalised ceiling before the comparison window opens, leaving
+  `1 − AUC_b ≈ 0.001`, so the ratio explodes. Excluded rather than reported.
+- **CLEAR logged no learning curves at all**, so it has no entry.
+
+### The matched subset, and why the figure uses it
+
+The per-method means are computed over different game sets, so they cannot be
+read against each other. Ours averages one or two games while the baselines
+average three or four. `transfer_table` therefore shows the **matched subset**,
+Breakout and Q\*bert, the only games all three runs have a usable curve for.
+
+| | matched subset mean |
+|---|---:|
+| **Min-Max (ours)** | **+0.09** |
+| CKA-RL | −1.70 |
+| CompoNet | −3.03 |
+
+**Read this with care, because the subset flatters us in two directions.** It
+excludes the two games ours never logged, which are unmeasured rather than
+known to be good. And it excludes Boxing, which is CKA-RL's only positive game
+at +0.31, dropping its mean from −0.94 across four games to −1.70 across two.
+The figure says so in its footnote.
+
+The alternative normalisation in `fwt.json`, `threshold_ceiling`, is not used
+because its matched subset degenerates to Breakout alone.
+
+### Why every forward-transfer number in this project carries `*`
+
+The from-scratch baseline the AUC form needs is being recomputed, here and in
+the GridWorld tier, so treat all of them as provisional until it lands.
+
+Note this supersedes an earlier claim in this file that Atari forward transfer
+was *not measurable at all*. That was true of the zero-shot form, since each
+task has its own head that stays at its initialisation until the task arrives
+and no task is evaluated before training. The AUC form does not need a zero-shot
+evaluation, only the within-phase curve, which three of the four runs have.
 
 ## Rebuild
 

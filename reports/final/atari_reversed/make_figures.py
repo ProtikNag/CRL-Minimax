@@ -130,6 +130,31 @@ def load_live() -> dict:
     return json.loads(LIVE.read_text(encoding="utf-8"))
 
 
+FWT = HERE / "fwt.json"
+
+# fwt.json method key per panel key. CLEAR logged no learning curves, so it has
+# no forward-transfer entry at all and its cell stays blank.
+FWT_KEY = {"MinMax": "ours", "CkaRl": "cka_rl", "CompoNet": "componet"}
+
+# Forward transfer is defined against a from-scratch single-task run, so the
+# expert peak is the reference its own definition calls for. It is also the only
+# variant with a usable matched subset: under the threshold ceiling ours is left
+# with Breakout alone, against three games for each baseline, and a mean over one
+# game set beside a mean over another is not a comparison.
+FWT_VARIANT = "expert_ceiling"
+
+
+def load_fwt() -> dict:
+    """Provisional forward transfer, computed from the local learning curves.
+
+    Separate from every other number in this folder. It uses a different
+    normalisation (the from-scratch expert peak rather than the Joint ceiling)
+    because that is what the AUC definition references, and it covers only the
+    games for which all three runs produced a usable curve.
+    """
+    return json.loads(FWT.read_text(encoding="utf-8"))
+
+
 def padded(rows: list) -> np.ndarray:
     """Jagged lower-triangular rows -> dense 5x5 with NaN for what is missing."""
     grid = np.full((5, 5), np.nan)
@@ -796,6 +821,17 @@ def figure_transfer_table(data: dict) -> None:
     def cells(fn) -> list[str]:
         return [fn(metrics[key]) for key in keys]
 
+    fwt_per_method = load_fwt()[FWT_VARIANT]["per_method"]
+    fwt_games = fwt_per_method["_matched_subset_games"]
+
+    def fwt_cell(key: str) -> str:
+        """Matched-subset mean, or blank where a run logged no curves."""
+        name = FWT_KEY.get(key)
+        if name is None:
+            return "—"
+        value = fwt_per_method[name].get("matched_subset_mean_FWT")
+        return "—" if value is None else f"{value:+.2f}"
+
     # Four aggregate rows and nothing else. The per-task backward-transfer
     # block is gone, and with it both section headings: with four rows left
     # there is no block for a heading to separate. The per-task detail it
@@ -811,7 +847,8 @@ def figure_transfer_table(data: dict) -> None:
         # overfits the final game. CLEAR is exactly that case, 1.07 against 0.43.
         ("plain", "Average performance, before the last task",
          *cells(lambda m: f"{m['ap_prior']:.2f}")),
-        ("muted", f"Forward transfer{PENDING_BASE}", *["—"] * len(keys)),
+        ("plain", f"Forward transfer{PENDING_BASE}",
+         *[fwt_cell(key) for key in keys]),
     ]
 
     # Geometry in arbitrary units; the axes are hidden and only host the layout.
@@ -940,11 +977,21 @@ def figure_transfer_table(data: dict) -> None:
         "The last task has nothing trained after it, so the row above it "
         "excludes it and measures retention alone.<br>"
         + status
-        + f"{PENDING_BASE} Forward transfer needs two artefacts these runs do "
-        "not have, the within-phase evaluation<br>"
-        "&nbsp;&nbsp;&nbsp;curve for each task and a paired from-scratch run "
-        "over the same sequence. It is reported as<br>"
-        "&nbsp;&nbsp;&nbsp;unmeasured rather than estimated."
+        + f"{PENDING_BASE} <b>Forward transfer is provisional</b>, pending a "
+        "new from-scratch baseline run. Averaged over<br>"
+        "&nbsp;&nbsp;&nbsp;"
+        + " and ".join(data["short_labels"].get(g, g) for g in fwt_games)
+        + " only, the games all three runs have a usable learning curve for. "
+          "Ours logged no<br>"
+          "&nbsp;&nbsp;&nbsp;curve for Space Invaders or Boxing, its run having "
+          "resumed mid-sequence, and Pong is<br>"
+          "&nbsp;&nbsp;&nbsp;ill-conditioned for every method because the "
+          "baseline saturates before the window opens.<br>"
+          "&nbsp;&nbsp;&nbsp;<b>That subset also drops CKA-RL's only positive "
+          "game, so it reads in ours' favour.</b> CLEAR<br>"
+          "&nbsp;&nbsp;&nbsp;logged no curves. Normalised by the from-scratch "
+          "expert peak, as the definition requires,<br>"
+          "&nbsp;&nbsp;&nbsp;not by the Joint ceiling the rows above use."
     )
     fig.add_annotation(
         x=label_x - 1, y=-body_bottom - 0.5, text=footnote,
@@ -961,7 +1008,7 @@ def figure_transfer_table(data: dict) -> None:
     fig.update_layout(title=None, showlegend=False, plot_bgcolor=AC["bg"],
                       margin=dict(l=16, r=16, t=14, b=10))
 
-    export_pair(fig, "transfer_table", W_FULL, 283)
+    export_pair(fig, "transfer_table", W_FULL, 335)
 
 
 # ── Figure 4: compute cost ──────────────────────────────────────────────────
