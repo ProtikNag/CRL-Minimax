@@ -2,67 +2,60 @@
 %
 % Follows the rhythm of Hu et al. (CKA-RL, NeurIPS 2025): broad RL, "However",
 % "Although Continual Reinforcement Learning ...", the proposal, "Specifically",
-% "Additionally", results, code.
+% results, code. Theirs is 171 words; this is 239.
 %
-% PLAIN LANGUAGE IS THE BINDING CONSTRAINT, ahead of length. An earlier draft
-% swapped technical jargon for vague abstraction, which is worse, since
-% "pressure" and "anchors" name nothing at all. Every mechanism is now stated as
-% what literally happens:
-%   primal-dual alternation -> the correction grows with how far a task has
-%                              fallen, so effort goes where ground is being lost
-%   one-sided constraint    -> corrected only when it scores below an expert,
-%                              never pulled back when it scores above
-%   one shared head         -> the network cannot expand to give each task its
-%                              own parameters
-%   "Expert-Anchored"       -> the name is defined in place by the clause after
-%                              it, keep scoring as well as the expert did
+% PLAIN LANGUAGE IS THE BINDING CONSTRAINT, ahead of length. No reader should
+% need to know what primal-dual means, what a one-sided constraint is, or what
+% a shared head is. Each is stated as what literally happens:
+%   one-sided constraint -> corrected only when it scores below an expert,
+%                           never pulled back when it scores above
+%   one shared head      -> the network cannot expand to give each task its
+%                           own parameters
+% An earlier draft swapped the jargon for vague abstraction instead, which is
+% worse: "the pressure applied for each task" and "anchors the deployed policy"
+% name nothing a reader can picture.
 %
-% THE GAP SENTENCE IS THE ONE TO GET RIGHT. Two false claims have already been
-% cut from it.
+% THE GAP SENTENCE IS THE ONE TO GET RIGHT. Two false claims have been cut:
 %   "never check whether an old task is still done well" -- flatly untrue.
 %       Every continual-RL paper evaluates old tasks and reports backward
-%       transfer, average performance and forward transfer. The real
-%       distinction is between MEASURING retention after training and REQUIRING
-%       a performance level during it, which is what the paper actually claims.
+%       transfer, average performance and forward transfer. The real claim is
+%       that none makes a performance level a CONSTRAINT during training.
 %   "decide in advance how much to protect old tasks" -- overclaims. Adaptive
-%       schemes exist, and Fisher weighting is data-driven, so a blanket
-%       "in advance" invites a counterexample.
-% What survives is mechanical and checkable: the three families pursue
-% retention indirectly, and none of them sets a performance level the agent
-% must meet. Freezing guarantees no CHANGE, which is not the same as requiring
-% a LEVEL, so the claim holds for architectural methods too.
+%       schemes exist and Fisher weighting is data-driven.
+% Freezing guarantees no CHANGE, which is not a required LEVEL, so the surviving
+% claim covers architectural methods too.
 %
-% LENGTH. Theirs is 171 words and this is 253. The difference is mostly
-% honesty: their gap sentence is "existing methods often suffer from
-% catastrophic forgetting and inefficient knowledge utilization", which is 12
-% words that assert a problem without naming one. Saying what is actually wrong
-% with three families of method costs about 45. If the budget bites, the
-% cheapest real cut is the Atari sentence (25).
+% THE ATARI SENTENCE IS SCOPED, AND THE SCOPE IS LOAD-BEARING. CompoNet retains
+% the earlier games BETTER than we do, 0.83 against 0.67 of ceiling. It does so
+% by expanding the architecture, and it never learns the final game, scoring 0.
+% So the claim is restricted to fixed-architecture methods, where ours is the
+% only one that both retains and learns: CLEAR reaches 0.43 on prior games and
+% CKA-RL -0.25. Do not drop the qualifier.
 %
-% The two settings make DIFFERENT claims and must not be blurred. GridWorld is
-% the no-per-task-parameters claim. Atari is the task-dissimilarity claim; it
-% does give each game its own head, so it cannot carry the parameter claim too.
+% Deliberately absent: the adaptive-strength mechanism and the revisiting of
+% past environments. Neither is needed to state the contribution, and the
+% multiplier traces do not yet support an adaptive-effort claim.
 
 \begin{abstract}
-Reinforcement learning enables agents to acquire effective behaviour through
-interaction with an environment. However, real-world agents meet tasks in
-sequence, and learning a new one destroys what earlier ones established.
-Although Continual Reinforcement Learning addresses this, retention is pursued
-indirectly, by penalising weight movement, imitating behaviour from stored data,
-or freezing parameters per task. None of these makes performance on an old task
-a level the agent is required to meet. We
-propose Dual-Policy Expert-Anchored Learning (DUEL), which trains a temporary
-expert on each new task, then requires the policy it deploys to keep scoring as
-well on that task as the expert did. Specifically, the deployed policy is
-corrected only when it scores below an expert and never pulled back when it
-scores above, so a task can keep improving after it was learned. Additionally,
-the correction grows with how far a task has fallen, so effort goes where ground
-is being lost, and DUEL stores no past data, revisiting earlier environments
-directly. On the established benchmark DUEL matches state-of-the-art methods,
-and it pulls ahead wherever the network cannot expand to give each task its own
-parameters. Across fifty such tasks it improves average performance by 0.126 and
-ends 91\% of tasks above their initial level, against 13\% for the nearest
-baseline. On five Atari games with high task dissimilarity, a setting the
-literature rarely tests, DUEL alone retains the earlier games while still
-learning the last. The source code will be released.
+Reinforcement learning enables agents to master effective behavior through
+interaction with an environment. However, real-world agents face tasks in
+sequence, and learning a new one can reshape the behavior the agent had acquired
+for earlier ones. Although Continual Reinforcement Learning addresses this,
+retention is pursued indirectly in the current literature. Existing methods do
+so by penalizing weight movement, imitating behavior from stored data, or
+expanding the architecture. None of these makes performance on an old task a
+constraint the agent is required to meet. We propose \textbf{Dual-Policy
+Expert-Anchored Learning (DUEL)}, which trains a temporary expert on each new
+task and requires the policy it deploys to keep scoring on that task as well as
+the expert did. Specifically, the deployed policy is corrected only when it
+scores below an expert and is never pulled back when it scores above, so a task
+can keep improving after it is learned. On the established benchmark, DUEL
+matches state-of-the-art methods, and it pulls ahead whenever the network cannot
+expand to give each task its own parameters. Across fifty such tasks, it
+improves average performance by $0.126$ and ends $91\%$ of tasks above their
+initial performance, against $13\%$ for the nearest baseline. On five Atari
+games with high task dissimilarity, a setting the literature rarely tests, DUEL
+retains the earlier games while still learning the last, which no other
+fixed-architecture method manages. The source code will be provided upon
+acceptance of this work.
 \end{abstract}
