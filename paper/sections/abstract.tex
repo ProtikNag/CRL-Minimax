@@ -1,40 +1,53 @@
 % Abstract.
 %
-% Method-first, per docs/PAPER_OUTLINE.md. Four moves in order:
-%   1. the gap, stated as what the three existing families each substitute for
-%      retention rather than as a list of prior work;
-%   2. the method, with the one-sided constraint and the primal-dual solution;
-%   3. the assumptions, stated here rather than left for a limitations section,
-%      because a reviewer who finds the simulator assumption in an appendix
-%      reads it as concealment;
-%   4. the results, with GridWorld carrying the numbers and the established
-%      benchmark reduced to one clause. That clause does double duty, since
-%      naming what the benchmark suppresses is what motivates the other two
-%      settings without spending a sentence on benchmark critique.
+% Follows the rhythm of Hu et al. (CKA-RL, NeurIPS 2025) beat for beat, so it
+% reads as native to the venue:
+%   1. broad RL, not continual RL, one plain sentence;
+%   2. "However," the non-stationarity that motivates the field;
+%   3. "Although Continual Reinforcement Learning ..., existing methods ...";
+%   4. "To address this, we propose NAME ...";
+%   5. "Specifically, we introduce ..." the first component;
+%   6. an effect sentence saying what that component buys;
+%   7. "Additionally, ..." the second component;
+%   8. "Experiments on three ... demonstrate ..." with concrete numbers;
+%   9. code availability.
 %
-% Claim discipline, per docs/storyline.md §7: "can substantially mask" rather
-% than any claim that benchmarks fail to measure forgetting, and "among the
-% methods evaluated" rather than field-wide superiority.
+% Their abstract is 171 words, so the rhythm comes with an economy the first
+% draft of this one did not have. This is 231, with no sentence over 33 words
+% against their longest of 30.
+%
+% Two deliberate departures from their template. Beat 8 says "matches" rather
+% than "outperforms state-of-the-art methods", since we are third of eleven on
+% the established benchmark, and the clause naming what that benchmark
+% suppresses is what earns the other two settings. The simulator assumption and
+% the compute cost ride in beat 7 rather than waiting for a limitations
+% section, per docs/storyline.md, because a reviewer who finds a
+% stronger-than-replay assumption in an appendix reads it as concealment.
+%
+% Cut for length, and the first thing to restore if room appears: the Atari
+% result, that DUEL alone both retains the earlier games and learns the last.
+% "Three settings" currently carries it implicitly.
 
 \begin{abstract}
-Continual reinforcement learning is meant to preserve earlier tasks, yet
-existing methods only approximate that requirement. Regularisation prices
-retention with a penalty weight fixed before it is known which tasks will come
-under pressure, replay approximates it with a stored sample, and modular methods
-buy it with frozen parameters. We state it directly. DUEL requires the deployed
-policy to stay within a tolerance of a task-specific specialist on every task
-seen so far, and enforces that requirement by primal-dual alternation, so each
-task's multiplier is set by the optimisation rather than chosen in advance. The
-constraint is one-sided, which leaves the policy free to exceed a specialist
-while preventing it from falling behind. DUEL assumes past-task simulators
-remain available, stores no trajectories, and costs roughly 1.4 to 1.8 times the
-cheapest baseline. It is competitive with the state of the art on the
-established benchmark, where per-task output heads and tasks drawn from a single
-game can substantially mask interference. Under one shared head across fifty
-tasks and three seeds it leads the nearest baseline by 0.126 in average
-performance and is the only method evaluated with positive backward transfer,
-$+0.358$ against $-0.187$, with 91\% of tasks ending above the level at which
-they were first learned against 13\% for the nearest competitor. Across five
-unrelated Atari games it is the only method evaluated that both retains the
-earlier games and learns the last.
+Reinforcement learning enables agents to acquire effective behaviour through
+interaction with an environment. However, real-world agents encounter tasks in
+sequence, and learning a new one typically overwrites what earlier ones
+established. Although Continual Reinforcement Learning addresses this setting,
+existing methods only approximate retention, pricing it with a fixed penalty
+weight, approximating it with a stored sample, or purchasing it with frozen
+parameters. To address this, we propose DUEL, a dual-policy method that states
+retention as an explicit constraint rather than a trade-off. Specifically, we
+introduce a specialist shortfall constraint requiring the deployed policy to
+stay within a tolerance of a local specialist trained on each task as it
+arrives. The constraint is one-sided, so the policy cannot fall behind a
+specialist yet may exceed one, which keeps positive backward transfer
+available. Additionally, we enforce it by primal-dual alternation, so each
+task's multiplier is set by the optimisation rather than in advance. DUEL
+stores no trajectories, re-entering past-task simulators at roughly 1.5 times
+the compute of the cheapest baseline. Experiments on three settings show that
+DUEL matches state-of-the-art methods on the established benchmark, where
+per-task heads and same-game tasks can substantially mask interference. Under
+one shared head across fifty tasks it improves average performance by 0.126 and
+ends 91\% of tasks above the level at which they were first learned, against
+13\% for the nearest baseline. The source code will be released.
 \end{abstract}
