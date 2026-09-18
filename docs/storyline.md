@@ -21,7 +21,7 @@ prior context on the project.
 | Decision | Resolution |
 |---|---|
 | Framing | **Method-first.** The algorithm is the headline contribution; the evaluation settings exist so it can be seen working |
-| Method name | **DUEL** |
+| Method name | **DUEL**, Dual-Policy Expert-Anchored Learning |
 | Title | *DUEL: Primal-Dual Retention Constraints for Continual Reinforcement Learning* |
 | Results order | Established benchmark, then GridWorld, then Atari |
 | Order sensitivity | Limitations section, framed as field-wide and out of scope |
@@ -70,26 +70,32 @@ the method below is for.
 
 ## 2. The method, DUEL
 
-**DUEL**, for the dual-policy structure and the primal-dual optimisation that
-enforces its constraint.
+**Dual-Policy Expert-Anchored Learning (DUEL)**. Two policies, and the deployed
+one is anchored to an expert on every task it has seen.
+
+**A note on vocabulary.** The paper itself avoids "primal-dual", "one-sided
+constraint" and "shared head", because no reader of an abstract or introduction
+should need to already know those terms. They are used freely in this document
+and in Section 4 of the paper, but the abstract states each as what literally
+happens. See `paper/sections/abstract.tex`.
 
 **Two policies.** A *local* policy specialises on whatever task has just arrived.
 A *global* policy is the one deployed and evaluated. At the start of each task
-the local policy is initialised from the global, so the specialist is always
+the local policy is initialised from the global, so the expert is always
 reachable from where the deployed policy currently sits.
 
 **The constraint.** For each task *k* the agent has seen, define the shortfall of
-the deployed global policy against that task's specialist
+the deployed global policy against that task's expert
 
 ```
 F_k = [ V_k(local) − V_k(global) ]_+ ^ 2  ≤  ε
 ```
 
-The deployed policy must stay within ε of a specialist on **every** task it has
+The deployed policy must stay within ε of an expert on **every** task it has
 seen. Two details in that form matter.
 
-- **One-sided.** The hinge `[·]_+` means beating the specialist is not a
-  violation. A two-sided constraint would cap the method at specialist
+- **One-sided.** The hinge `[·]_+` means beating the expert is not a
+  violation. A two-sided constraint would cap the method at expert
   performance, throwing away the positive backward transfer that turns out to be
   the main empirical result.
 - **Squared.** Gives a smooth gradient as the shortfall approaches zero.
@@ -256,11 +262,16 @@ level, not only as aggregates.
   score is 3.6× the joint reference while everything before decayed, which is why
   it falls to 0.43 once the last task is excluded.
 
-CompoNet posts the **best** score in the table before the last task, 0.83,
-precisely because frozen components cannot be overwritten. Its 0.66 overall is
-what that costs, and the whole difference is the game it never learned. Ours is
-the only method among those evaluated that both retains old tasks and keeps
-learning new ones.
+**CompoNet posts the best retention in the table, 0.83 against our 0.67**,
+precisely because frozen components cannot be overwritten. It buys that by
+expanding the architecture, and it never learns the final game at all, scoring
+0.0, which is why its all-task average of 0.66 sits below ours at 0.78.
+
+**State the claim with its qualifier.** Among methods that do **not** expand the
+architecture, ours is the only one that both retains the earlier games and
+learns the last: CLEAR reaches 0.43 on prior games and CKA-RL −0.25, against our
+0.67. Dropping "without an expanding architecture" turns a true claim into one a
+reviewer can refute from our own table.
 
 ---
 
@@ -337,10 +348,10 @@ give ground back regardless of where the task started.
 **Contributions**, most to least important.
 
 1. **The method.** Retention stated as an explicit per-task constraint on the
-   deployed policy's shortfall against a specialist, solved by primal-dual
+   deployed policy's shortfall against an expert, solved by primal-dual
    alternation, rather than approximated by a fixed penalty, a replay buffer, or
    a parameter partition. The constraint is one-sided, so the deployed policy is
-   protected from falling behind specialists while remaining free to exceed them.
+   protected from falling behind experts while remaining free to exceed them.
 2. **Two evaluation settings** that remove, one at a time, the two properties
    that suppress interference in the established benchmark, holding the other
    fixed in each.

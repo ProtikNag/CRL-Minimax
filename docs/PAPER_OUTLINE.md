@@ -4,7 +4,7 @@ ICLR 2026. Structure loosely follows NeurIPS convention. Each entry carries a
 one-line goal and a flow. Claims referenced here are held in
 [`PAPER_ARGUMENTS.md`](PAPER_ARGUMENTS.md).
 
-Working method name **SPARC** (SPecialist-Anchored Regret Constraint).
+Working method name **DUEL**, Dual-Policy Expert-Anchored Learning.
 
 **Revised 2026-09-17.** The algorithm is the contribution. The evaluation
 design is instrumental, it exists so the constraint can be seen working, and it
@@ -25,7 +25,7 @@ task's solution has to share capacity with the next one → existing answers
 either store data (replay) or spend parameters (modular growth), and neither
 states retention as a requirement the optimiser must satisfy → we do, as an
 explicit per-task constraint on the deployed policy's shortfall against a
-specialist → the resulting min-max problem is solved by primal-dual alternation
+expert → the resulting min-max problem is solved by primal-dual alternation
 → one honest complication, the standard benchmark cannot show this working,
 because per-task heads and same-game tasks suppress the interference, so we
 also evaluate where interference is real → contributions.
@@ -84,15 +84,15 @@ evidence.
 **goal** Motivate splitting the roles rather than tuning one policy harder.
 **flow** A single policy must both acquire and hold, and the two pull opposite
 ways → split them → local specialises on the current task, global is deployed →
-local initialises from global each phase, so the specialist is always reachable.
+local initialises from global each phase, so the expert is always reachable.
 
-### 4.2 The specialist shortfall constraint
+### 4.2 The expert shortfall constraint
 **goal** Give the constraint and justify every choice in its form.
-**flow** Define the shortfall of the global against task *k*'s specialist →
-one-sided, because beating the specialist is not a violation and penalising it
-would cap the method at the specialist → squared, for a smooth gradient near
+**flow** Define the shortfall of the global against task *k*'s expert →
+one-sided, because beating the expert is not a violation and penalising it
+would cap the method at the expert → squared, for a smooth gradient near
 zero → epsilon in squared-value units → the feasible set is every policy within
-epsilon of every specialist seen so far.
+epsilon of every expert seen so far.
 
 ### 4.3 Primal-dual optimisation
 **goal** Show how the constraint is enforced, not merely stated.
@@ -174,7 +174,9 @@ in every bin → note CbpNet falling below plain fine-tuning.
 **flow** Five games, disjoint state spaces, one head each → both orders reported
 → retention matrices for four methods → the two baseline failures are opposite,
 CKA-RL forgets to below random while CompoNet freezes and never learns Q\*bert →
-ours is the only method that both retains and keeps learning.
+ours is the only method **without an expanding architecture** that both retains
+and keeps learning. CompoNet retains better, 0.83 against our 0.67, by expanding
+and by never learning the final game. Keep the qualifier.
 
 ### 6.4 Ablations
 **goal** Isolate the objective from the environment access.

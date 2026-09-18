@@ -14,7 +14,7 @@ That is now inverted at Protik's direction.
 
 > Continual RL still loses old tasks whenever capacity is shared. We state
 > retention as an explicit constraint, that the deployed policy stay within
-> epsilon of a specialist on every task it has seen, and solve the resulting
+> epsilon of an expert on every task it has seen, and solve the resulting
 > min-max problem by primal-dual alternation.
 
 The evaluation contribution is **subordinate and instrumental**. The standard
@@ -27,6 +27,47 @@ and naive fine-tuning differ by **0.0011** (0.8670 vs FT-N 0.8659). Remove the
 per-task heads and the gap is **0.335** (0.596 vs 0.261). Used to explain why a
 third-place finish on a saturated benchmark is uninformative either way, not to
 argue that benchmarks are the paper's subject.
+
+## 1b. Claims already cut as false, do not reintroduce
+
+Two formulations of the gap were drafted and killed. Both are the kind a
+reviewer refutes in one line, so they are recorded here rather than left to be
+rediscovered.
+
+**"Existing methods never check whether an old task is still done well."**
+Flatly untrue. Every continual-RL paper evaluates old tasks and reports backward
+transfer, average performance and forward transfer off a forgetting matrix. The
+distinction the paper actually draws is between **measuring** retention after
+training and **requiring** a performance level during it.
+
+**"They decide in advance how much to protect old tasks."** Overclaims.
+Adaptive schemes exist and Fisher weighting is data-driven, so a blanket "in
+advance" invites a counterexample.
+
+**What survives, and why it holds.** Retention is pursued indirectly, by
+penalising weight movement, imitating behaviour from stored data, or expanding
+the architecture, and none of these makes performance on an old task a
+constraint the agent is required to meet. That last clause covers architectural
+methods too, because freezing guarantees no **change**, which is not the same as
+requiring a **level**, and is why those methods cannot improve an old task
+either.
+
+## 1c. Plain language in the abstract and introduction
+
+No reader should need to already know what primal-dual means, what a one-sided
+constraint is, or what a shared head is. Each is stated as what literally
+happens.
+
+| Term | What to write instead |
+|---|---|
+| primal-dual alternation | the correction grows with how far a task has fallen |
+| one-sided constraint | corrected only when it scores below an expert, never pulled back when it scores above |
+| one shared head | the network cannot expand to give each task its own parameters |
+
+The failure mode to avoid is swapping jargon for vague abstraction, which is
+worse. An earlier draft wrote "the pressure applied for each task" and "anchors
+the deployed policy", neither of which names anything a reader can picture. The
+technical vocabulary is correct and belongs in Section 4.
 
 ## 2. The two crutches, as a factorial
 
@@ -111,6 +152,13 @@ in the reversed order only. Report both orders wherever Atari appears.
 | GridWorld, 50 tasks, 3 seeds, 6 methods | **The method claim.** No interval overlap, 0.126 ahead, 91% against 13% |
 | CKA-RL benchmark | The saturation diagnosis |
 | Atari, 5 games, both orders | Interference under genuinely different tasks, plus the order-sensitivity limitation |
+
+**The Atari claim needs its qualifier.** CompoNet retains the earlier games
+better than we do, 0.83 against 0.67 of ceiling, by expanding the architecture
+and by never learning the final game, which it scores 0.0 on. Ours is the only
+method **without an expanding architecture** that both retains and learns, with
+CLEAR at 0.43 on prior games and CKA-RL at −0.25. Unqualified, the claim is
+refutable from our own table.
 
 GridWorld is the only tier with real seeds and it is the one where we dominate.
 Atari single-seed and order-contingent cannot carry a method claim.
