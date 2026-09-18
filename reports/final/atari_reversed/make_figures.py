@@ -1136,6 +1136,391 @@ def figure_compute_cost() -> None:
 
 
 # ── Export ──────────────────────────────────────────────────────────────────
+# ── Supplementary figures, added 2026-09-18 ─────────────────────────────────
+# Four figures from JSON that Hyperion committed. Nothing here re-runs
+# training; every value is read from a tracked file.
+#
+# NORMALISATION. These stay on this folder's scale, `score / Joint ceiling`,
+# rather than the `(raw - random) / (threshold - random)` the source notes use.
+# For ours and CompoNet the two agree to within 0.02. For CKA-RL they do not,
+# -0.25 against -0.03 on the prior-four mean, because CKA-RL's Pong sits at the
+# random floor and only the second form credits it for that. Mixing scales
+# inside one folder was a defect fixed earlier; it is not reintroduced here.
+
+DYNAMICS = HERE / "consolidation_dynamics.json"
+TOPUP = HERE / "boxing_topup_ablation.json"
+
+
+def load_dynamics() -> dict:
+    return json.loads(DYNAMICS.read_text(encoding="utf-8"))
+
+
+def load_topup() -> dict:
+    return json.loads(TOPUP.read_text(encoding="utf-8"))
+
+
+def figure_retention_tradeoff(data: dict) -> None:
+    """Retention before the last task against retention over all of them.
+
+    The gap between the two bars is the whole stability-plasticity story. A
+    method that freezes scores well on the left and pays for it on the right;
+    one that overfits the final task does the reverse.
+    """
+    live = load_live()
+    order = data["orders"][ORDER_KEY]
+    joint = reference_in_order(data, "joint", order)
+    merged = filled(data, live)
+
+    keys = [k for k, _s, _n in PANELS]
+    prior, allt = {}, {}
+    for key in keys:
+        final = merged[key][0][-1] / joint
+        prior[key], allt[key] = float(final[:-1].mean()), float(final.mean())
+
+    fig = go.Figure()
+    for label, values, opacity in (("Before the last task", prior, 1.0),
+                                   ("All tasks", allt, 0.45)):
+        fig.add_trace(go.Bar(
+            x=[NAME[k] for k in keys], y=[values[k] for k in keys],
+            name=label, marker=dict(color=[COLOR[k] for k in keys],
+                                    opacity=opacity, line=dict(width=0)),
+            text=[f"{values[k]:.2f}" for k in keys], textposition="outside",
+            cliponaxis=False,
+            textfont=dict(family=FONT_MONO, size=11, color=AC["text_primary"]),
+            hovertemplate="%{x}: %{y:.3f}<extra></extra>",
+        ))
+
+    fig.add_hline(y=1.0, line=dict(color=COLOR["Joint"], width=1.2, dash="dash"))
+    fig.add_annotation(x=1.0, y=1.0, xref="paper", yref="y", text="Joint ceiling",
+                       showarrow=False, xanchor="right", yanchor="bottom",
+                       font=dict(family=FONT_UI, size=10, color=COLOR["Joint"]))
+    fig.update_yaxes(title=dict(text="retained vs ceiling",
+                                font=dict(family=FONT_UI, size=12,
+                                          color=AC["text_muted"])),
+                     showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
+                     zeroline=True, zerolinecolor=AC["border"], nticks=6,
+                     tickfont=dict(family=FONT_MONO, size=10,
+                                   color=AC["text_muted"]))
+    fig.update_xaxes(showgrid=False, showline=True, linecolor=AC["border"],
+                     tickfont=dict(family=FONT_UI, size=11,
+                                   color=AC["text_primary"]))
+    fig.update_layout(
+        barmode="group", bargap=0.34, bargroupgap=0.08, title=None,
+        margin=dict(l=62, r=16, t=52, b=132),
+        legend=dict(orientation="h", x=0, xanchor="left", y=1.14,
+                    yanchor="bottom", bgcolor="rgba(0,0,0,0)",
+                    font=dict(family=FONT_UI, size=11)),
+    )
+    fig.add_annotation(
+        x=0, y=0, xref="paper", yref="paper", xshift=-50, yshift=-44,
+        text=("Solid is the mean over every task except the last; faded is the "
+              "mean over all five.<br>"
+              "<b>The gap between a pair is the trade.</b> CompoNet leads before "
+              "the last task because frozen components cannot be<br>"
+              "overwritten, and gives it back over all five because it never "
+              "learns Q*bert, scoring 0. CLEAR reverses that, its final<br>"
+              "game reaching 3.6x its ceiling while everything earlier decayed. "
+              "Ours is the only pair that is strong on both."),
+        showarrow=False, xanchor="left", yanchor="top", align="left",
+        font=dict(family=FONT_UI, size=10, color=AC["text_muted"]))
+    export_pair(fig, "retention_tradeoff", W_FULL, 436)
+
+
+def figure_forward_transfer(data: dict) -> None:
+    """Per-game forward transfer, provisional, on the expert-peak scale."""
+    fwt = load_fwt()
+    variant = fwt[FWT_VARIANT]["per_method"]
+    order = data["orders"][ORDER_KEY]
+    labels = data["short_labels"]
+    keys = [k for k in (k for k, _s, _n in PANELS) if k in FWT_KEY]
+
+    fig = go.Figure()
+    for key in keys:
+        per_task = variant[FWT_KEY[key]]["per_task"]
+        values = [per_task.get(g, {}).get("FWT") for g in order]
+        fig.add_trace(go.Bar(
+            x=[labels[g] for g in order],
+            y=[v if v is not None else None for v in values],
+            name=NAME[key], marker=dict(color=COLOR[key], line=dict(width=0)),
+            text=[f"{v:+.2f}" if v is not None else "" for v in values],
+            textposition="outside", cliponaxis=False,
+            textfont=dict(family=FONT_MONO, size=10, color=AC["text_primary"]),
+            hovertemplate="%{x}: %{y:+.3f}<extra></extra>",
+        ))
+
+    # Mark every game that no method could be scored on, so an empty column
+    # reads as "not measurable" rather than as "zero".
+    for index, game in enumerate(order):
+        present = [variant[FWT_KEY[k]]["per_task"].get(game, {}).get("FWT")
+                   for k in keys]
+        if all(v is None for v in present):
+            fig.add_annotation(x=labels[game], y=0, text="not<br>measurable",
+                               showarrow=False, yshift=18,
+                               font=dict(family=FONT_UI, size=9,
+                                         color=AC["text_faint"]))
+
+    fig.add_hline(y=0, line=dict(color=AC["axis"], width=1.1))
+    fig.update_yaxes(title=dict(text="forward transfer",
+                                font=dict(family=FONT_UI, size=12,
+                                          color=AC["text_muted"])),
+                     showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
+                     zeroline=False, nticks=7,
+                     tickfont=dict(family=FONT_MONO, size=10,
+                                   color=AC["text_muted"]))
+    fig.update_xaxes(showgrid=False, showline=True, linecolor=AC["border"],
+                     tickfont=dict(family=FONT_UI, size=11,
+                                   color=AC["text_primary"]))
+    fig.update_layout(
+        barmode="group", bargap=0.3, bargroupgap=0.06, title=None,
+        showlegend=True, margin=dict(l=62, r=16, t=76, b=176),
+        legend=dict(orientation="h", x=0, xanchor="left", y=1.02,
+                    yanchor="bottom", bgcolor="rgba(0,0,0,0)",
+                    font=dict(family=FONT_UI, size=11)),
+    )
+    fig.add_annotation(
+        x=0, y=0, xref="paper", yref="paper", xshift=-50, yshift=-48,
+        text=("<b>Provisional</b>, pending a from-scratch baseline run now in "
+              "progress. Higher is better and zero is parity with<br>"
+              "learning that game alone. <b>On the two games all three methods "
+              "can be scored on, Breakout and Q*bert, ours<br>"
+              "is highest on both</b> and is the only one above zero. CKA-RL's "
+              "+0.31 on Boxing is the only other positive<br>"
+              "value, on a game ours has no curve for. A missing bar is a game "
+              "that method has no usable curve for:<br>"
+              "ours logged none for Space Invaders or Boxing, its run having "
+              "resumed mid-sequence, and Pong is<br>"
+              "ill-conditioned for everyone because the baseline saturates "
+              "before the window opens. CLEAR logged no<br>"
+              "curves at all. Single seed, so no error bars. Normalised by the "
+              "from-scratch expert peak, which is the<br>"
+              "reference this definition calls for, not by the Joint ceiling "
+              "the other figures use."),
+        showarrow=False, xanchor="left", yanchor="top", align="left",
+        font=dict(family=FONT_UI, size=10, color=AC["text_muted"]))
+    export_pair(fig, "forward_transfer", W_FULL, 580)
+
+
+def figure_consolidation_dynamics() -> None:
+    """What the constraint actually does, iteration by iteration.
+
+    Three rows, one per consolidated task, and three columns.
+      (a) the deployed value against the expert it is held to, with the
+          multiplier beneath it. This is the mechanism visible: the correction
+          falls to zero wherever the deployed value is already above the
+          expert, and re-engages the moment it drops below.
+      (b) value against greedy score. They come apart, which is the documented
+          limitation of constraining value rather than score.
+      (c) entropy and the PPO trust-region diagnostics, to show consolidation
+          is not destabilising the policy while all this happens.
+    """
+    dynamics = load_dynamics()
+    games = dynamics["games_1indexed"]
+    task_keys = sorted(dynamics["by_task"], key=int)
+
+    titles = []
+    for key in task_keys:
+        titles += [f"{games[key]} · value vs expert",
+                   f"{games[key]} · value vs score",
+                   f"{games[key]} · stability"]
+
+    fig = make_subplots(
+        rows=len(task_keys), cols=3, subplot_titles=titles,
+        horizontal_spacing=0.125, vertical_spacing=0.10,
+        specs=[[{"secondary_y": True}] * 3 for _ in task_keys],
+    )
+
+    # The multiplier is capped at 5. Letting each row autoscale made Q*bert's
+    # saturated multiplier, which sits between 4.98 and 5.00 for the whole
+    # phase, render as violent oscillation. One fixed range across all rows
+    # shows what is true: it pins to the cap and stays there.
+    mu_cap = max(r["mu"] for rows_ in dynamics["by_task"].values() for r in rows_)
+    mu_range = [0, mu_cap * 1.08]
+
+    for row, key in enumerate(task_keys, start=1):
+        rows_ = dynamics["by_task"][key]
+        step = [r["step"] for r in rows_]
+        first = row == 1
+
+        # (a) value against the expert reference, multiplier on the right.
+        fig.add_trace(go.Scatter(
+            x=step, y=[r["V_k_global"] for r in rows_], mode="lines",
+            name="deployed value", legendgroup="v", showlegend=first,
+            line=dict(color=COLOR["MinMax"], width=1.6),
+        ), row=row, col=1)
+        fig.add_trace(go.Scatter(
+            x=step, y=[r["V_k_ref_local"] for r in rows_], mode="lines",
+            name="expert reference", legendgroup="ref", showlegend=first,
+            line=dict(color=AC["text_primary"], width=1.4, dash="dash"),
+        ), row=row, col=1)
+        fig.add_trace(go.Scatter(
+            x=step, y=[r["mu"] for r in rows_], mode="lines",
+            name="multiplier (right)", legendgroup="mu", showlegend=first,
+            line=dict(color=AC["red"], width=1.2),
+        ), row=row, col=1, secondary_y=True)
+        # Explicit ticks, not just a shared range. The global nticks call
+        # below re-picks ticks per axis, which gave each row a different
+        # set and undid the point of sharing the range.
+        fig.update_yaxes(range=mu_range, tickmode="array",
+                         tickvals=[0, 1, 2, 3, 4, 5],
+                         row=row, col=1, secondary_y=True)
+
+        # (b) value against greedy score. Score is evaluated sparsely.
+        fig.add_trace(go.Scatter(
+            x=step, y=[r["V_k_global"] for r in rows_], mode="lines",
+            legendgroup="v", showlegend=False,
+            line=dict(color=COLOR["MinMax"], width=1.6),
+        ), row=row, col=2)
+        scored = [(r["step"], r["greedy_score"]) for r in rows_
+                  if r["greedy_score"] is not None]
+        fig.add_trace(go.Scatter(
+            x=[s for s, _ in scored], y=[g for _, g in scored],
+            mode="lines+markers", name="greedy score (right)",
+            legendgroup="score", showlegend=first,
+            line=dict(color=COLOR["Joint"], width=1.5),
+            marker=dict(size=5, color=COLOR["Joint"]),
+        ), row=row, col=2, secondary_y=True)
+
+        # (c) entropy left, trust-region diagnostics right.
+        fig.add_trace(go.Scatter(
+            x=step, y=[r["entropy"] for r in rows_], mode="lines",
+            name="entropy", legendgroup="ent", showlegend=first,
+            line=dict(color=COLOR["CompoNet"], width=1.5),
+        ), row=row, col=3)
+        for field, colour, group, label in (
+                ("clipfrac", AC["amber"], "clip", "clip fraction (right)"),
+                ("approx_kl", AC["violet"], "kl", "approx KL (right)")):
+            fig.add_trace(go.Scatter(
+                x=step, y=[r[field] for r in rows_], mode="lines",
+                name=label, legendgroup=group, showlegend=first,
+                line=dict(color=colour, width=1.2),
+            ), row=row, col=3, secondary_y=True)
+        fig.update_yaxes(range=[0, 0.32], row=row, col=3, secondary_y=True)
+
+    for column in (1, 2, 3):
+        fig.update_xaxes(title_text="consolidation iteration",
+                         row=len(task_keys), col=column)
+
+    # No y-axis titles. With a secondary axis on every panel they collided with
+    # the neighbouring panel's primary title; the subplot titles and the legend
+    # carry the meaning instead.
+    fig.update_xaxes(showgrid=False, showline=True, linecolor=AC["border"],
+                     tickfont=dict(family=FONT_MONO, size=8.5,
+                                   color=AC["text_muted"]),
+                     title_font=dict(family=FONT_UI, size=9.5,
+                                     color=AC["text_muted"]))
+    fig.update_yaxes(showgrid=True, gridcolor=AC["grid"], gridwidth=0.5,
+                     zeroline=False,
+                     tickfont=dict(family=FONT_MONO, size=8.5,
+                                   color=AC["text_muted"]))
+    for row, _key in enumerate(task_keys, start=1):
+        for column in (1, 2, 3):
+            fig.update_yaxes(nticks=4, row=row, col=column, secondary_y=False)
+        fig.update_yaxes(nticks=4, row=row, col=2, secondary_y=True)
+        fig.update_yaxes(range=mu_range, tickmode="array",
+                         tickvals=[0, 1, 2, 3, 4, 5],
+                         row=row, col=1, secondary_y=True)
+        fig.update_yaxes(range=[0, 0.32], nticks=4,
+                         row=row, col=3, secondary_y=True)
+    for annotation in fig.layout.annotations[:len(titles)]:
+        annotation.font = dict(family=FONT_UI, size=10.5,
+                               color=AC["text_primary"])
+
+    fig.update_layout(
+        title=None, showlegend=True, margin=dict(l=46, r=46, t=104, b=150),
+        legend=dict(orientation="h", x=0, xanchor="left", y=1.035,
+                    yanchor="bottom", bgcolor="rgba(0,0,0,0)",
+                    font=dict(family=FONT_UI, size=10), tracegroupgap=0),
+    )
+    fig.add_annotation(
+        x=0, y=0, xref="paper", yref="paper", xshift=-40, yshift=-52,
+        text=("<b>Left.</b> The multiplier climbs and saturates at its cap of "
+              f"{mu_cap:.0f}, so the constraint is binding hard throughout, "
+              "yet the<br>"
+              "applied coefficient still falls to exactly zero wherever the "
+              "deployed value sits above the expert and re-engages<br>"
+              "the moment it drops back below. That is the one-sidedness "
+              "working. <b>Centre.</b> Value and greedy score come apart,<br>"
+              "which is the documented cost of constraining value rather than "
+              "score; score is evaluated every 200 iterations, so<br>"
+              "it is drawn only where measured. <b>Right.</b> Entropy holds "
+              "and both trust-region diagnostics stay small, so none<br>"
+              "of this is bought with an unstable policy. Ours, seed 0."),
+        showarrow=False, xanchor="left", yanchor="top", align="left",
+        font=dict(family=FONT_UI, size=10, color=AC["text_muted"]))
+    export_pair(fig, "consolidation_dynamics", W_FULL, 712)
+
+
+def figure_boxing_topup() -> None:
+    """Three attempts to recover a forgotten task after the sequence ended."""
+    topup = load_topup()
+    probes = topup["probes"]
+    names = {
+        "10iter_pure": "10 iterations, Boxing only",
+        "100iter_pure": "100 iterations, Boxing only",
+        "100iter_mix40_60": "100 iterations, 40/60 Boxing and rest",
+    }
+    keys = [k for k in ("10iter_pure", "100iter_pure", "100iter_mix40_60")
+            if k in probes]
+    games = [g.replace("atari-", "") for g in probes[keys[0]]["games"]]
+
+    fig = make_subplots(rows=1, cols=len(keys),
+                        subplot_titles=[names[k] for k in keys],
+                        horizontal_spacing=0.07)
+
+    for column, key in enumerate(keys, start=1):
+        delta = probes[key]["delta"]
+        # Boxing is the task being recovered; everything else is collateral.
+        colours = [COLOR["MinMax"] if g == "Boxing" else AC["text_faint"]
+                   for g in games]
+        fig.add_trace(go.Bar(
+            x=games, y=delta, marker=dict(color=colours, line=dict(width=0)),
+            showlegend=False, width=0.66,
+            text=[f"{d:+,.0f}" for d in delta], textposition="outside",
+            cliponaxis=False,
+            textfont=dict(family=FONT_MONO, size=9.5),
+            hovertemplate="%{x}: %{y:+,.1f}<extra></extra>",
+        ), row=1, col=column)
+        fig.add_hline(y=0, line=dict(color=AC["axis"], width=1.0),
+                      row=1, col=column)
+        span = max(abs(min(delta)), abs(max(delta)))
+        fig.update_yaxes(range=[-span * 1.42, span * 1.42], row=1, col=column)
+
+    fig.update_yaxes(title=dict(text="change in greedy-100 score",
+                                font=dict(family=FONT_UI, size=11,
+                                          color=AC["text_muted"])),
+                     row=1, col=1)
+    fig.update_yaxes(showgrid=True, gridcolor=AC["grid"], gridwidth=0.6,
+                     zeroline=False, nticks=5,
+                     tickfont=dict(family=FONT_MONO, size=9,
+                                   color=AC["text_muted"]))
+    fig.update_xaxes(showgrid=False, showline=True, linecolor=AC["border"],
+                     tickangle=-35,
+                     tickfont=dict(family=FONT_UI, size=9.5,
+                                   color=AC["text_primary"]))
+    for annotation in fig.layout.annotations[:len(keys)]:
+        annotation.font = dict(family=FONT_UI, size=11,
+                               color=AC["text_primary"])
+    fig.update_layout(title=None, margin=dict(l=62, r=16, t=56, b=190))
+    fig.add_annotation(
+        x=0, y=0, xref="paper", yref="paper", xshift=-50, yshift=-84,
+        text=("Each panel resumes training from the finished global policy and "
+              "tries to recover Boxing, the one task the<br>"
+              "sequence lost. <b>All three were discarded as net-negative.</b> "
+              "Boxing (blue) moves between +2 and +36 while<br>"
+              "Breakout and Q*bert give up far more, Q*bert alone losing 4,424 "
+              "in the middle panel. Note each panel has its<br>"
+              "own vertical scale. The +625 on Space Invaders in the first "
+              "panel is evaluation noise on a single greedy-100<br>"
+              "run rather than a gain, and it does not survive the longer "
+              "probes. <b>A forgotten task cannot be patched after<br>"
+              "the fact</b>, which is the argument for holding retention during "
+              "the sequence rather than repairing it at the end.<br>"
+              "The reported matrices are unaffected."),
+        showarrow=False, xanchor="left", yanchor="top", align="left",
+        font=dict(family=FONT_UI, size=10, color=AC["text_muted"]))
+    export_pair(fig, "boxing_topup", W_FULL, 534)
+
+
 def export_pair(fig: go.Figure, stem: str, width: int, height: int) -> None:
     """Write ``png/<stem>.png`` and ``svg/<stem>.svg``, both verified non-empty."""
     PNG_DIR.mkdir(parents=True, exist_ok=True)
@@ -1153,6 +1538,10 @@ def main() -> int:
     figure_matrices(data)
     figure_final_scores(data)
     figure_transfer_table(data)
+    figure_retention_tradeoff(data)
+    figure_forward_transfer(data)
+    figure_consolidation_dynamics()
+    figure_boxing_topup()
     return 0
 
 
