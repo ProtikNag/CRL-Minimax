@@ -10,7 +10,7 @@ benchmark, where tasks are modes of one game and each gets its own head.
 
 | Subfolder | Line | Status |
 |-----------|------|--------|
-| `atari_reversed/` | Five-game Atari sequence, reversed order: ours vs CLEAR vs CKA-RL vs CompoNet | **in flight** — CLEAR, CKA-RL and CompoNet complete 5/5; ours at 4/5 |
+| `atari_reversed/` | Five-game Atari sequence, reversed order: ours vs CLEAR vs CKA-RL vs CompoNet | **done** — all four methods complete 5/5 |
 | `gridworld/` | 50-task shared-head GridWorld: ours vs CKA-RL vs CbpNet vs CReLUs vs fine-tuning vs from-scratch | **done** — 6 methods x 3 seeds, 18 complete runs |
 | `cka_rl/` | CKA-RL (NeurIPS 25) benchmark: Meta-World CW20, SpaceInvaders, Freeway | Table 1 + per-mode success done; Meta-World still running |
 

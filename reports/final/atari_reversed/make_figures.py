@@ -543,17 +543,27 @@ def figure_final_scores(data: dict) -> None:
         showlegend=True, hoverinfo="skip",
     ), row=1, col=1)
     counts = measured_rows(data, live)
+    total = len(order)
+    # The caveat is derived, not typed. An earlier version hardcoded "ours is
+    # the only run still going", which went stale the moment ours finished.
+    partial = [k for k, _s, _n in PANELS if counts[k] < total]
+    if partial:
+        caveat = ("<br><b>" + ", ".join(NAME[k] for k in partial)
+                  + (" has" if len(partial) == 1 else " have")
+                  + " not finished the sequence</b>, so those bars come "
+                    "earlier than the rest and have not taken<br>"
+                    "the final consolidation. They are not strictly comparable "
+                    "to the finished runs.")
+    else:
+        caveat = ("<br>Every run has finished the sequence, so all bars are "
+                  "measured after the same number of tasks.")
     fig.add_annotation(
         x=0, y=0, xref="paper", yref="paper", xshift=-54, yshift=-30,
-        text=("Each bar is that run's most recent complete evaluation. A "
-              "missing bar is a task it has not reached.<br>"
-              "Nothing is stood in for. Tasks finished, "
-              + ", ".join(f"{NAME[k]} {counts[k]}/5" for k, _s, _n in PANELS)
-              + ".<br>"
-              "<b>Ours is the only run still going</b>, so its bars come after "
-              "four tasks rather than five and have not yet<br>"
-              "taken the final consolidation. They are not strictly comparable "
-              "to the finished runs, and the gap favours ours."),
+        text=("Each bar is that run's score after its final task. Nothing is "
+              "stood in for and no value<br>"
+              "comes from another run. Tasks finished, "
+              + ", ".join(f"{NAME[k]} {counts[k]}/{total}" for k, _s, _n in PANELS)
+              + "." + caveat),
         showarrow=False, xanchor="left", yanchor="top", align="left",
         font=dict(family=FONT_UI, size=10.5, color=AC["text_muted"]))
     # Tighter top and a taller frame: the bars were a third of the figure and
