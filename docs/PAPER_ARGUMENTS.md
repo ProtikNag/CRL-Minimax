@@ -69,6 +69,26 @@ worse. An earlier draft wrote "the pressure applied for each task" and "anchors
 the deployed policy", neither of which names anything a reader can picture. The
 technical vocabulary is correct and belongs in Section 4.
 
+## 1d. The multiplier adapts, and this is the evidence
+
+The abstract and the method section both claim each task's multiplier is set by
+the optimisation rather than chosen in advance. The dual traces support it
+directly, and across two tiers in opposite directions.
+
+| Tier | Multiplier | Backward transfer |
+|---|---|---:|
+| GridWorld, 50 tasks | zero in ~98% of logged steps, peak 0.007 to 0.02 | **+0.358** |
+| Atari, 5 games | active in all 88 logged steps of all three consolidated tasks, saturated at its cap of 5.0 | −0.26 |
+
+Slack where the constraint is easily satisfied, pinned to the ceiling where it
+is not. A fixed penalty weight cannot do both.
+
+**State it as a sentence, not a figure.** Four figures were built from
+`reports/final/atari_reversed/consolidation_dynamics.json` and all four cut; the
+reasons are recorded in that folder's README. The short version is that a
+one-sided hinge releasing above zero is true by construction, and the tier that
+shows the mechanism is not the tier that shows the payoff.
+
 ## 2. The two crutches, as a factorial
 
 | Tier | Head | Task relatedness |

@@ -125,52 +125,38 @@ means *at random*, not far below it, and a reader has to be told that once.
 | `forgetting_matrices` | Retention matrices, 2×2, all four methods |
 | `final_scores` | Per-game score after the final task, five series |
 | `transfer_table` | Five aggregate metrics per method, no per-task rows |
-| `retention_tradeoff` | Retention before the last task against over all of them, the stability-plasticity trade as one picture |
-| `forward_transfer` | Per-game forward transfer, provisional |
-| `consolidation_dynamics` | What the constraint does per iteration, 3 tasks x 3 views |
-| `boxing_topup` | Three post-hoc recovery attempts, all net-negative |
 
 `backward_transfer_matrix` and `compute_cost` were dropped. Compute was measured
 across different GPUs per method, so the comparison was never fair.
 
-## The supplementary figures
+## What the dynamics log shows, and why it is not a figure
 
-Four figures added 2026-09-18 from JSON Hyperion committed. None re-runs
-training; every value is read from a tracked file.
+`consolidation_dynamics.json` and `boxing_topup_ablation.json` are tracked and
+deliberately unplotted. Four figures were built from them and all four cut.
 
-**They stay on this folder's scale**, `score / Joint ceiling`, not the
-`(raw − random) / (threshold − random)` the source notes use. For ours and
-CompoNet the two agree to within 0.02. For CKA-RL they do not, −0.25 against
-−0.03 on the prior-four mean, because CKA-RL's Pong sits at the random floor and
-only the second form credits it for that. Mixing scales inside one folder was a
-defect fixed earlier and is not reintroduced.
+- **retention_tradeoff, forward_transfer, boxing_topup.** Every number already
+  appears in `transfer_table`. A second rendering of the same values is not a
+  second piece of evidence.
+- **constraint_activity.** The one-sided hinge contributing nothing above zero
+  is true by construction, so plotting it establishes nothing a reader could
+  have doubted. Its only empirical content is that the deployed policy does
+  rise above its expert, 41%, 7% and 22% of the three logged phases. The claim
+  that would justify, that this headroom makes positive backward transfer
+  reachable, cannot be made on this tier, where backward transfer is −0.26 and
+  Boxing ends at 16% of ceiling.
 
-| | prior-4, raw/joint | prior-4, random-normalised | all-5, raw/joint | all-5, random-normalised |
-|---|---:|---:|---:|---:|
-| Ours | 0.670 | 0.685 | 0.779 | 0.794 |
-| CompoNet | 0.827 | 0.829 | 0.662 | 0.655 |
-| CKA-RL | **−0.246** | **−0.034** | **0.010** | **0.181** |
+**One finding from the log does belong in the paper, as a sentence.** The dual
+multiplier is active in every one of the 88 logged steps of all three
+consolidated tasks here, saturating at its cap of 5.0. In the GridWorld runs it
+sits at zero in roughly 98% of steps. The same mechanism is slack in one tier
+and pinned to its ceiling in the other, which is direct evidence for the claim
+that each task's multiplier is set by the optimisation rather than chosen in
+advance. That belongs in the method section, not in a figure.
 
-**`consolidation_dynamics` settles an open question.** The multiplier is active
-in every one of the 88 logged steps of all three consolidated tasks, climbing to
-its cap of 5.0 and staying there. That is the opposite of the GridWorld runs,
-where it sits at zero in roughly 98% of steps. The constraint is slack in one
-tier and saturated in the other, which is worth stating in the paper as evidence
-that the multiplier adapts across regimes rather than sitting at a fixed
-strength. The applied coefficient still drops to exactly zero wherever the
-deployed value is above its expert, so the one-sidedness is visible in the same
-panel.
-
-Its multiplier axis is pinned to a shared range with explicit ticks. Left to
-autoscale, Q\*bert's saturated multiplier, which stays between 4.98 and 5.00 for
-the whole phase, rendered as violent oscillation.
-
-**`forward_transfer` is provisional** and needs a rebuild when the from-scratch
-baseline lands. Note the claim it supports is narrow: on the two games all three
-methods can be scored on, Breakout and Q\*bert, ours is highest on both and the
-only one above zero. CKA-RL's +0.31 on Boxing is the only other positive value,
-on a game ours has no curve for. An earlier draft of the caption claimed ours
-held the only positive value anywhere, which is false.
+Mechanism and outcome sit on different tiers, and it is worth being aware of
+that. GridWorld carries the outcome, +0.358 backward transfer, with a
+multiplier that is near-zero throughout. Atari carries the mechanism, a
+saturated multiplier, with backward transfer at −0.26.
 
 ## Nothing is stood in for
 
