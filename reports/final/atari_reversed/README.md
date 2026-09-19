@@ -229,9 +229,29 @@ label was read as meaning the CKA-RL run *is* the CLEAR baseline. It is not.
 | CLEAR | `CRL-Minimax-joint/results/atari5_clear_order2_seed0` | 505.9, 36.8, 23.9, 11.1, 15350.8 |
 
 The label is now `"CKA-RL"` and the data file carries a `_method_naming` note.
-CKA-RL's forward transfer is computed and in the table at −1.11. CLEAR's is
-blank and stays blank, because its run predates the per-iteration logging and
-lives in a different clone.
+CKA-RL's forward transfer is computed and in the table at −1.11.
+
+### CLEAR's forward transfer is wanted
+
+The blank cell is a real gap, not a presentational choice, and the number is
+wanted. `make_figures.py` already lists CLEAR in `FWT_KEY` and its lookup
+tolerates the missing entry, so the cell fills itself the moment a `"clear"`
+entry appears under `fresh_baseline.<ceiling>.per_method` in `fwt.json`. No
+figure code needs touching.
+
+**Check before rerunning.** The reversed CLEAR run is
+`CRL-Minimax-joint/results/atari5_clear_order2_seed0`, which is where the
+retention numbers in this folder already come from. It has not been inspected
+for per-iteration logs. What the AUC form needs is rows carrying a
+`greedy_score` during each task's own training phase, the same cadence the other
+three reversed runs used, roughly every 200 iterations. If those rows exist the
+number is a computation rather than a run.
+
+Only if they do not is a rerun needed, at roughly 1.5 A100-days. Note that it
+would not widen the matched subset, which is capped at Breakout and Q\*bert by
+our own missing Space Invaders and Boxing curves and by Pong being
+ill-conditioned for every method. CLEAR would be a fourth column over the same
+two games.
 
 ### Which ceiling, and why not the flattering one
 

@@ -133,9 +133,13 @@ def load_live() -> dict:
 
 FWT = HERE / "fwt.json"
 
-# fwt.json method key per panel key. CLEAR logged no learning curves, so it has
-# no forward-transfer entry at all and its cell stays blank.
-FWT_KEY = {"DUEL": "ours", "CkaRl": "cka_rl", "CompoNet": "componet"}
+# fwt.json method key per panel key. CLEAR is listed ahead of its data: as of
+# 2026-09-18 fwt.json has no "clear" entry, because that run predates the
+# per-iteration greedy logging and lives in the CRL-Minimax-joint clone. The
+# lookup below tolerates a missing key, so the cell fills itself the moment one
+# appears and nobody has to remember to edit this file.
+FWT_KEY = {"DUEL": "ours", "CLEAR": "clear",
+           "CkaRl": "cka_rl", "CompoNet": "componet"}
 
 # Forward transfer is defined against a from-scratch single-task run, so the
 # expert peak is the reference its own definition calls for.
@@ -838,11 +842,15 @@ def figure_transfer_table(data: dict) -> None:
     fwt_games = fwt_block["matched_subset_games"]
 
     def fwt_cell(key: str) -> str:
-        """Matched-subset mean, or blank where a run logged no curves."""
+        """Matched-subset mean, or blank where a run has no usable curve.
+
+        Tolerates a method being absent from fwt.json entirely, which is how
+        CLEAR currently reads, rather than raising. A blank here means the
+        number does not exist, never that it was omitted.
+        """
         name = FWT_KEY.get(key)
-        if name is None:
-            return "—"
-        value = fwt_per_method[name].get("matched_subset_mean_FWT")
+        entry = fwt_per_method.get(name) if name else None
+        value = entry.get("matched_subset_mean_FWT") if entry else None
         return "—" if value is None else f"{value:+.2f}"
 
     # Four aggregate rows and nothing else. The per-task backward-transfer
