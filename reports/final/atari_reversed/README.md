@@ -217,6 +217,22 @@ leaving `1 − AUC_b < 0.05`. **CLEAR logged no learning curves at all.**
 all three runs have a usable curve for. Per-method means over different game
 sets are not comparable to each other.
 
+### CLEAR and CKA-RL are different runs
+
+Worth stating plainly, because the two have already been confused once. The
+`cka_rl` entry in `data_live.json` was labelled `"CLEAR / CKA-RL"`, and that
+label was read as meaning the CKA-RL run *is* the CLEAR baseline. It is not.
+
+| | source | final row |
+|---|---|---|
+| CKA-RL | `results/atari5_rev_cka_rl_seed0` | 212.6, −15.5, 6.7, −21.0, 4420.5 |
+| CLEAR | `CRL-Minimax-joint/results/atari5_clear_order2_seed0` | 505.9, 36.8, 23.9, 11.1, 15350.8 |
+
+The label is now `"CKA-RL"` and the data file carries a `_method_naming` note.
+CKA-RL's forward transfer is computed and in the table at −1.11. CLEAR's is
+blank and stays blank, because its run predates the per-iteration logging and
+lives in a different clone.
+
 ### Which ceiling, and why not the flattering one
 
 `fwt.json` offers two normalisations and they disagree on magnitude.

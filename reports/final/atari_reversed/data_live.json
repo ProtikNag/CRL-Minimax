@@ -4,6 +4,7 @@
   "order": ["SpaceInvaders", "Boxing", "Breakout", "Pong", "Qbert"],
   "thresholds": {"SpaceInvaders": 900, "Boxing": 67, "Breakout": 285, "Pong": 20, "Qbert": 4260},
   "random_scores": {"SpaceInvaders": 148.0, "Boxing": 0.1, "Breakout": 1.7, "Pong": -20.7, "Qbert": 163.9},
+  "_method_naming": "The cka_rl entry below is CKA-RL ONLY. It was previously labelled \"CLEAR / CKA-RL\", which led to it being read as the CLEAR run. CLEAR is a separate method and a separate run, CRL-Minimax-joint/results/atari5_clear_order2_seed0, transcribed into reports/order_sensitivity/data.json as matrices.clear_reversed. Their final rows differ: CKA-RL [212.55, -15.46, 6.69, -21.0, 4420.5], CLEAR [505.85, 36.8, 23.9, 11.1, 15350.75].",
   "notes": {
     "breakout_local_peak": 396.0,
     "breakout_ours_consolidated_diag": 77.57,
@@ -33,7 +34,7 @@
       "frames_total": 121241600
     },
     "cka_rl": {
-      "label": "CLEAR / CKA-RL",
+      "label": "CKA-RL",
       "tasks_done": 5,
       "done": true,
       "eval_matrix": [
