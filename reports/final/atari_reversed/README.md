@@ -189,54 +189,48 @@ at −15.5 and Pong at −21.0, both under the random floor. A zero-pinned axis 
 those two bars with no height at all, which read as *not reached* against a
 caption saying exactly that. The floor now follows the data.
 
-## Forward transfer, provisional
+## Forward transfer
 
 `fwt.json` carries the AUC form, `FWT_i = (AUC_i − AUC_i^b) / (1 − AUC_i^b)`,
 computed from each task's local learning curve against a from-scratch
-single-task expert. **These numbers are temporary. A new baseline run is under
-way and will replace them.**
+single-task run. **Use the `fresh_baseline` block.** Its baselines run the exact
+continual configuration, `configs/atari_base_<Game>.yaml` matching
+`configs/atari5_reversed.yaml`, rather than the earlier `experts/` runs the
+top-level blocks used.
 
-Per game, normalised by the from-scratch expert peak, which is the reference the
-definition calls for rather than the Joint ceiling the rest of this folder uses.
+Per game, on the expert-peak scale.
 
-| | SpaceInv | Boxing | Breakout | Pong | Q\*bert | defined on |
+| | SpaceInv | Boxing | Breakout | Pong | Q\*bert | matched subset |
 |---|---:|---:|---:|---:|---:|---:|
-| **Min-Max (ours)** | — | — | **+0.26** | — | −0.07 | 2 games |
-| CKA-RL | −0.68 | **+0.31** | −2.43 | — | −0.97 | 4 games |
-| CompoNet | −0.76 | −0.34 | −2.26 | — | −3.79 | 4 games |
+| **Min-Max (ours)** | — | — | **+0.17** | — | **+0.08** | **+0.13** |
+| CKA-RL | −0.28 | −2.10 | −2.15 | — | −0.07 | −1.11 |
+| CompoNet | −0.34 | −3.96 | −1.99 | — | −0.26 | −1.13 |
 | CLEAR | — | — | — | — | — | no curves logged |
 
-Three separate reasons for the blanks, and they matter.
+Three reasons for the blanks. **Ours has no curve for Space Invaders or
+Boxing**, its run having resumed from task 3, which is a logging gap rather than
+a result. **Pong is ill-conditioned for every method**, since the from-scratch
+baseline reaches the normalised ceiling before the comparison window opens,
+leaving `1 − AUC_b < 0.05`. **CLEAR logged no learning curves at all.**
 
-- **Ours has no curve for Space Invaders or Boxing.** Its run resumed from task
-  3, so those two local phases were never logged. This is a logging gap, not a
-  result.
-- **Pong is ill-conditioned for every method.** The from-scratch expert reaches
-  the normalised ceiling before the comparison window opens, leaving
-  `1 − AUC_b ≈ 0.001`, so the ratio explodes. Excluded rather than reported.
-- **CLEAR logged no learning curves at all**, so it has no entry.
+`transfer_table` shows the matched subset, Breakout and Q\*bert, the only games
+all three runs have a usable curve for. Per-method means over different game
+sets are not comparable to each other.
 
-### The matched subset, and why the figure uses it
+### Which ceiling, and why not the flattering one
 
-The per-method means are computed over different game sets, so they cannot be
-read against each other. Ours averages one or two games while the baselines
-average three or four. `transfer_table` therefore shows the **matched subset**,
-Breakout and Q\*bert, the only games all three runs have a usable curve for.
+`fwt.json` offers two normalisations and they disagree on magnitude.
 
-| | matched subset mean |
-|---|---:|
-| **Min-Max (ours)** | **+0.09** |
-| CKA-RL | −1.70 |
-| CompoNet | −3.03 |
+| matched subset | ours | CKA-RL | CompoNet |
+|---|---:|---:|---:|
+| expert peak (**used**) | +0.13 | −1.11 | −1.13 |
+| threshold | +0.59 | −2.05 | −5.01 |
 
-**Read this with care, because the subset flatters us in two directions.** It
-excludes the two games ours never logged, which are unmeasured rather than
-known to be good. And it excludes Boxing, which is CKA-RL's only positive game
-at +0.31, dropping its mean from −0.94 across four games to −1.70 across two.
-The figure says so in its footnote.
-
-The alternative normalisation in `fwt.json`, `threshold_ceiling`, is not used
-because its matched subset degenerates to Breakout alone.
+The expert peak is used. It is the reference the AUC definition calls for, since
+the whole quantity is measured against from-scratch learning, and it was chosen
+before these numbers existed. The threshold scale is markedly more favourable to
+us, roughly four times the margin, and switching to it after seeing that would
+be picking the scale for its answer. The ordering is the same either way.
 
 ### Why every forward-transfer number in this project carries `*`
 

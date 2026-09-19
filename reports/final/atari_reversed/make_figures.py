@@ -137,11 +137,20 @@ FWT = HERE / "fwt.json"
 FWT_KEY = {"MinMax": "ours", "CkaRl": "cka_rl", "CompoNet": "componet"}
 
 # Forward transfer is defined against a from-scratch single-task run, so the
-# expert peak is the reference its own definition calls for. It is also the only
-# variant with a usable matched subset: under the threshold ceiling ours is left
-# with Breakout alone, against three games for each baseline, and a mean over one
-# game set beside a mean over another is not a comparison.
+# expert peak is the reference its own definition calls for.
+#
+# This choice was made before the fresh baselines landed and is kept unchanged
+# now that they have, because the alternative is the more flattering one. Under
+# the threshold ceiling ours reads +0.59 against -2.05 and -5.01; under the
+# expert ceiling it reads +0.13 against -1.11 and -1.13. Switching after seeing
+# that would be choosing the scale for its answer. Both are in fwt.json and the
+# folder README tabulates them.
 FWT_VARIANT = "expert_ceiling"
+
+# The fresh block supersedes the top-level one. Its baselines are from-scratch
+# single-task runs on the EXACT continual config, configs/atari_base_<Game>.yaml
+# matching configs/atari5_reversed.yaml, rather than the earlier experts/ runs.
+FWT_BLOCK = "fresh_baseline"
 
 
 def load_fwt() -> dict:
@@ -821,8 +830,9 @@ def figure_transfer_table(data: dict) -> None:
     def cells(fn) -> list[str]:
         return [fn(metrics[key]) for key in keys]
 
-    fwt_per_method = load_fwt()[FWT_VARIANT]["per_method"]
-    fwt_games = fwt_per_method["_matched_subset_games"]
+    fwt_block = load_fwt()[FWT_BLOCK][FWT_VARIANT]
+    fwt_per_method = fwt_block["per_method"]
+    fwt_games = fwt_block["matched_subset_games"]
 
     def fwt_cell(key: str) -> str:
         """Matched-subset mean, or blank where a run logged no curves."""
@@ -977,8 +987,8 @@ def figure_transfer_table(data: dict) -> None:
         "The last task has nothing trained after it, so the row above it "
         "excludes it and measures retention alone.<br>"
         + status
-        + f"{PENDING_BASE} <b>Forward transfer is provisional</b>, pending a "
-        "new from-scratch baseline run. Averaged over<br>"
+        + f"{PENDING_BASE} Forward transfer against from-scratch single-task "
+        "runs on the same configuration. Averaged over<br>"
         "&nbsp;&nbsp;&nbsp;"
         + " and ".join(data["short_labels"].get(g, g) for g in fwt_games)
         + " only, the games all three runs have a usable learning curve for. "
@@ -987,11 +997,11 @@ def figure_transfer_table(data: dict) -> None:
           "resumed mid-sequence, and Pong is<br>"
           "&nbsp;&nbsp;&nbsp;ill-conditioned for every method because the "
           "baseline saturates before the window opens.<br>"
-          "&nbsp;&nbsp;&nbsp;<b>That subset also drops CKA-RL's only positive "
-          "game, so it reads in ours' favour.</b> CLEAR<br>"
-          "&nbsp;&nbsp;&nbsp;logged no curves. Normalised by the from-scratch "
-          "expert peak, as the definition requires,<br>"
-          "&nbsp;&nbsp;&nbsp;not by the Joint ceiling the rows above use."
+          "&nbsp;&nbsp;&nbsp;CLEAR logged no curves. Normalised by the "
+          "from-scratch expert peak, as the definition<br>"
+          "&nbsp;&nbsp;&nbsp;requires, not by the Joint ceiling the rows above "
+          "use; the threshold scale in fwt.json is<br>"
+          "&nbsp;&nbsp;&nbsp;more favourable to us and was not adopted."
     )
     fig.add_annotation(
         x=label_x - 1, y=-body_bottom - 0.5, text=footnote,
