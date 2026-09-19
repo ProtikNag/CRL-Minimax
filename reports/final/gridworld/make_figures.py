@@ -54,7 +54,7 @@ RESCUED_FILL = "#DCE7FB"   # learned poorly, ended strong
 LOST_FILL = "#FBDCDC"      # learned strong, ended poorly
 
 METHODS = [
-    ("ours",     "Min-Max (ours)", AC["blue"],       "biggrid50_sh_ours_"),
+    ("ours",     "DUEL (ours)",      AC["blue"],       "biggrid50_sh_ours_"),
     ("cka_rl",   "CKA-RL",         AC["amber"],      "biggrid50_cka_rl_"),
     ("cbp",      "CbpNet",         AC["violet"],     "biggrid50_cbp_"),
     ("crelu",    "CReLUs",         AC["teal"],       "biggrid50_crelu_"),
@@ -141,7 +141,7 @@ def pending_note() -> str:
 
 
 def seed_summary() -> str:
-    """"Min-Max 3, CKA-RL 2, ..." — the complete-seed count per method.
+    """"DUEL 3, CKA-RL 2, ..." — the complete-seed count per method.
 
     Captions state seed counts, and seed counts change every time a run lands.
     Deriving the sentence rather than typing it is what stops a figure from

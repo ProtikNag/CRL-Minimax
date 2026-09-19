@@ -8,7 +8,8 @@ not rebuilt here.
 
 Differences from ``reports/order_sensitivity`` (the exploratory version):
 
-* The method is named **Min-Max** everywhere. The internal "V5" label is gone.
+* The method is named **DUEL** everywhere, short for Dual-Policy
+  Expert-Anchored Learning. The earlier "Min-Max" and "V5" labels are gone.
 * The retention colour scale is **clamped at the ceiling**. Anything at or above
   100% of the Joint ceiling renders as the same blue, so a well-retained 82% is
   no longer dragged toward red by a 360% outlier at the top of the old scale.
@@ -56,7 +57,7 @@ ORDER_KEY = "reversed"
 # deliberately quieter: the specialist is neutral grey, the ceiling is drawn as
 # a rule rather than a bar so it reads as a threshold and not as a competitor.
 COLOR = {
-    "MinMax": AC["blue"],
+    "DUEL": AC["blue"],
     "CLEAR": AC["amber"],
     "CkaRl": AC["violet"],
     "CompoNet": AC["teal"],
@@ -64,7 +65,7 @@ COLOR = {
     "Joint": AC["green"],
 }
 NAME = {
-    "MinMax": "Min-Max (ours)",
+    "DUEL": "DUEL (ours)",
     "CLEAR": "CLEAR",
     "CkaRl": "CKA-RL",
     "CompoNet": "CompoNet",
@@ -76,7 +77,7 @@ NAME = {
 # (key, source, live-name). "cache" reads the completed transcription,
 # "live" reads the in-progress snapshot.
 PANELS = [
-    ("MinMax",   "live",  "ours"),
+    ("DUEL",   "live",  "ours"),
     ("CLEAR",    "cache", "clear_reversed"),
     ("CkaRl",    "live",  "cka_rl"),
     ("CompoNet", "live",  "componet"),
@@ -134,7 +135,7 @@ FWT = HERE / "fwt.json"
 
 # fwt.json method key per panel key. CLEAR logged no learning curves, so it has
 # no forward-transfer entry at all and its cell stays blank.
-FWT_KEY = {"MinMax": "ours", "CkaRl": "cka_rl", "CompoNet": "componet"}
+FWT_KEY = {"DUEL": "ours", "CkaRl": "cka_rl", "CompoNet": "componet"}
 
 # Forward transfer is defined against a from-scratch single-task run, so the
 # expert peak is the reference its own definition calls for.
@@ -653,11 +654,11 @@ def bwt_matrix(data: dict, key: str) -> np.ndarray:
 
 
 def figure_bwt_matrix(data: dict) -> None:
-    """Backward transfer at every phase, Min-Max against CLEAR."""
+    """Backward transfer at every phase, DUEL against CLEAR."""
     order = data["orders"][ORDER_KEY]
     labels = data["short_labels"]
     panels = [
-        (NAME["MinMax"], bwt_matrix(data, f"v5_{ORDER_KEY}")),
+        (NAME["DUEL"], bwt_matrix(data, f"v5_{ORDER_KEY}")),
         (NAME["CLEAR"], bwt_matrix(data, f"clear_{ORDER_KEY}")),
     ]
     axis_labels = [labels[game] for game in order]
@@ -682,7 +683,7 @@ def figure_bwt_matrix(data: dict) -> None:
                 on_diagonal = row_index == column_index
                 # The diagonal is zero by definition, not a measurement, and is
                 # held apart from the scale so it cannot be confused with a
-                # measured zero (Min-Max holds Pong at exactly 0.00).
+                # measured zero (DUEL holds Pong at exactly 0.00).
                 fraction = 0.5 + 0.5 * value / limit
                 fill = AC["surface"] if on_diagonal else sample_scale(
                     BWT_SCALE, fraction)
@@ -1045,7 +1046,7 @@ def figure_compute_cost() -> None:
     clear_values = hours["clear"]
     clear_mean = sum(clear_values) / len(clear_values)
     series = [
-        ("ours", hours["ours"], COLOR["MinMax"], None),
+        ("ours", hours["ours"], COLOR["DUEL"], None),
         ("clear", clear_mean, COLOR["CLEAR"], (min(clear_values), max(clear_values))),
         ("joint", hours["joint"], COLOR["Joint"], None),
     ]
@@ -1062,7 +1063,7 @@ def figure_compute_cost() -> None:
     # it, which says what it is more economically than a label would.
     fig.add_shape(
         type="line", x0=reference, x1=reference, y0=-0.55, y1=len(series) - 0.45,
-        line=dict(color=hex_to_rgba(COLOR["MinMax"], 0.35), width=1.1, dash="dash"),
+        line=dict(color=hex_to_rgba(COLOR["DUEL"], 0.35), width=1.1, dash="dash"),
         layer="below",
     )
 
@@ -1130,7 +1131,7 @@ def figure_compute_cost() -> None:
     )
     fig.add_annotation(
         x=0, y=-0.40, xref="paper", yref="paper",
-        text=("× is relative to Min-Max, marked by the dashed rule. CLEAR's capped span "
+        text=("× is relative to DUEL, marked by the dashed rule. CLEAR's capped span "
               "covers its buffer configurations (36.4–37.3 h).<br>"
               "Single seed, single GPU. Ours sums per-phase training time while "
               "CLEAR and Joint use total elapsed<br>"

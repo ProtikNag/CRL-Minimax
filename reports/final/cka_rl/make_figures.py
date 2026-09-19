@@ -3,7 +3,7 @@
 
 Figure 1 reproduces the structure of the paper's Table 1 (average performance
 and forward transfer across Meta-World, SpaceInvaders and Freeway) with our
-min-max row added.
+DUEL row added.
 
 **Meta-World is left blank for our row**, because that run is still going at a
 reduced budget.
@@ -56,7 +56,7 @@ ENV_ORDER = ["meta_world", "space_invaders", "freeway", "average"]
 # Tints are the palette's selected-region and warning grounds; acviz.AC carries
 # the series and neutral tokens but not these two.
 BAND = {
-    "Min-Max (ours)": ("#EFF6FF", AC["blue"]),
+    "DUEL (ours)": ("#EFF6FF", AC["blue"]),
     "CKA-RL": ("#FEF3C7", AC["amber"]),
 }
 
@@ -102,7 +102,7 @@ def fill_average(rows: list[dict]) -> None:
 
 
 def figure_table1(data: dict) -> None:
-    """Table 1 of the CKA-RL paper with our min-max row added."""
+    """Table 1 of the CKA-RL paper with our DUEL row added."""
     labels = dict(data["environment_labels"])
     rows = list(data["rows"])
     fill_average(rows)

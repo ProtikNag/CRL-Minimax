@@ -16,7 +16,7 @@
     "joint": 13.2
   },
   "labels": {
-    "ours": "Min-Max (ours)",
+    "ours": "DUEL (ours)",
     "clear": "CLEAR",
     "joint": "Joint"
   },

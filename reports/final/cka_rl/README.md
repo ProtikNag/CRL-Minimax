@@ -1,6 +1,6 @@
 # Line 2: CKA-RL (NeurIPS 2025) benchmark comparison
 
-Our min-max method added as a row in the benchmark of Hu et al., *Continual
+Our DUEL method added as a row in the benchmark of Hu et al., *Continual
 Knowledge Adaptation for Reinforcement Learning*, NeurIPS 2025
 (`docs/papers/2025_Hu_CKA_RL_Continual_Knowledge_Adaptation.pdf`). The port lives
 in the separate clone `CKA-RL-compare`, branch `ours-minmax-row`, not in this
@@ -70,7 +70,7 @@ Sorted by the recomputed two-environment average performance:
 |---:|---|---:|---:|
 | 1 | CKA-RL | 0.8925 | 0.7589 |
 | 2 | CompoNet | 0.8729 | 0.7039 |
-| **3** | **Min-Max (ours)** | **0.8670** | **0.6555** |
+| **3** | **DUEL (ours)** | **0.8670** | **0.6555** |
 | 4 | FT-N | 0.8659 | 0.6900 |
 | 5 | CReLUs | 0.8354 | 0.6305 |
 | 6 | CbpNet | 0.8035 | 0.6022 |

@@ -17,7 +17,7 @@ this folder is measured and nothing is extrapolated.
 
 | Method | Tasks finished | Source |
 |---|---:|---|
-| Min-Max (ours) | 5 / 5 | `data_live.json`, post-threshold-fix |
+| DUEL (ours) | 5 / 5 | `data_live.json`, post-threshold-fix |
 | CLEAR | 5 / 5 | `../../order_sensitivity/data.json` |
 | CKA-RL | 5 / 5 | `data_live.json`, post-threshold-fix |
 | CompoNet | 5 / 5 | `data_live.json`, post-threshold-fix |
@@ -96,7 +96,7 @@ that both retains earlier tasks and learns the last one.
 
 | | Backward transfer | Forgetting | Average, all | Average, before last |
 |---|---:|---:|---:|---:|
-| **Min-Max (ours)** | **−0.26** | 0.40 | **0.78** | 0.67 |
+| **DUEL (ours)** | **−0.26** | 0.40 | **0.78** | 0.67 |
 | CLEAR | −0.62 | 0.62 | 1.07 | 0.43 |
 | CKA-RL | −0.99 | 0.99 | 0.01 | −0.25 |
 | CompoNet | +0.00 | **0.00** | 0.66 | **0.83** |
@@ -202,7 +202,7 @@ Per game, on the expert-peak scale.
 
 | | SpaceInv | Boxing | Breakout | Pong | Q\*bert | matched subset |
 |---|---:|---:|---:|---:|---:|---:|
-| **Min-Max (ours)** | — | — | **+0.17** | — | **+0.08** | **+0.13** |
+| **DUEL (ours)** | — | — | **+0.17** | — | **+0.08** | **+0.13** |
 | CKA-RL | −0.28 | −2.10 | −2.15 | — | −0.07 | −1.11 |
 | CompoNet | −0.34 | −3.96 | −1.99 | — | −0.26 | −1.13 |
 | CLEAR | — | — | — | — | — | no curves logged |

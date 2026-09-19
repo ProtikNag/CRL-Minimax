@@ -4,7 +4,7 @@
     "paper_source": "docs/papers/2025_Hu_CKA_RL_Continual_Knowledge_Adaptation.pdf, Table 1 (page 7)",
     "paper_seeds": "10 random seeds; values are mean with the standard deviation the paper prints as a subscript",
     "paper_check": "Transcription verified against the paper's own prose: Avg PERF 0.7196->0.7498 (+4.20%), Avg FWT 0.4674->0.5049 (+8.02%), Meta-World 0.4368->0.4642 (+6.27%), SpaceInvaders PERF 0.9828->0.9928 (+1.02%), Freeway PERF 0.7835->0.7923 (+1.12%), SpaceInvaders FWT 0.6963->0.7749 (+11.29%), Freeway FWT 0.7303->0.7429 (+1.73%).",
-    "ours": "Min-Max min-max consolidation ported into the CKA-RL harness, branch ours-minmax-row of the separate clone CKA-RL-compare. SEED 0 ONLY, so no standard deviation is available and none is invented.",
+    "ours": "DUEL consolidation ported into the CKA-RL harness, branch ours-minmax-row of the separate clone CKA-RL-compare. SEED 0 ONLY, so no standard deviation is available and none is invented.",
     "ours_source": "HANDOFF.md, ACTIVE WORK (2026-09-12). Freeway and SpaceInvaders complete; Meta-World CW20 still running at a reduced delta of 300k steps.",
     "disclosures": [
       "Ours has live past-task environment access; the baselines have none.",
@@ -97,7 +97,7 @@
       "average_paper_3env": [[0.7498, 0.29], [0.5049, 0.17]]
     },
     {
-      "method": "Min-Max (ours)",
+      "method": "DUEL (ours)",
       "ours": true,
       "meta_world":     null,
       "space_invaders": [[0.981, null], [0.650, null]],

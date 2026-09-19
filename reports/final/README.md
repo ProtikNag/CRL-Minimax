@@ -16,7 +16,8 @@ benchmark, where tasks are modes of one game and each gets its own head.
 
 ## Conventions shared by every set
 
-- **The method is called Min-Max.** The internal "V5" version label does not
+- **The method is called DUEL**, short for Dual-Policy Expert-Anchored
+  Learning. The earlier "Min-Max" name and the internal "V5" label do not
   appear in any finalised figure.
 - **No titles inside the artwork.** The caption is set in LaTeX. A baked-in
   title duplicates it and is cropped at typesetting time anyway.

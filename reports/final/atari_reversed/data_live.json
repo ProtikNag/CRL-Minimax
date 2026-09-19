@@ -18,7 +18,7 @@
   },
   "methods": {
     "ours": {
-      "label": "Min-Max (ours)",
+      "label": "DUEL (ours)",
       "policy": "impala_ac_multihead",
       "tasks_done": 5,
       "done": true,

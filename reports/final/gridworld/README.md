@@ -40,7 +40,7 @@ rebuild after any future run updates the figures and their captions together.
 
 | | PERF | Forgetting | BWT | FWT |
 |---|---:|---:|---:|---:|
-| **Min-Max (ours)** | **0.596** ±0.007 | **0.112** ±0.008 | **+0.358** ±0.028 | 0.077 ±0.063 |
+| **DUEL (ours)** | **0.596** ±0.007 | **0.112** ±0.008 | **+0.358** ±0.028 | 0.077 ±0.063 |
 | CKA-RL | 0.470 ±0.040 | 0.237 ±0.028 | −0.187 ±0.039 | 0.162 ±0.037 |
 | CReLUs | 0.328 ±0.043 | 0.391 ±0.057 | −0.359 ±0.057 | **0.179** ±0.066 |
 | Fine-tuning | 0.261 ±0.051 | 0.430 ±0.048 | −0.390 ±0.053 | 0.142 ±0.020 |
@@ -89,7 +89,7 @@ than when it was learned* — and the methods separate completely:
 
 | | tasks that ended **better** |
 |---|---:|
-| **Min-Max (ours)** | **91%** |
+| **DUEL (ours)** | **91%** |
 | CKA-RL | 13% |
 | Fine-tuning | 8% |
 | From-scratch | 6% |
@@ -113,7 +113,7 @@ Each panel shades only the quadrant that characterises its method.
 
 | | points | rescued | lost | lost as a rate |
 |---|---:|---:|---:|---:|
-| **Min-Max (ours)** | 150 | **32** | **0** | **0%** |
+| **DUEL (ours)** | 150 | **32** | **0** | **0%** |
 | CKA-RL | 150 | 0 | 12 | 8% |
 | CReLUs | 150 | 0 | 40 | 27% |
 | Fine-tuning | 150 | 0 | 45 | 30% |
@@ -133,7 +133,7 @@ the gain as a share of the headroom still available (`1 − learned`) rules it o
 
 | | learned < 0.2 | 0.2–0.5 | > 0.5 |
 |---|---:|---:|---:|
-| **Min-Max (ours)** | **+42%** | **+57%** | **+19%** |
+| **DUEL (ours)** | **+42%** | **+57%** | **+19%** |
 | CKA-RL | −6% | −24% | −86% |
 | Fine-tuning | −7% | −38% | −182% |
 | CReLUs | −12% | −34% | −192% |
@@ -155,7 +155,7 @@ The per-task detail behind the aggregate is not flattering in every direction:
 
 | | mean score when just learned | mean score at the end |
 |---|---:|---:|
-| **Min-Max (ours)** | 0.25 | **0.60** |
+| **DUEL (ours)** | 0.25 | **0.60** |
 | CKA-RL | 0.65 | 0.47 |
 | CReLUs | 0.68 | 0.33 |
 | Fine-tuning | 0.64 | 0.26 |
@@ -203,7 +203,7 @@ achievement on different tasks. Median final score:
 
 | | raw | normalised |
 |---|---:|---:|
-| **Min-Max (ours)** | 0.92 | **0.67** |
+| **DUEL (ours)** | 0.92 | **0.67** |
 | CKA-RL | 0.87 | 0.49 |
 | CReLUs | 0.81 | 0.25 |
 | Fine-tuning | 0.80 | 0.20 |
@@ -236,7 +236,7 @@ for the retention ones, which is the trade the method is for.
 
 | | wall-clock | vs ours |
 |---|---:|---:|
-| **Min-Max (ours)** | 244 min | — |
+| **DUEL (ours)** | 244 min | — |
 | From-scratch | 171 min | 0.70× |
 | CKA-RL | 161 min | 0.66× |
 | CReLUs | 159 min | 0.65× |
