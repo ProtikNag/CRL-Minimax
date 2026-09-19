@@ -226,11 +226,36 @@ sets are not comparable to each other.
 | expert peak (**used**) | +0.13 | −1.11 | −1.13 |
 | threshold | +0.59 | −2.05 | −5.01 |
 
-The expert peak is used. It is the reference the AUC definition calls for, since
-the whole quantity is measured against from-scratch learning, and it was chosen
-before these numbers existed. The threshold scale is markedly more favourable to
-us, roughly four times the margin, and switching to it after seeing that would
-be picking the scale for its answer. The ordering is the same either way.
+**The expert peak is used, and the reason is conditioning, not preference.**
+The metric divides by `1 − AUC_b`, and `fwt.json` already nulls anything under
+0.05.
+
+| | AUC_b | 1 − AUC_b | ours FWT |
+|---|---:|---:|---:|
+| Threshold, Breakout | 0.526 | 0.474 | +0.18 |
+| Expert, Breakout | 0.537 | 0.464 | +0.17 |
+| **Threshold, Q\*bert** | 0.780 | **0.220** | **+1.00** |
+| Expert, Q\*bert | 0.181 | 0.819 | +0.08 |
+
+Q\*bert's threshold is 4,260 and ours scored 5,195, so under the threshold scale
+the normalised score clips at 1 for the whole window and the metric returns
+exactly +1.00. That is saturation, not perfect transfer, and 0.220 is heading
+toward the cliff the file already guards against. Under the expert ceiling of
+18,000 the same phase reads +0.08.
+
+Breakout agrees to 0.01 across the two scales, so **the entire four-fold
+difference in the matched-subset mean comes from that one saturated cell.** The
+threshold scale being more favourable to us is therefore an artefact rather than
+a signal, and the principled choice and the conservative one coincide.
+
+**On the folder carrying two scales.** Retention and forward transfer measure
+different things against different references, which is coherent. Retention asks
+how much of the jointly-achievable score survives, so the Joint ceiling is right.
+Forward transfer asks how much faster than learning the task alone, and its
+formula already requires a from-scratch curve in both numerator and denominator,
+so the from-scratch peak keeps that quantity on one reference. Mixing scales
+*within* a quantity was the earlier defect; using the right reference for each
+quantity is not.
 
 ### Why every forward-transfer number in this project carries `*`
 

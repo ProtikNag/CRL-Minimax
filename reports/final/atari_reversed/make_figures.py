@@ -139,12 +139,14 @@ FWT_KEY = {"MinMax": "ours", "CkaRl": "cka_rl", "CompoNet": "componet"}
 # Forward transfer is defined against a from-scratch single-task run, so the
 # expert peak is the reference its own definition calls for.
 #
-# This choice was made before the fresh baselines landed and is kept unchanged
-# now that they have, because the alternative is the more flattering one. Under
-# the threshold ceiling ours reads +0.59 against -2.05 and -5.01; under the
-# expert ceiling it reads +0.13 against -1.11 and -1.13. Switching after seeing
-# that would be choosing the scale for its answer. Both are in fwt.json and the
-# folder README tabulates them.
+# Settled on conditioning, not preference. The metric divides by (1 - AUC_b).
+# Under the threshold ceiling Q*bert gives AUC_b 0.78, so 1 - AUC_b is 0.22 and
+# ours returns exactly +1.00, which is the normalised score clipping at the
+# ceiling rather than perfect transfer: the threshold is 4,260 and ours scored
+# 5,195. Under the expert ceiling the same phase gives 0.82 and +0.08. Breakout
+# agrees to 0.01 across both scales, so the whole four-fold difference in the
+# matched-subset mean is that one saturated cell. The threshold scale is the
+# more flattering one and it is the less sound one.
 FWT_VARIANT = "expert_ceiling"
 
 # The fresh block supersedes the top-level one. Its baselines are from-scratch
